@@ -14,11 +14,18 @@ import {
 import { INITIAL_ASSETS, INITIAL_FOLDERS } from './data/mockAssets';
 import {
   parseFilesToAssets,
+  parseNativeEntriesToAssets,
   pickLocalDirectory,
   scanDirectoryHandle,
   copyImageToClipboard,
   copyTextToClipboard,
 } from './utils/localFileSystem';
+import {
+  isDesktopApp,
+  pickNativeFolder,
+  scanNativeFolder,
+  revealInWindowsExplorer,
+} from './utils/tauriBridge';
 import { writeMetadataBackToAsset } from './utils/metadataWriter';
 import {
   saveDirectoryHandle,
@@ -419,6 +426,38 @@ export default function App() {
 
   // --- Open Folder & Local File System Access ---
   const handleOpenLocalFolder = async () => {
+    // 1. Native Windows 11 Desktop workflow (Tauri v2)
+    if (isDesktopApp()) {
+      try {
+        const nativePath = await pickNativeFolder();
+        if (nativePath) {
+          const folderName = nativePath.split(/[/\\]/).filter(Boolean).pop() || 'Složka';
+          addToast('Prohledávám disk Windows...', folderName, 'info');
+          const entries = await scanNativeFolder(nativePath);
+          const imported = parseNativeEntriesToAssets(entries, folderName);
+          if (imported.length > 0) {
+            setAssets((prev) => [...imported, ...prev]);
+            setSelectedIds(new Set([imported[0].id]));
+            setFocusedId(imported[0].id);
+            setActiveFolder(`/${folderName}`);
+            saveAssetsToIndexedDB(imported);
+            addToast(
+              'Složka načtena přímo z disku',
+              `Načteno ${imported.length} souborů z ${folderName}`
+            );
+            return;
+          } else {
+            addToast('Složka je prázdná', folderName, 'info');
+            return;
+          }
+        }
+        return;
+      } catch (err) {
+        console.warn('Native folder selection fallback to web API:', err);
+      }
+    }
+
+    // 2. Web browser File System Access API workflow
     const result = await pickLocalDirectory();
     if (result && result.files.length > 0) {
       addToast('Analyzuji složku...', `${result.files.length} souborů`, 'info');
@@ -455,6 +494,17 @@ export default function App() {
       folderInputRef.current.click();
     }
   };
+
+  const handleRevealInExplorer = useCallback(async (asset: AssetItem) => {
+    if (!asset.fullPath) return;
+    if (isDesktopApp()) {
+      await revealInWindowsExplorer(asset.fullPath);
+      addToast('Zobrazeno v Průzkumníku', asset.name, 'info');
+    } else {
+      handleCopyPath(asset);
+    }
+  }, [addToast, handleCopyPath]);
+
 
   // Rescan existing saved directory handle from IndexedDB
   const handleRescanSavedDirectory = async (dir: SavedDirectoryRecord) => {
@@ -1003,6 +1053,7 @@ export default function App() {
             onCopyPath={() => focusedAsset && handleCopyPath(focusedAsset)}
             onCopyImage={() => focusedAsset && handleCopyImage(focusedAsset)}
             onDownload={() => focusedAsset && handleDownloadSingle(focusedAsset)}
+            onRevealInExplorer={() => focusedAsset && handleRevealInExplorer(focusedAsset)}
             onUpdateKeywords={handleUpdateKeywords}
             onOpenBatchIptc={() => setBatchIptcOpen(true)}
           />

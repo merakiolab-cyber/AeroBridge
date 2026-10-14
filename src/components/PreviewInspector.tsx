@@ -9,6 +9,7 @@ import {
   Camera,
   Layers,
   Tag,
+  FolderOpen,
 } from 'lucide-react';
 
 interface PreviewInspectorProps {
@@ -18,6 +19,7 @@ interface PreviewInspectorProps {
   onCopyPath: () => void;
   onCopyImage: () => void;
   onDownload: () => void;
+  onRevealInExplorer?: () => void;
   onUpdateKeywords?: (keywords: string[]) => void;
   onOpenBatchIptc?: () => void;
 }
@@ -29,6 +31,7 @@ export const PreviewInspector: React.FC<PreviewInspectorProps> = ({
   onCopyPath,
   onCopyImage,
   onDownload,
+  onRevealInExplorer,
   onUpdateKeywords,
   onOpenBatchIptc,
 }) => {
@@ -122,33 +125,44 @@ export const PreviewInspector: React.FC<PreviewInspectorProps> = ({
             </div>
 
             {/* Action Buttons Row */}
-            <div className="grid grid-cols-3 gap-2">
+            <div className={`grid ${onRevealInExplorer ? 'grid-cols-4 gap-1.5' : 'grid-cols-3 gap-2'}`}>
               <button
                 type="button"
                 onClick={onCopyImage}
-                className="flex items-center justify-center gap-1.5 py-2 px-2 bg-white/[0.04] hover:bg-white/[0.08] text-stone-200 rounded-full text-xs transition-all border border-white/[0.06]"
+                className="flex items-center justify-center gap-1.5 py-2 px-1.5 bg-white/[0.04] hover:bg-white/[0.08] text-stone-200 rounded-full text-xs transition-all border border-white/[0.06]"
                 title="Kopírovat obrázek do schránky (Ctrl+C)"
               >
                 <Copy className="w-3.5 h-3.5 text-[#ede8df]" />
-                <span>Kopírovat</span>
+                <span className="truncate">Kopírovat</span>
               </button>
               <button
                 type="button"
                 onClick={onCopyPath}
-                className="flex items-center justify-center gap-1.5 py-2 px-2 bg-white/[0.04] hover:bg-white/[0.08] text-stone-200 rounded-full text-xs transition-all border border-white/[0.06]"
+                className="flex items-center justify-center gap-1.5 py-2 px-1.5 bg-white/[0.04] hover:bg-white/[0.08] text-stone-200 rounded-full text-xs transition-all border border-white/[0.06]"
                 title="Kopírovat cestu k souboru"
               >
                 <FileText className="w-3.5 h-3.5 text-stone-300" />
-                <span>Cesta</span>
+                <span className="truncate">Cesta</span>
               </button>
+              {onRevealInExplorer && (
+                <button
+                  type="button"
+                  onClick={onRevealInExplorer}
+                  className="flex items-center justify-center gap-1.5 py-2 px-1.5 bg-white/[0.04] hover:bg-white/[0.08] text-stone-200 rounded-full text-xs transition-all border border-white/[0.06]"
+                  title="Otevřít a označit soubor v Průzkumníku Windows"
+                >
+                  <FolderOpen className="w-3.5 h-3.5 text-emerald-300" />
+                  <span className="truncate">Složka</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={onDownload}
-                className="flex items-center justify-center gap-1.5 py-2 px-2 bg-white/[0.04] hover:bg-white/[0.08] text-stone-200 rounded-full text-xs transition-all border border-white/[0.06]"
+                className="flex items-center justify-center gap-1.5 py-2 px-1.5 bg-white/[0.04] hover:bg-white/[0.08] text-stone-200 rounded-full text-xs transition-all border border-white/[0.06]"
                 title="Stáhnout kopii souboru"
               >
                 <Download className="w-3.5 h-3.5 text-stone-300" />
-                <span>Uložit</span>
+                <span className="truncate">Uložit</span>
               </button>
             </div>
 

@@ -2,6 +2,18 @@
 
 ## Changelog
 
+### Version 3.0.0 (Dokončení Fáze 3: Nativní Windows 11 IPC Můstek & Průzkumník)
+- **Nativní IPC můstek v Rustu ([tauriBridge.ts](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/utils/tauriBridge.ts) & [lib.rs](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src-tauri/src/lib.rs)):**
+  - Implementován nativní Windows 11 dialog výběru složek (`rfd::FileDialog`) bez vyskakovacích webových bezpečnostních potvrzení.
+  - Ultra-rychlé prohledávání disků a složek přímo v Rustu přes `std::fs::read_dir` (`scan_folder_native`).
+  - Přímé binární čtení souborů (`read_file_binary`) a bezpaměťové zobrazování médií přes Tauri asset protokol (`convertFileSrc`).
+- **Integrace s Průzkumníkem Windows:**
+  - Přidán nativní IPC příkaz `reveal_in_explorer` volající `explorer.exe /select,"<cesta>"`.
+  - V pravém inspekčním panelu [PreviewInspector.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/PreviewInspector.tsx) přidáno tlačítko **„Složka / Průzkumník“**, které jedním kliknutím otevře složku a zvýrazní aktivní soubor v systému Windows.
+  - Automatická detekce desktopového prostředí (`isDesktopApp()`) s plynulým fallbackem na webové API při běhu v prohlížeči.
+
+---
+
 ### Version 2.9.1 (Vyřazení Typografie & OpenType ze záměru projektu)
 - **Zpřesnění rozsahu a eliminace balastu:**
   - Sekce a modul pro **Typografii & OpenType** (font management / náhledy písem / glyfy) byl kompletně vyřazen ze specifikace a roadmapy jako zbytečný.

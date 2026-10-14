@@ -10,6 +10,7 @@ import {
   getImageDimensions,
   generateDocumentPlaceholder,
 } from './adobeThumbnailExtractor';
+import { toDesktopAssetUrl, type NativeFileEntry } from './tauriBridge';
 
 /**
  * Format raw bytes into human-readable representation (e.g. 4.2 MB)
@@ -427,4 +428,74 @@ export async function downloadAssetsAsZip(
   document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(downloadUrl), 5000);
 }
+
+/**
+ * Parses native Windows 11 file entries obtained directly via Rust Tauri std::fs into AssetItem models.
+ * Provides instant media indexing without web browser sandbox delays.
+ */
+export function parseNativeEntriesToAssets(
+  entries: NativeFileEntry[],
+  folderName: string
+): AssetItem[] {
+  const results: AssetItem[] = [];
+  const imageExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg', 'bmp', 'ico'];
+  const videoExtensions = ['mp4', 'webm', 'ogg', 'mov', 'm4v'];
+
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i];
+    if (entry.is_dir) continue; // skip subdirectories in the flat asset grid
+
+    const ext = entry.extension.toLowerCase();
+    const typeInfo = getAdobeFileType(entry.name);
+    const dateModified = entry.modified_ms > 0
+      ? new Date(entry.modified_ms).toISOString().replace('T', ' ').slice(0, 19)
+      : new Date().toISOString().replace('T', ' ').slice(0, 19);
+
+    const isStandardMedia = imageExtensions.includes(ext) || videoExtensions.includes(ext);
+    const previewUrl = isStandardMedia
+      ? toDesktopAssetUrl(entry.path)
+      : generateDocumentPlaceholder(
+          entry.name,
+          typeInfo.extension || ext.toUpperCase(),
+          typeInfo.colorBadge,
+          formatBytes(entry.size)
+        );
+
+    const asset: AssetItem = {
+      id: `native-${Date.now()}-${i}-${Math.random().toString(36).substring(2, 7)}`,
+      name: entry.name,
+      folder: `/${folderName}`,
+      fullPath: entry.path,
+      url: previewUrl,
+      type: typeInfo.category as any,
+      category: typeInfo.category,
+      format: typeInfo.format,
+      extension: typeInfo.extension || ext.toUpperCase(),
+      colorBadge: typeInfo.colorBadge,
+      size: entry.size,
+      dimensions: { width: 0, height: 0 },
+      dateModified,
+      dateCreated: dateModified,
+      rating: 0,
+      label: 'none',
+      flag: 'unflagged',
+      exif: {
+        resolutionDpi: 300,
+        bitDepth: 'Windows 11 Native File',
+        colorProfile: 'sRGB IEC61966-2.1',
+      },
+      iptc: {
+        title: entry.name.replace(/\.[^/.]+$/, ''),
+        caption: `Soubor ${entry.name} (${formatBytes(entry.size)})`,
+        keywords: [ext, 'windows', folderName.toLowerCase()],
+      },
+      isCustomUploaded: true,
+    };
+
+    results.push(asset);
+  }
+
+  return results;
+}
+
 

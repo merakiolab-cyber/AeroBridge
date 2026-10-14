@@ -48,12 +48,15 @@
 
 ---
 
-## 🖥️ Fáze 3: Samostatná nativní desktopová aplikace pro Windows 11 (Tauri v2) (PROBÍHÁ ⚙️)
+## 🖥️ Fáze 3: Samostatná nativní desktopová aplikace pro Windows 11 (Tauri v2) (DOKONČENO ✅)
 - [x] **Přechod na Tauri v2 (Rust + WebView2):**
   - [x] Inicializace Tauri v2 architektury (`src-tauri`) a konfigurace nativního okna (1400×900, centrované, resizovatelné)
   - [x] Přidání desktopových npm skriptů (`npm run desktop:dev`, `npm run desktop:build`)
-  - [ ] Nativní Windows okno se Snap Layouts podporou a přímým přístupem k diskům bez webových dialogů
-  - [ ] Kompilace standalone .exe balíčku (velikost do 15 MB)
+  - [x] Nativní Windows okno se Snap Layouts podporou a přímým přístupem k diskům bez webových dialogů
+  - [x] Nativní IPC most v Rustu (`pick_folder_native`, `scan_folder_native`, `read_file_binary`, `reveal_in_explorer`)
+  - [x] Tlačítko „Složka / Průzkumník“ v pravém inspekčním panelu pro okamžité zvýraznění souboru ve Windows File Exploreru
+  - [x] Podpora kompilace standalone .exe balíčku (velikost do 15 MB)
+
 
 ---
 
