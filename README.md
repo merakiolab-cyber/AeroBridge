@@ -59,7 +59,7 @@ Aplikace funguje **100% offline**, uchovává přístup k lokálním složkám p
 ### 4. 🎨 Bauhaus & Flowty Design
 - Tmavý profesionální motiv s barvou pozadí `#14161e`.
 - Čisté rectilinear rozvržení s jemnými oddělovači (`border-white/10`).
-- Typografie: **JetBrains Mono** pro technická data a EXIF, **Plus Jakarta Sans** pro UI prvky.
+- Vizuální styl: Písmo **JetBrains Mono** pro technická data a EXIF, **Plus Jakarta Sans** pro UI prvky.
 - Resizovatelný postranní panel s ukládáním šířky do paměti.
 - Žádný rušivý vizuální balast – decentní bílý 10% závoj pro označené soubory.
 

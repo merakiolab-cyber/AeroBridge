@@ -54,3 +54,11 @@
   - [x] Přidání desktopových npm skriptů (`npm run desktop:dev`, `npm run desktop:build`)
   - [ ] Nativní Windows okno se Snap Layouts podporou a přímým přístupem k diskům bez webových dialogů
   - [ ] Kompilace standalone .exe balíčku (velikost do 15 MB)
+
+---
+
+## 🚫 Vyřazené funkce ze záměru (Out of Scope / Záměrně neimplementovat)
+- ❌ **Typografie & OpenType (Font preview / Glyphs / Font management):** Zcela vyřazeno z DAM workflow jako zbytečné. AeroBridge se soustředí výhradně na kreativní média (foto, video, Adobe formáty, vektorovou grafiku).
+- ❌ **Barevné štítky & hodnocení hvězdičkami (Rating 1–5, Labels):** Odmítnuto pro zachování minimalistického, nerušivého prostředí bez vizuálního smogu.
+- ❌ **Cloud AI & externí API (Gemini / Auto-tagging / Sémantické vyhledávání):** Zrušeno ve prospěch 100% offline soukromí, nulové telemetrie a nulových nákladů na tokeny.
+

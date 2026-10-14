@@ -109,6 +109,7 @@ AeroBridge processes user creative files, system paths, and media buffers. Secur
 - ❌ **Don't use Tailwind utility overload without purpose:** Stick to the established color tokens (`bg-[#14161e]`, `bg-[#1a1d27]`, `border-white/10`).
 - ❌ **Don't block the main thread with heavy image resizing:** Process exports sequentially or with yields (`await new Promise(r => setTimeout(r, 0))`).
 - ❌ **Don't assume `window.showDirectoryPicker` is available everywhere:** Keep fallback to standard `<input type="file" webkitdirectory />` or Drag & Drop.
+- ❌ **Don't add font management / Typography & OpenType previews:** The project is strictly a digital media asset manager (photos, videos, Adobe graphics), not a font catalog or glyph inspector.
 
 ---
 

@@ -2,7 +2,15 @@
 
 ## Changelog
 
-### Version 2.9.0 (Aktuální verze — Tauri v2 Windows 11 Desktop Integrace)
+### Version 2.9.1 (Vyřazení Typografie & OpenType ze záměru projektu)
+- **Zpřesnění rozsahu a eliminace balastu:**
+  - Sekce a modul pro **Typografii & OpenType** (font management / náhledy písem / glyfy) byl kompletně vyřazen ze specifikace a roadmapy jako zbytečný.
+  - AeroBridge Studio se striktně soustředí na ultra-rychlou organizaci a dávkovou správu digitálních médií (fotografie, videa, Adobe formáty PSD/AI/INDD/AEP).
+  - Aktualizována [ROADMAP.md](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/ROADMAP.md), [README.md](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/README.md) a [CLAUDE.md](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/CLAUDE.md) s explicitním pravidlem zákazu implementace font katalogu.
+
+---
+
+### Version 2.9.0 (Tauri v2 Windows 11 Desktop Integrace)
 - **Implementace Tauri v2 (Rust + WebView2):**
   - Inicializována nativní desktopová architektura v adresáři [src-tauri/](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src-tauri).
   - Všechny Rust crate závislosti (Tauri 2.12, Windows API, WebView2) úspěšně zkompilovány bez chyb.
