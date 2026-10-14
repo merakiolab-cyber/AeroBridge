@@ -2,13 +2,13 @@
 
 <div align="center">
 
-**Ultra-rychlý moderní digitální asset manažer (DAM) a organizér médií — lehká, blesková a bezplatná alternativa k Adobe Bridge.**
+**Ultra-rychlý moderní digitální asset manažer (DAM) a organizér médií — lehká, blesková a bezplatná alternativa k Adobe Bridge s nativní podporou čtení Adobe (PSD, AI, INDD, AEP) a Camera RAW souborů.**
 
 [![React](https://img.shields.io/badge/React-19.0-61DAFB?logo=react&logoColor=black)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Vite](https://img.shields.io/badge/Vite-8.x-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-38B2AC?logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
-[![Windows 11](https://img.shields.io/badge/Platform-Windows_11_%2F_Web-0078D4?logo=windows-11&logoColor=white)](https://microsoft.com)
+[![Tauri v2](https://img.shields.io/badge/Tauri_v2-Windows_11-FFC131?logo=tauri&logoColor=black)](https://tauri.app/)
+[![Adobe Formats](https://img.shields.io/badge/Adobe-PSD_%7C_AI_%7C_INDD_%7C_AEP-FF0000?logo=adobe&logoColor=white)](https://adobe.com)
+[![RAW Support](https://img.shields.io/badge/RAW-CR2_%7C_CR3_%7C_NEF_%7C_ARW_%7C_DNG-blue)](https://adobe.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 </div>
@@ -21,26 +21,37 @@
 
 ## 📸 O projektu
 
-**AeroBridge Studio** vznikl jako odpověď na těžkopádnost, pomalé načítání a licenční poplatky Adobe Bridge. Nabízí tvůrcům, fotografům, grafikům a video tvůrcům okamžitou odezvu, čistý Bauhaus vizuální design a pokročilé nástroje pro organizaci souborů.
+**AeroBridge Studio** vznikl jako odpověď na těžkopádnost, pomalé načítání a licenční poplatky Adobe Bridge. Nabízí tvůrcům, fotografům, grafikům a DTP operátorům okamžitou odezvu, čistý Bauhaus vizuální design a pokročilé nástroje pro organizaci souborů.
 
-Aplikace funguje **100% offline**, uchovává přístup k lokálním složkám přes standardní **File System Access API** a ukládá relace do **IndexedDB**.
+Klíčovou předností je **schopnost nativně číst a otevírat náhledy grafických projektů Adobe Creative Cloud (Photoshop, InDesign, Illustrator, After Effects) i surových Camera RAW snímků přímo z disku** — bez nutnosti mít spuštěné nebo předplacené aplikace od Adobe.
+
+Aplikace funguje **100% offline**, uchovává přístup k lokálním složkám a diskům v systému Windows 11 a ukládá relace do **IndexedDB**.
 
 ---
 
 ## ✨ Klíčové funkce
 
-### 1. 🎛️ 4 pracovní režimy (Workspaces)
-- **Essentials:** Klasické studio s mřížkou náhledů a podrobným pravým inspektorem.
-- **Filmstrip:** Velký náhled vybraného snímku nahoře s plynulým posuvným filmovým pásem dole (ideální pro culling fotografií).
-- **Compare (Porovnání):** Srovnání dvou i více snímků vedle sebe pro výběr toho nejostřejšího.
-- **Metadata Table:** Přehledná tabulka s technickými specifikacemi (rozměry, velikost, formát, datum, EXIF) s možností rychlého řazení.
+### 1. 🗂️ Nativní čtení & náhledy Adobe ekosystému a RAW formátů
+AeroBridge obsahuje vlastní binární parsery vyvinuté pro okamžité dekódování profesionálních grafických a DTP formátů:
+- **Adobe Photoshop (`.psd`, `.psb`):** Extrakce kompozitních miniatur ve vysokém rozlišení přímo z binárních hlaviček Photoshop Image Resources (`0x040C` / `0x0414`) bez nutnosti re-renderingu.
+- **Adobe InDesign (`.indd`, `.idml`):** Nativní extrakce náhledů tiskových publikací z XMP packetů (`<xmpGImg:image>` base64 JPEG) a binárních streamů jednotlivých stran.
+- **Adobe Illustrator & Vektory (`.ai`, `.eps`, `.svg`):** Rychlé načtení vložených PDF kompatibilních náhledů i vektorových dat.
+- **Adobe After Effects (`.aep`):** Automatická detekce video kompozic a projektů s dedikovanou Bauhaus kartou a barevným kódováním.
+- **Camera RAW formáty zrcadlovek a bezzrcadlovek:** Blesková O(1) extrakce náhledů pro **Canon** (`.cr2`, `.cr3`), **Nikon** (`.nef`), **Sony** (`.arw`), **Adobe** (`.dng`), **Fujifilm** (`.raf`), **Olympus** (`.orf`) a **Panasonic** (`.rw2`) přes TIFF IFD tagy (`0x0201` / `0x0202`).
+- **Okamžité otevření v systému:** Tlačítko **Složka / Průzkumník** v inspekčním panelu vyvolá Průzkumník Windows a daný soubor přímo označí pro otevření ve vaší výchozí aplikaci.
 
-### 2. ⚡ Výkon a podpora souborů
-- **Okamžité náhledy:** Podpora JPEG, PNG, WebP, SVG, GIF i video souborů (MP4, WebM).
-- **Adobe PSD náhledy:** Vlastní klientský parser pro extrakci náhledových miniatur přímo z hlaviček souborů Photoshopu (`.psd`).
-- **Nativní přístup ke složkám:** Možnost připojit libovolné složky z disku (včetně externích SSD a NAS) s trvalým uložením v IndexedDB a obnovením jedním kliknutím.
+### 2. 🎛️ 4 pracovní režimy (Workspaces)
+- **Essentials (Mřížka):** Klasické studio s virtualizovanou mřížkou náhledů a podrobným pravým inspektorem.
+- **Filmstrip (Filmový pás):** Velký náhled vybraného snímku nahoře s plynulým posuvným filmovým pásem dole (ideální pro culling a výběr nejlepších záběrů).
+- **Compare (Porovnání):** Srovnání dvou i více snímků vedle sebe pro kontrolu ostrosti a barevného tónu.
+- **Metadata Table (Seznam):** Přehledná tabulka s technickými specifikacemi (rozměry, velikost, formát, datum, EXIF) s možností okamžitého řazení.
 
-### 3. 🏷️ Dávkové nástroje pro profesionály
+### 3. ⚡ Bleskový výkon pro Windows 11 (Tauri v2 + Rust)
+- **Virtualizované procházení:** Zvládá složky s 10 000+ soubory bez jakéhokoliv zasekávání rozhraní a bez paměťových úniků.
+- **Nativní přístup k diskům:** Žádná vyskakovací bezpečnostní okna prohlížeče — přímý přístup k interním SSD, externím diskům i síťovým úložištím (NAS).
+
+
+### 4. 🏷️ Dávkové nástroje pro profesionály
 - **Dávkové přejmenování (Batch Rename):**
   - Flexibilní šablony: Prefix, volitelné datum (YYYYMMDD / YYYY-MM-DD), automatická číselná řada s volitelným počtem cifer, suffix.
   - Hledání a nahrazování textu v názvech (`Find & Replace`).
@@ -50,13 +61,14 @@ Aplikace funguje **100% offline**, uchovává přístup k lokálním složkám p
   - Hromadný zápis: Titulek, Popis / Anotace (režim přepsat nebo připojit), Autor, Copyright, Místo / Lokalita.
   - Klíčová slova s volbou: připojit, nahradit nebo odebrat existující štítky.
   - Rychlé předpřipravené šablony pro ateliéry a fotografy.
+  - **Přímý zápis na disk:** Volitelný přímý binární zápis Adobe XMP packetů zpět do souborů se 100% zachováním EXIF metadat fotoaparátu.
 - **Export do ZIP s klientským převodem (Batch Export):**
   - Převod do formátů WebP, JPEG nebo PNG s nastavitelnou kompresí / kvalitou.
   - Automatická změna velikosti (zachování poměru, max šířka, max výška).
   - Vložení decentního copyright vodoznaku přímo do obrazových dat.
   - Stažení celého balíčku v ZIP archivu bez odesílání dat na externí servery.
 
-### 4. 🎨 Bauhaus & Flowty Design
+### 5. 🎨 Bauhaus & Flowty Design
 - Tmavý profesionální motiv s barvou pozadí `#14161e`.
 - Čisté rectilinear rozvržení s jemnými oddělovači (`border-white/10`).
 - Vizuální styl: Písmo **JetBrains Mono** pro technická data a EXIF, **Plus Jakarta Sans** pro UI prvky.
@@ -73,6 +85,8 @@ Aplikace funguje **100% offline**, uchovává přístup k lokálním složkám p
 | `Ctrl + M` | Otevřít dialog **Dávková úprava IPTC** |
 | `Ctrl + I` | Přepnout trvalé zobrazení informací na kartách |
 | `Ctrl + A` | Vybrat všechny položky v aktuální složce |
+| `F2` | Přejmenovat označený soubor |
+| `Delete` | Bezpečné smazání / odebrání souboru |
 | `Esc` | Zavřít aktivní modální okno / zrušit výběr |
 | `Šipky (← → ↑ ↓)` | Pohyb mezi soubory |
 
@@ -82,25 +96,34 @@ Aplikace funguje **100% offline**, uchovává přístup k lokálním složkám p
 
 ### Požadavky
 - [Node.js](https://nodejs.org/) v18+ (doporučeno v22+)
+- [Rust](https://rustup.rs/) (pro nativní Windows desktop build přes Tauri v2)
 - npm nebo bun
 
 ### Instalace a spuštění
 
 ```bash
 # 1. Klonování repozitáře
-git clone https://github.com/your-username/aerobridge-studio.git
-cd aerobridge-studio
+git clone https://github.com/merakiolab-cyber/AeroBridge.git
+cd AeroBridge
 
 # 2. Instalace závislostí
 npm install
 
-# 3. Spuštění vývojového serveru
+# 3a. Spuštění jako nativní Windows 11 desktop aplikace (Doporučeno)
+npm run desktop:dev
+
+# 3b. Nebo spuštění ve webovém prohlížeči
 npm run dev
 ```
 
-Aplikace se otevře na adrese: `http://localhost:3000`
+### Sestavení standalone instalačního balíčku (.exe / MSI)
 
-### Sestavení pro produkci
+```bash
+# Vytvoří kompaktní instalační balíček (~15 MB) bez závislosti na Node.js
+npm run desktop:build
+```
+
+### Sestavení pro produkční web
 
 ```bash
 npm run build
