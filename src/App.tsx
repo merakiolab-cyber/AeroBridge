@@ -547,6 +547,30 @@ export default function App() {
     }
   };
 
+  // --- Delete / Remove Selection from View ---
+  const handleDeleteSelected = useCallback(() => {
+    if (selectedIds.size === 0) return;
+    const count = selectedIds.size;
+    const removedAssets = assets.filter((a) => selectedIds.has(a.id));
+
+    // Safely revoke any blob URLs to prevent memory leaks
+    removedAssets.forEach((a) => {
+      if (a.url && a.url.startsWith('blob:')) {
+        try {
+          URL.revokeObjectURL(a.url);
+        } catch {}
+      }
+    });
+
+    setAssets((prev) => prev.filter((a) => !selectedIds.has(a.id)));
+    setSelectedIds(new Set());
+    setFocusedId(null);
+    addToast(
+      'Položky odebrány ze zobrazení',
+      `Odebráno ${count} ${count === 1 ? 'položka' : count < 5 ? 'položky' : 'položek'}`
+    );
+  }, [selectedIds, assets, addToast]);
+
   // --- Keyboard Shortcuts ---
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
@@ -558,9 +582,38 @@ export default function App() {
       }
 
       // Spacebar: Quick Look Fullscreen
-      if (e.key === ' ' && !quickLookOpen) {
+      if (e.key === ' ' && !quickLookOpen && !batchRenameOpen && !batchExportOpen && !batchIptcOpen) {
         e.preventDefault();
         if (focusedAsset) setQuickLookOpen(true);
+        return;
+      }
+
+      // F2: Windows Shortcut for Batch Rename
+      if (e.key === 'F2') {
+        e.preventDefault();
+        if (selectedAssets.length > 0) {
+          setBatchRenameOpen(true);
+        } else {
+          addToast('Dávkové přejmenování', 'Nejprve vyberte alespoň jeden soubor (F2)', 'info');
+        }
+        return;
+      }
+
+      // Delete: Remove selected items from view
+      if (e.key === 'Delete' && !quickLookOpen && !batchRenameOpen && !batchExportOpen && !batchIptcOpen) {
+        if (selectedIds.size > 0) {
+          e.preventDefault();
+          handleDeleteSelected();
+        }
+        return;
+      }
+
+      // Escape: Clear selection
+      if (e.key === 'Escape' && !quickLookOpen && !batchRenameOpen && !batchExportOpen && !batchIptcOpen) {
+        if (selectedIds.size > 0) {
+          e.preventDefault();
+          setSelectedIds(new Set());
+        }
         return;
       }
 
@@ -636,10 +689,15 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, [
     quickLookOpen,
+    batchRenameOpen,
+    batchExportOpen,
+    batchIptcOpen,
     focusedAsset,
     filteredAssets,
     focusedId,
+    selectedIds,
     selectedAssets.length,
+    handleDeleteSelected,
     handleCopyImage,
     addToast,
   ]);

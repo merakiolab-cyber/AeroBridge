@@ -20,18 +20,18 @@
 
 ---
 
-## 🎯 Fáze 1: Windows 11 Desktop Připravenost & Git Portfolio (Nejbližší cíl)
-- [ ] **Git Inicializace & Portfolio Příprava:**
+## 🎯 Fáze 1: Windows 11 Desktop Připravenost & Git Portfolio (DOKONČENO ✅)
+- [x] **Git Inicializace & Portfolio Příprava:**
   - [x] Vytvoření reprezentativního `README.md` se snímky obrazovky, odznaky (badges) a návodem k použití
   - [x] Přidání licence (MIT)
   - [x] Bezpečnostní audit: ověření že žádná citlivá data / klíče nejsou v repu, sanitizace názvů (Path Traversal / Zip Slip), prevence memory leaků
-  - [ ] Inicializace git repozitáře a nastavení větve `main`
-- [ ] **Lokální Windows 11 UX:**
-  - Plná PWA instalace na Windows 11 plochu / do Start menu jako nativní okno
-  - Lepší ošetření chybějících souborů při odpojení externího disku
-  - Klávesová navigace ve Windows stylu (`F2` pro přejmenování, `Delete` pro smazání/koš, `Ctrl+A` označit vše)
-- [ ] **Výkon s velkými složkami (10 000+ souborů):**
-  - Virtualizace mřížky (DOM virtual scrolling) pro okamžité vykreslení tisíců fotografií bez zátěže paměti
+  - [x] Inicializace git repozitáře a nastavení větve `main`
+- [x] **Lokální Windows 11 UX:**
+  - [x] Plná PWA instalace na Windows 11 plochu / do Start menu s `file_handlers` pro asociaci souborů
+  - [x] Lepší ošetření chybějících souborů a oprávnění při odpojení externího disku
+  - [x] Klávesová navigace ve Windows stylu (`F2` pro přejmenování, `Delete` pro smazání, `Escape` pro zrušení výběru, `Ctrl+A` označit vše)
+- [x] **Výkon s velkými složkami (10 000+ souborů):**
+  - [x] Virtualizace mřížky (DOM virtual scrolling) v `AssetGrid` pro okamžité vykreslení tisíců fotografií bez zátěže paměti a s auto-scrollem při navigaci klávesnicí
 
 ---
 

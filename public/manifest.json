@@ -1,5 +1,5 @@
 {
-  "id": "/",
+  "id": "aerobridge-studio-app",
   "name": "AeroBridge Studio",
   "short_name": "AeroBridge",
   "description": "Ultra-rychlý moderní digitální asset manažer a organizér médií — lehká offline alternativa k Adobe Bridge.",
@@ -7,15 +7,46 @@
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#090a0f",
-  "theme_color": "#14161e",
+  "background_color": "#131211",
+  "theme_color": "#161513",
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any"
+      "purpose": "any maskable"
     }
   ],
-  "categories": ["utilities", "productivity", "photo"]
+  "categories": ["utilities", "productivity", "photo"],
+  "shortcuts": [
+    {
+      "name": "Otevřít složku",
+      "short_name": "Složka",
+      "description": "Otevřít složku z disku v AeroBridge",
+      "url": "/?action=open-folder",
+      "icons": [{ "src": "/icon.svg", "sizes": "any" }]
+    },
+    {
+      "name": "Oblíbené projekty",
+      "short_name": "Oblíbené",
+      "description": "Rychlý přechod do oblíbených projektů",
+      "url": "/?action=favorites",
+      "icons": [{ "src": "/icon.svg", "sizes": "any" }]
+    }
+  ],
+  "file_handlers": [
+    {
+      "action": "/",
+      "name": "AeroBridge Media Handler",
+      "icons": [{ "src": "/icon.svg", "sizes": "any" }],
+      "accept": {
+        "image/*": [".jpg", ".jpeg", ".png", ".webp", ".svg", ".gif", ".bmp"],
+        "video/*": [".mp4", ".webm", ".mov"],
+        "application/x-photoshop": [".psd"],
+        "application/illustrator": [".ai"],
+        "application/pdf": [".pdf"]
+      }
+    }
+  ]
 }

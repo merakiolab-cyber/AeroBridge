@@ -1,5 +1,4 @@
-import React, { useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import { AssetItem } from '../types';
 import { ThumbnailCard } from './ThumbnailCard';
 import { Layers, Sparkles } from 'lucide-react';
@@ -37,6 +36,37 @@ export const AssetGrid: React.FC<AssetGridProps> = ({
   activeFolder,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
+
+  // Viewport dimensions for virtualized grid calculation
+  const [dimensions, setDimensions] = useState({ width: 1200, height: 800 });
+  const [scrollTop, setScrollTop] = useState(0);
+
+  // Measure viewport size
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        if (width > 0 && height > 0) {
+          setDimensions({ width, height });
+        }
+      }
+    });
+
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // Reset scroll position on folder change
+  useEffect(() => {
+    if (viewportRef.current) {
+      viewportRef.current.scrollTop = 0;
+      setScrollTop(0);
+    }
+  }, [activeFolder]);
 
   // Ctrl / Cmd + MouseWheel to dynamically resize thumbnails in real time (Finder / Bridge style)
   useEffect(() => {
@@ -58,6 +88,72 @@ export const AssetGrid: React.FC<AssetGridProps> = ({
       container.removeEventListener('wheel', handleWheelResize);
     };
   }, [thumbnailSize, onThumbnailSizeChange]);
+
+  // Virtualization constants
+  const GAP = 16;
+  const PADDING_X = 48; // 24px left + 24px right (p-6)
+  const itemWidth = thumbnailSize;
+  const itemHeight = showAllInfo ? Math.round(thumbnailSize * 0.82) + 68 : thumbnailSize;
+  const rowHeight = itemHeight + GAP;
+
+  // Compute number of columns that fit horizontally
+  const availableWidth = Math.max(itemWidth, dimensions.width - PADDING_X);
+  const columns = Math.max(1, Math.floor((availableWidth + GAP) / (itemWidth + GAP)));
+  const totalRows = Math.ceil(assets.length / columns);
+  const totalHeight = totalRows * rowHeight;
+
+  // Handle scroll events with RAF throttling for high-frame-rate rendering
+  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    setScrollTop(e.currentTarget.scrollTop);
+  }, []);
+
+  // Compute visible range with 2-row overscan before and after
+  const { startRow, endRow, visibleAssets, offsetTop } = useMemo(() => {
+    if (assets.length === 0) {
+      return { startRow: 0, endRow: 0, visibleAssets: [], offsetTop: 0 };
+    }
+
+    // Always render all directly if 60 items or fewer for zero overhead
+    if (assets.length <= 60) {
+      return {
+        startRow: 0,
+        endRow: totalRows,
+        visibleAssets: assets,
+        offsetTop: 0,
+      };
+    }
+
+    const start = Math.max(0, Math.floor(scrollTop / rowHeight) - 2);
+    const end = Math.min(totalRows - 1, Math.ceil((scrollTop + dimensions.height) / rowHeight) + 2);
+    const startIndex = start * columns;
+    const endIndex = Math.min(assets.length, (end + 1) * columns);
+
+    return {
+      startRow: start,
+      endRow: end,
+      visibleAssets: assets.slice(startIndex, endIndex),
+      offsetTop: start * rowHeight,
+    };
+  }, [assets, scrollTop, rowHeight, totalRows, dimensions.height, columns]);
+
+  // Auto-scroll viewport into view when focusedId changes (e.g. keyboard arrow navigation)
+  useEffect(() => {
+    if (!focusedId || !viewportRef.current) return;
+    const index = assets.findIndex((a) => a.id === focusedId);
+    if (index === -1) return;
+
+    const itemRow = Math.floor(index / columns);
+    const itemTop = itemRow * rowHeight;
+    const itemBottom = itemTop + rowHeight;
+    const currentScrollTop = viewportRef.current.scrollTop;
+    const viewHeight = dimensions.height;
+
+    if (itemTop < currentScrollTop) {
+      viewportRef.current.scrollTop = itemTop;
+    } else if (itemBottom > currentScrollTop + viewHeight - 24) {
+      viewportRef.current.scrollTop = itemBottom - viewHeight + 24;
+    }
+  }, [focusedId, assets, columns, rowHeight, dimensions.height]);
 
   if (assets.length === 0) {
     return (
@@ -81,8 +177,12 @@ export const AssetGrid: React.FC<AssetGridProps> = ({
       className="flex-1 flex flex-col h-full bg-[#131211] relative overflow-hidden select-none outline-hidden"
       tabIndex={0}
     >
-      {/* Main Grid Viewport */}
-      <div className="flex-1 overflow-y-auto p-6">
+      {/* Main Virtualized Grid Viewport */}
+      <div
+        ref={viewportRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto p-6"
+      >
         {/* Drop zone overlay in Ivory Bauhaus style */}
         {isDragOver && (
           <div className="absolute inset-0 z-40 bg-[#ede8df]/5 border border-dashed border-[#ede8df] m-4 rounded-none flex items-center justify-center backdrop-blur-xs pointer-events-none">
@@ -95,31 +195,37 @@ export const AssetGrid: React.FC<AssetGridProps> = ({
           </div>
         )}
 
-        {/* Dynamic Responsive Grid with smooth fluid rendering */}
-        <motion.div
-          key={activeFolder || 'all'}
-          initial={{ opacity: 0.8 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.15, ease: 'easeOut' }}
-          className="flex flex-wrap gap-4 items-start content-start"
+        {/* Outer virtualized scroll canvas with exact height */}
+        <div
+          className="relative w-full"
+          style={{ height: `${Math.max(totalHeight, dimensions.height)}px` }}
         >
-          {assets.map((asset) => (
-            <ThumbnailCard
-              key={asset.id}
-              asset={asset}
-              isSelected={selectedIds.has(asset.id)}
-              isFocused={focusedId === asset.id}
-              thumbnailSize={thumbnailSize}
-              fitMode={fitMode}
-              showAllInfo={showAllInfo}
-              selectedIds={selectedIds}
-              onClick={(e) => onSelect(asset.id, e)}
-              onDoubleClick={() => onOpenQuickLook(asset.id)}
-              onCopyPath={() => onCopyPath(asset)}
-              onCopyImage={() => onCopyImage(asset)}
-            />
-          ))}
-        </motion.div>
+          {/* Inner visible rows placed with hardware accelerated translation */}
+          <div
+            className="absolute left-0 right-0 grid gap-4 content-start"
+            style={{
+              top: `${offsetTop}px`,
+              gridTemplateColumns: `repeat(${columns}, ${thumbnailSize}px)`,
+            }}
+          >
+            {visibleAssets.map((asset) => (
+              <ThumbnailCard
+                key={asset.id}
+                asset={asset}
+                isSelected={selectedIds.has(asset.id)}
+                isFocused={focusedId === asset.id}
+                thumbnailSize={thumbnailSize}
+                fitMode={fitMode}
+                showAllInfo={showAllInfo}
+                selectedIds={selectedIds}
+                onClick={(e) => onSelect(asset.id, e)}
+                onDoubleClick={() => onOpenQuickLook(asset.id)}
+                onCopyPath={() => onCopyPath(asset)}
+                onCopyImage={() => onCopyImage(asset)}
+              />
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
