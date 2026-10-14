@@ -157,14 +157,14 @@ export const AssetGrid: React.FC<AssetGridProps> = ({
 
   if (assets.length === 0) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center p-12 text-center text-stone-500 select-none bg-[#131211]">
-        <div className="w-16 h-16 rounded-none bg-[#1c1b18] border border-white/[0.06] flex items-center justify-center mb-4 text-stone-400 shadow-xl">
-          <Layers className="w-8 h-8 opacity-50 text-[#ede8df]" />
+      <div className="flex-1 flex flex-col items-center justify-center p-12 text-center text-zinc-500 select-none bg-[#121316]">
+        <div className="w-16 h-16 rounded-none bg-[#1c1e22] border border-white/[0.06] flex items-center justify-center mb-4 text-zinc-400 shadow-xl">
+          <Layers className="w-8 h-8 opacity-50 text-[#e2e4e9]" />
         </div>
-        <h3 className="text-sm font-semibold text-stone-300 mb-1">
+        <h3 className="text-sm font-semibold text-zinc-300 mb-1">
           Žádné soubory k zobrazení
         </h3>
-        <p className="text-xs text-stone-500 max-w-sm mb-4">
+        <p className="text-xs text-zinc-500 max-w-sm mb-4">
           Zkuste změnit filtry vyhledávání nebo přetáhněte složku ze svého počítače.
         </p>
       </div>
@@ -174,7 +174,7 @@ export const AssetGrid: React.FC<AssetGridProps> = ({
   return (
     <div
       ref={containerRef}
-      className="flex-1 flex flex-col h-full bg-[#131211] relative overflow-hidden select-none outline-hidden"
+      className="flex-1 flex flex-col h-full bg-[#121316] relative overflow-hidden select-none outline-hidden"
       tabIndex={0}
     >
       {/* Main Virtualized Grid Viewport */}
@@ -185,10 +185,10 @@ export const AssetGrid: React.FC<AssetGridProps> = ({
       >
         {/* Drop zone overlay in Ivory Bauhaus style */}
         {isDragOver && (
-          <div className="absolute inset-0 z-40 bg-[#ede8df]/5 border border-dashed border-[#ede8df] m-4 rounded-none flex items-center justify-center backdrop-blur-xs pointer-events-none">
-            <div className="bg-[#1e1d1a] px-6 py-4 rounded-none border border-[#ede8df]/40 text-center shadow-2xl">
-              <Sparkles className="w-8 h-8 text-[#ede8df] mx-auto mb-2 animate-bounce" />
-              <span className="text-sm font-semibold text-[#ede8df]">
+          <div className="absolute inset-0 z-40 bg-[#e2e4e9]/5 border border-dashed border-[#e2e4e9] m-4 rounded-none flex items-center justify-center backdrop-blur-xs pointer-events-none">
+            <div className="bg-[#1e2024] px-6 py-4 rounded-none border border-[#e2e4e9]/40 text-center shadow-2xl">
+              <Sparkles className="w-8 h-8 text-[#e2e4e9] mx-auto mb-2 animate-bounce" />
+              <span className="text-sm font-semibold text-[#e2e4e9]">
                 Pusťte složky nebo soubory pro okamžité offline načtení
               </span>
             </div>

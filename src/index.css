@@ -7,8 +7,8 @@
   }
 
   body {
-    background-color: #0d0f12;
-    color: #e2e8f0;
+    background-color: #121316;
+    color: #e4e4e7;
     overflow: hidden;
     user-select: none;
     -webkit-font-smoothing: antialiased;
@@ -24,11 +24,11 @@
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #2a2e39;
+  background: #27272a;
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #3b4252;
+  background: #3f3f46;
 }
 
 /* Prevent unwanted drag ghost issues */

@@ -363,7 +363,7 @@ export function generateDocumentPlaceholder(
 
   // File Name
   ctx.font = '600 32px "Plus Jakarta Sans", sans-serif';
-  ctx.fillStyle = '#ede8df';
+  ctx.fillStyle = '#e2e4e9';
   const truncatedName = fileName.length > 28 ? fileName.slice(0, 25) + '...' : fileName;
   ctx.fillText(truncatedName, 600, 520);
 

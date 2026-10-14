@@ -58,10 +58,10 @@ export const ThumbnailCard: React.FC<ThumbnailCardProps> = ({
       onDoubleClick={onDoubleClick}
       className={`group relative flex flex-col rounded-none transition-all duration-150 cursor-pointer select-none text-left overflow-hidden ${
         isSelected
-          ? 'bg-[#332f2b] shadow-xl'
+          ? 'bg-[#2a2c32] shadow-xl'
           : 'border ' + (isFocused
-          ? 'bg-[#1e1c1a] border-white/20'
-          : 'bg-[#181715] border-white/[0.06] hover:bg-[#201e1b] hover:border-white/[0.15]')
+          ? 'bg-[#22242a] border-white/20'
+          : 'bg-[#18191d] border-white/[0.06] hover:bg-[#22242a] hover:border-white/[0.15]')
       }`}
       style={{
         width: `${thumbnailSize}px`,
@@ -69,7 +69,7 @@ export const ThumbnailCard: React.FC<ThumbnailCardProps> = ({
     >
       {/* Thumbnail Image Container */}
       <div
-        className="relative overflow-hidden bg-[#11100f] flex items-center justify-center rounded-none"
+        className="relative overflow-hidden bg-[#101114] flex items-center justify-center rounded-none"
         style={{
           height: showAllInfo
             ? `${Math.round(thumbnailSize * 0.82)}px`
@@ -78,8 +78,8 @@ export const ThumbnailCard: React.FC<ThumbnailCardProps> = ({
       >
         {/* Highly visible warm ivory tint overlay when selected */}
         {isSelected && (
-          <div className="absolute inset-0 bg-[#ede8df]/30 z-15 pointer-events-none transition-opacity duration-150 flex items-start justify-end p-2">
-            <div className="w-5 h-5 rounded-full bg-[#ede8df] text-[#111317] flex items-center justify-center shadow-lg font-bold text-xs">
+          <div className="absolute inset-0 bg-[#e2e4e9]/30 z-15 pointer-events-none transition-opacity duration-150 flex items-start justify-end p-2">
+            <div className="w-5 h-5 rounded-full bg-[#e2e4e9] text-[#111215] flex items-center justify-center shadow-lg font-bold text-xs">
               ✓
             </div>
           </div>
@@ -170,7 +170,7 @@ export const ThumbnailCard: React.FC<ThumbnailCardProps> = ({
         >
           {asset.name}
         </div>
-        <div className="flex items-center justify-between text-[11px] text-stone-400 font-mono tabular-nums">
+        <div className="flex items-center justify-between text-[11px] text-zinc-400 font-mono tabular-nums">
           <span>{formatBytes(asset.size)}</span>
           <span>
             {asset.dimensions.width > 0
@@ -179,7 +179,7 @@ export const ThumbnailCard: React.FC<ThumbnailCardProps> = ({
           </span>
         </div>
         {asset.exif.colorProfile && (
-          <div className="text-[10px] text-[#ede8df] font-mono truncate">
+          <div className="text-[10px] text-[#e2e4e9] font-mono truncate">
             {asset.exif.colorProfile}
           </div>
         )}

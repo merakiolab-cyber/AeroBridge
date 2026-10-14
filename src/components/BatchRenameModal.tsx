@@ -105,7 +105,7 @@ export const BatchRenameModal: React.FC<BatchRenameModalProps> = ({
                 type="text"
                 value={config.prefix}
                 onChange={(e) => setConfig({ ...config, prefix: e.target.value })}
-                className="w-full bg-[#0c0d12] border border-white/10 rounded-none px-3 py-1.5 text-xs text-white focus:outline-hidden focus:border-[#ede8df]"
+                className="w-full bg-[#0c0d12] border border-white/10 rounded-none px-3 py-1.5 text-xs text-white focus:outline-hidden focus:border-[#e2e4e9]"
                 placeholder="např. EDITORIAL_"
               />
             </div>
@@ -117,7 +117,7 @@ export const BatchRenameModal: React.FC<BatchRenameModalProps> = ({
                 type="text"
                 value={config.suffix}
                 onChange={(e) => setConfig({ ...config, suffix: e.target.value })}
-                className="w-full bg-[#0c0d12] border border-white/10 rounded-none px-3 py-1.5 text-xs text-white focus:outline-hidden focus:border-[#ede8df]"
+                className="w-full bg-[#0c0d12] border border-white/10 rounded-none px-3 py-1.5 text-xs text-white focus:outline-hidden focus:border-[#e2e4e9]"
                 placeholder="např. _FINAL"
               />
             </div>
@@ -132,7 +132,7 @@ export const BatchRenameModal: React.FC<BatchRenameModalProps> = ({
                 type="text"
                 value={config.findText}
                 onChange={(e) => setConfig({ ...config, findText: e.target.value })}
-                className="w-full bg-[#0c0d12] border border-white/10 rounded-none px-3 py-1.5 text-xs text-white focus:outline-hidden focus:border-[#ede8df]"
+                className="w-full bg-[#0c0d12] border border-white/10 rounded-none px-3 py-1.5 text-xs text-white focus:outline-hidden focus:border-[#e2e4e9]"
                 placeholder="Text k nahrazení..."
               />
             </div>
@@ -144,7 +144,7 @@ export const BatchRenameModal: React.FC<BatchRenameModalProps> = ({
                 type="text"
                 value={config.replaceText}
                 onChange={(e) => setConfig({ ...config, replaceText: e.target.value })}
-                className="w-full bg-[#0c0d12] border border-white/10 rounded-none px-3 py-1.5 text-xs text-white focus:outline-hidden focus:border-[#ede8df]"
+                className="w-full bg-[#0c0d12] border border-white/10 rounded-none px-3 py-1.5 text-xs text-white focus:outline-hidden focus:border-[#e2e4e9]"
                 placeholder="Nový text..."
               />
             </div>
@@ -156,7 +156,7 @@ export const BatchRenameModal: React.FC<BatchRenameModalProps> = ({
                 type="checkbox"
                 checked={config.includeDate}
                 onChange={(e) => setConfig({ ...config, includeDate: e.target.checked })}
-                className="rounded-none border-white/20 bg-black accent-[#ede8df] focus:ring-0"
+                className="rounded-none border-white/20 bg-black accent-[#e2e4e9] focus:ring-0"
               />
               <span>Vložit datum ({dateStr})</span>
             </label>
@@ -166,7 +166,7 @@ export const BatchRenameModal: React.FC<BatchRenameModalProps> = ({
                 type="checkbox"
                 checked={config.includeSequence}
                 onChange={(e) => setConfig({ ...config, includeSequence: e.target.checked })}
-                className="rounded-none border-white/20 bg-black accent-[#ede8df] focus:ring-0"
+                className="rounded-none border-white/20 bg-black accent-[#e2e4e9] focus:ring-0"
               />
               <span>Číslování (001, 002...)</span>
             </label>
@@ -184,7 +184,7 @@ export const BatchRenameModal: React.FC<BatchRenameModalProps> = ({
                     {item.oldName}
                   </span>
                   <span className="text-slate-500 px-2">→</span>
-                  <span className="text-[#ede8df] font-medium truncate max-w-[45%]">
+                  <span className="text-[#e2e4e9] font-medium truncate max-w-[45%]">
                     {item.newName}
                   </span>
                 </div>
@@ -205,9 +205,9 @@ export const BatchRenameModal: React.FC<BatchRenameModalProps> = ({
           <button
             type="button"
             onClick={handleExecute}
-            className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-[#ede8df] hover:bg-white text-[#111317] text-xs font-semibold transition-colors shadow-md"
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-[#e2e4e9] hover:bg-white text-[#111215] text-xs font-semibold transition-colors shadow-md"
           >
-            <Check className="w-3.5 h-3.5 text-[#111317]" />
+            <Check className="w-3.5 h-3.5 text-[#111215]" />
             <span>Přejmenovat soubory</span>
           </button>
         </div>

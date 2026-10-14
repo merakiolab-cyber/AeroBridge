@@ -157,10 +157,10 @@ export const QuickLookModal: React.FC<QuickLookModalProps> = ({
           <span className="text-xs font-medium text-white truncate max-w-xs sm:max-w-md">
             {asset.name}
           </span>
-          <span className="text-xs text-stone-300 font-mono tabular-nums">
-            · {asset.dimensions.width} × {asset.dimensions.height} · <span className="text-[#ede8df] font-mono font-medium">{asset.exif.colorProfile || 'sRGB IEC61966-2.1'}</span> · {formatBytes(asset.size)}
+          <span className="text-xs text-zinc-300 font-mono tabular-nums">
+            · {asset.dimensions.width} × {asset.dimensions.height} · <span className="text-[#e2e4e9] font-mono font-medium">{asset.exif.colorProfile || 'sRGB IEC61966-2.1'}</span> · {formatBytes(asset.size)}
           </span>
-          <span className="text-[11px] text-stone-500 font-mono">
+          <span className="text-[11px] text-zinc-500 font-mono">
             ({currentIndex + 1}/{assets.length})
           </span>
         </motion.div>

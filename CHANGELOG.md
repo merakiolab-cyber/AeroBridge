@@ -2,6 +2,14 @@
 
 ## Changelog
 
+### Version 3.1.0 (Čistá neutrální šedá paleta — Neutral Studio Gray)
+- **Profesionální vizuální redesign barev:**
+  - Odstraněny teplé pískové a hnědé odstíny (`stone-*`, `#ede8df`, `#131211`, `#161513`) napříč celou aplikací.
+  - Zavedena čistá neutrální šedá paleta v tónech tmavého zinku a platiny (`zinc-*`, platinový akcent `#e2e4e9`, čisté pozadí `#121316` a panely `#16171a`).
+  - Sjednoceny karty náhledů, postranní panel, horní lišta, modální okna i rychlý náhled (QuickLook) do jednotného kalibrovaného tmavého schématu ve stylu moderních profesionálních nástrojů (Adobe / Apple Pro Apps).
+
+---
+
 ### Version 3.0.0 (Dokončení Fáze 3: Nativní Windows 11 IPC Můstek & Průzkumník)
 - **Nativní IPC můstek v Rustu ([tauriBridge.ts](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/utils/tauriBridge.ts) & [lib.rs](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src-tauri/src/lib.rs)):**
   - Implementován nativní Windows 11 dialog výběru složek (`rfd::FileDialog`) bez vyskakovacích webových bezpečnostních potvrzení.

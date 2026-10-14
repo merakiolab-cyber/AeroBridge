@@ -82,7 +82,7 @@ export const BatchExportModal: React.FC<BatchExportModalProps> = ({
                   onClick={() => setConfig({ ...config, format: fmt })}
                   className={`py-2 px-3 rounded-full text-xs font-medium uppercase border transition-all ${
                     config.format === fmt
-                      ? 'bg-[#ede8df] text-[#111317] border-[#ede8df] font-semibold shadow-xs'
+                      ? 'bg-[#e2e4e9] text-[#111215] border-[#e2e4e9] font-semibold shadow-xs'
                       : 'bg-[#0c0d12] text-slate-300 border-white/10 hover:border-white/20'
                   }`}
                 >
@@ -95,7 +95,7 @@ export const BatchExportModal: React.FC<BatchExportModalProps> = ({
           <div>
             <div className="flex justify-between text-xs font-medium text-slate-300 mb-1.5">
               <span>Kvalita komprese</span>
-              <span className="font-mono text-[#ede8df]">
+              <span className="font-mono text-[#e2e4e9]">
                 {Math.round(config.quality * 100)}%
               </span>
             </div>
@@ -108,7 +108,7 @@ export const BatchExportModal: React.FC<BatchExportModalProps> = ({
               onChange={(e) =>
                 setConfig({ ...config, quality: parseFloat(e.target.value) })
               }
-              className="w-full accent-[#ede8df] cursor-pointer"
+              className="w-full accent-[#e2e4e9] cursor-pointer"
             />
           </div>
 
@@ -120,7 +120,7 @@ export const BatchExportModal: React.FC<BatchExportModalProps> = ({
                 onChange={(e) =>
                   setConfig({ ...config, addWatermark: e.target.checked })
                 }
-                className="rounded-none border-white/20 bg-black accent-[#ede8df] focus:ring-0"
+                className="rounded-none border-white/20 bg-black accent-[#e2e4e9] focus:ring-0"
               />
               <span>Přidat copyright vodoznak</span>
             </label>
@@ -132,13 +132,13 @@ export const BatchExportModal: React.FC<BatchExportModalProps> = ({
                 onChange={(e) =>
                   setConfig({ ...config, watermarkText: e.target.value })
                 }
-                className="w-full bg-[#0c0d12] border border-white/10 rounded-none px-3 py-1.5 text-xs text-white focus:outline-hidden focus:border-[#ede8df]"
+                className="w-full bg-[#0c0d12] border border-white/10 rounded-none px-3 py-1.5 text-xs text-white focus:outline-hidden focus:border-[#e2e4e9]"
                 placeholder="Text vodoznaku..."
               />
             )}
           </div>
 
-          <div className="p-3 bg-[#0c0d12] rounded-none border border-white/5 text-[11px] text-stone-400">
+          <div className="p-3 bg-[#0c0d12] rounded-none border border-white/5 text-[11px] text-zinc-400">
             Export probíhá přímo ve vašem prohlížeči v plné rychlosti CPU bez odesílání dat na jakýkoliv server.
           </div>
         </div>
@@ -156,7 +156,7 @@ export const BatchExportModal: React.FC<BatchExportModalProps> = ({
             type="button"
             onClick={handleExportZip}
             disabled={isExporting}
-            className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-[#ede8df] hover:bg-white text-[#111317] text-xs font-semibold transition-colors shadow-md disabled:opacity-50"
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-[#e2e4e9] hover:bg-white text-[#111215] text-xs font-semibold transition-colors shadow-md disabled:opacity-50"
           >
             {isExporting ? (
               <>

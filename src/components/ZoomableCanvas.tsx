@@ -191,10 +191,10 @@ export const ZoomableCanvas: React.FC<ZoomableCanvasProps> = ({
             transition={{ duration: 0.15 }}
             className="absolute bottom-5 left-6 px-3.5 py-1.5 rounded-full bg-[#12141c]/90 text-white/90 text-xs font-mono font-medium backdrop-blur-md border border-white/10 shadow-xl pointer-events-none flex items-center gap-2"
           >
-            <span className="tabular-nums font-semibold text-[#ede8df]">
+            <span className="tabular-nums font-semibold text-[#e2e4e9]">
               {Math.round(scale * 100)}%
             </span>
-            <span className="text-[11px] text-stone-400">
+            <span className="text-[11px] text-zinc-400">
               {scale === 1 ? 'Přizpůsobeno' : 'Kolečkem zvětšete / Dvojklik pro reset'}
             </span>
           </motion.div>
@@ -244,7 +244,7 @@ export const ZoomableCanvas: React.FC<ZoomableCanvasProps> = ({
                 e.stopPropagation();
                 resetZoom();
               }}
-              className="w-7 h-7 rounded-full flex items-center justify-center text-[#ede8df] hover:text-white hover:bg-white/10 transition-colors"
+              className="w-7 h-7 rounded-full flex items-center justify-center text-[#e2e4e9] hover:text-white hover:bg-white/10 transition-colors"
               title="Přizpůsobit oknu"
             >
               <RotateCcw className="w-3.5 h-3.5" />

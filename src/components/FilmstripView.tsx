@@ -76,7 +76,7 @@ export const FilmstripView: React.FC<FilmstripViewProps> = ({
             </span>
             <span className="font-medium truncate max-w-sm">{currentAsset.name}</span>
             <span className="text-slate-400 font-mono text-[11px] tabular-nums">
-              · {currentAsset.dimensions.width} × {currentAsset.dimensions.height} · <span className="text-[#ede8df] font-mono font-medium">{currentAsset.exif.colorProfile || 'sRGB IEC61966-2.1'}</span>
+              · {currentAsset.dimensions.width} × {currentAsset.dimensions.height} · <span className="text-[#e2e4e9] font-mono font-medium">{currentAsset.exif.colorProfile || 'sRGB IEC61966-2.1'}</span>
             </span>
           </motion.div>
 
@@ -141,7 +141,7 @@ export const FilmstripView: React.FC<FilmstripViewProps> = ({
               onClick={() => onSelect(asset.id)}
               className={`h-full aspect-4/3 rounded-none overflow-hidden relative cursor-pointer shrink-0 transition-all ${
                 isCurrent
-                  ? 'ring-1 ring-[#ede8df] scale-102 bg-[#161922] shadow-lg'
+                  ? 'ring-1 ring-[#e2e4e9] scale-102 bg-[#161922] shadow-lg'
                   : 'border border-white/[0.08] opacity-60 hover:opacity-100 bg-[#111319]'
               }`}
             >

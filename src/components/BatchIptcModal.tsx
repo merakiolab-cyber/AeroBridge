@@ -138,21 +138,21 @@ export const BatchIptcModal: React.FC<BatchIptcModalProps> = ({
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-[#171923]">
           <div>
             <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 text-[10px] font-mono uppercase tracking-wider font-bold bg-[#ede8df] text-[#111317]">
+              <span className="px-2 py-0.5 text-[10px] font-mono uppercase tracking-wider font-bold bg-[#e2e4e9] text-[#111215]">
                 IPTC Editor
               </span>
               <h3 className="text-sm font-semibold text-white">
                 Dávková úprava IPTC metadat ({selectedAssets.length} souborů)
               </h3>
             </div>
-            <p className="text-xs text-stone-400 mt-1">
+            <p className="text-xs text-zinc-400 mt-1">
               Vyberte pole, která chcete změnit. Nezaškrtnutá pole zůstanou u souborů beze změny.
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 text-stone-400 hover:text-white rounded-none hover:bg-white/10 transition-colors"
+            className="p-1.5 text-zinc-400 hover:text-white rounded-none hover:bg-white/10 transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -160,28 +160,28 @@ export const BatchIptcModal: React.FC<BatchIptcModalProps> = ({
 
         {/* Quick Presets Bar */}
         <div className="px-6 py-2.5 bg-[#0e1017] border-b border-white/[0.06] flex items-center gap-2 overflow-x-auto text-xs">
-          <div className="flex items-center gap-1.5 text-stone-400 shrink-0 font-medium text-[11px]">
-            <Sparkles className="w-3.5 h-3.5 text-[#ede8df]" />
+          <div className="flex items-center gap-1.5 text-zinc-400 shrink-0 font-medium text-[11px]">
+            <Sparkles className="w-3.5 h-3.5 text-[#e2e4e9]" />
             <span>Rychlé šablony:</span>
           </div>
           <button
             type="button"
             onClick={() => applyPreset('studio')}
-            className="px-2.5 py-1 bg-white/[0.04] hover:bg-white/[0.08] text-stone-300 hover:text-white border border-white/10 rounded-none text-[11px] transition-colors whitespace-nowrap"
+            className="px-2.5 py-1 bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 hover:text-white border border-white/10 rounded-none text-[11px] transition-colors whitespace-nowrap"
           >
             AeroBridge Studio 2026
           </button>
           <button
             type="button"
             onClick={() => applyPreset('copyrightOnly')}
-            className="px-2.5 py-1 bg-white/[0.04] hover:bg-white/[0.08] text-stone-300 hover:text-white border border-white/10 rounded-none text-[11px] transition-colors whitespace-nowrap"
+            className="px-2.5 py-1 bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 hover:text-white border border-white/10 rounded-none text-[11px] transition-colors whitespace-nowrap"
           >
             Pouze Copyright 2026
           </button>
           <button
             type="button"
             onClick={() => applyPreset('photography')}
-            className="px-2.5 py-1 bg-white/[0.04] hover:bg-white/[0.08] text-stone-300 hover:text-white border border-white/10 rounded-none text-[11px] transition-colors whitespace-nowrap"
+            className="px-2.5 py-1 bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 hover:text-white border border-white/10 rounded-none text-[11px] transition-colors whitespace-nowrap"
           >
             Fotografie & Architektura
           </button>
@@ -195,7 +195,7 @@ export const BatchIptcModal: React.FC<BatchIptcModalProps> = ({
             <div
               className={`p-3.5 border transition-all ${
                 config.updateTitle
-                  ? 'bg-white/[0.03] border-[#ede8df]/40'
+                  ? 'bg-white/[0.03] border-[#e2e4e9]/40'
                   : 'bg-black/20 border-white/[0.06] opacity-75'
               }`}
             >
@@ -207,14 +207,14 @@ export const BatchIptcModal: React.FC<BatchIptcModalProps> = ({
                     onChange={(e) =>
                       setConfig((prev) => ({ ...prev, updateTitle: e.target.checked }))
                     }
-                    className="rounded-none border-stone-600 bg-stone-900 text-[#ede8df] focus:ring-0 w-3.5 h-3.5"
+                    className="rounded-none border-zinc-600 bg-zinc-900 text-[#e2e4e9] focus:ring-0 w-3.5 h-3.5"
                   />
                   <span className="flex items-center gap-1.5">
-                    <FileText className="w-3.5 h-3.5 text-stone-400" />
+                    <FileText className="w-3.5 h-3.5 text-zinc-400" />
                     Titulek (Title / Object Name)
                   </span>
                 </label>
-                <span className="text-[10px] text-stone-500 font-mono">IPTC: 2:05</span>
+                <span className="text-[10px] text-zinc-500 font-mono">IPTC: 2:05</span>
               </div>
               <input
                 type="text"
@@ -224,7 +224,7 @@ export const BatchIptcModal: React.FC<BatchIptcModalProps> = ({
                   setConfig((prev) => ({ ...prev, title: e.target.value }))
                 }
                 placeholder="Zadejte společný titulek pro vybrané položky..."
-                className="w-full bg-[#0a0c10] border border-white/10 rounded-none px-3 py-2 text-xs text-white placeholder-stone-600 focus:outline-hidden focus:border-[#ede8df] disabled:opacity-40"
+                className="w-full bg-[#0a0c10] border border-white/10 rounded-none px-3 py-2 text-xs text-white placeholder-zinc-600 focus:outline-hidden focus:border-[#e2e4e9] disabled:opacity-40"
               />
             </div>
 
@@ -232,7 +232,7 @@ export const BatchIptcModal: React.FC<BatchIptcModalProps> = ({
             <div
               className={`p-3.5 border transition-all ${
                 config.updateCaption
-                  ? 'bg-white/[0.03] border-[#ede8df]/40'
+                  ? 'bg-white/[0.03] border-[#e2e4e9]/40'
                   : 'bg-black/20 border-white/[0.06] opacity-75'
               }`}
             >
@@ -244,10 +244,10 @@ export const BatchIptcModal: React.FC<BatchIptcModalProps> = ({
                     onChange={(e) =>
                       setConfig((prev) => ({ ...prev, updateCaption: e.target.checked }))
                     }
-                    className="rounded-none border-stone-600 bg-stone-900 text-[#ede8df] focus:ring-0 w-3.5 h-3.5"
+                    className="rounded-none border-zinc-600 bg-zinc-900 text-[#e2e4e9] focus:ring-0 w-3.5 h-3.5"
                   />
                   <span className="flex items-center gap-1.5">
-                    <FileText className="w-3.5 h-3.5 text-stone-400" />
+                    <FileText className="w-3.5 h-3.5 text-zinc-400" />
                     Popis / Anotace (Caption / Description)
                   </span>
                 </label>
@@ -260,8 +260,8 @@ export const BatchIptcModal: React.FC<BatchIptcModalProps> = ({
                     }
                     className={`px-2 py-0.5 rounded-none font-medium transition-colors ${
                       config.captionMode === 'replace'
-                        ? 'bg-[#ede8df] text-[#111317]'
-                        : 'text-stone-400 hover:text-white bg-white/5'
+                        ? 'bg-[#e2e4e9] text-[#111215]'
+                        : 'text-zinc-400 hover:text-white bg-white/5'
                     }`}
                   >
                     Nahradit
@@ -274,8 +274,8 @@ export const BatchIptcModal: React.FC<BatchIptcModalProps> = ({
                     }
                     className={`px-2 py-0.5 rounded-none font-medium transition-colors ${
                       config.captionMode === 'append'
-                        ? 'bg-[#ede8df] text-[#111317]'
-                        : 'text-stone-400 hover:text-white bg-white/5'
+                        ? 'bg-[#e2e4e9] text-[#111215]'
+                        : 'text-zinc-400 hover:text-white bg-white/5'
                     }`}
                   >
                     Připojit na konec
@@ -290,7 +290,7 @@ export const BatchIptcModal: React.FC<BatchIptcModalProps> = ({
                   setConfig((prev) => ({ ...prev, caption: e.target.value }))
                 }
                 placeholder="Detailní textový popis obsahu..."
-                className="w-full bg-[#0a0c10] border border-white/10 rounded-none px-3 py-2 text-xs text-white placeholder-stone-600 focus:outline-hidden focus:border-[#ede8df] disabled:opacity-40 resize-none"
+                className="w-full bg-[#0a0c10] border border-white/10 rounded-none px-3 py-2 text-xs text-white placeholder-zinc-600 focus:outline-hidden focus:border-[#e2e4e9] disabled:opacity-40 resize-none"
               />
             </div>
 
@@ -300,7 +300,7 @@ export const BatchIptcModal: React.FC<BatchIptcModalProps> = ({
               <div
                 className={`p-3.5 border transition-all ${
                   config.updateCreator
-                    ? 'bg-white/[0.03] border-[#ede8df]/40'
+                    ? 'bg-white/[0.03] border-[#e2e4e9]/40'
                     : 'bg-black/20 border-white/[0.06] opacity-75'
                 }`}
               >
@@ -315,10 +315,10 @@ export const BatchIptcModal: React.FC<BatchIptcModalProps> = ({
                           updateCreator: e.target.checked,
                         }))
                       }
-                      className="rounded-none border-stone-600 bg-stone-900 text-[#ede8df] focus:ring-0 w-3.5 h-3.5"
+                      className="rounded-none border-zinc-600 bg-zinc-900 text-[#e2e4e9] focus:ring-0 w-3.5 h-3.5"
                     />
                     <span className="flex items-center gap-1.5">
-                      <User className="w-3.5 h-3.5 text-stone-400" />
+                      <User className="w-3.5 h-3.5 text-zinc-400" />
                       Autor / Fotograf
                     </span>
                   </label>
@@ -331,7 +331,7 @@ export const BatchIptcModal: React.FC<BatchIptcModalProps> = ({
                     setConfig((prev) => ({ ...prev, creator: e.target.value }))
                   }
                   placeholder="Jméno autora nebo ateliéru"
-                  className="w-full bg-[#0a0c10] border border-white/10 rounded-none px-3 py-2 text-xs text-white placeholder-stone-600 focus:outline-hidden focus:border-[#ede8df] disabled:opacity-40"
+                  className="w-full bg-[#0a0c10] border border-white/10 rounded-none px-3 py-2 text-xs text-white placeholder-zinc-600 focus:outline-hidden focus:border-[#e2e4e9] disabled:opacity-40"
                 />
               </div>
 
@@ -339,7 +339,7 @@ export const BatchIptcModal: React.FC<BatchIptcModalProps> = ({
               <div
                 className={`p-3.5 border transition-all ${
                   config.updateCopyright
-                    ? 'bg-white/[0.03] border-[#ede8df]/40'
+                    ? 'bg-white/[0.03] border-[#e2e4e9]/40'
                     : 'bg-black/20 border-white/[0.06] opacity-75'
                 }`}
               >
@@ -354,10 +354,10 @@ export const BatchIptcModal: React.FC<BatchIptcModalProps> = ({
                           updateCopyright: e.target.checked,
                         }))
                       }
-                      className="rounded-none border-stone-600 bg-stone-900 text-[#ede8df] focus:ring-0 w-3.5 h-3.5"
+                      className="rounded-none border-zinc-600 bg-zinc-900 text-[#e2e4e9] focus:ring-0 w-3.5 h-3.5"
                     />
                     <span className="flex items-center gap-1.5">
-                      <Shield className="w-3.5 h-3.5 text-stone-400" />
+                      <Shield className="w-3.5 h-3.5 text-zinc-400" />
                       Autorská práva
                     </span>
                   </label>
@@ -370,7 +370,7 @@ export const BatchIptcModal: React.FC<BatchIptcModalProps> = ({
                     setConfig((prev) => ({ ...prev, copyright: e.target.value }))
                   }
                   placeholder="© 2026 Studio. All rights reserved."
-                  className="w-full bg-[#0a0c10] border border-white/10 rounded-none px-3 py-2 text-xs text-white placeholder-stone-600 focus:outline-hidden focus:border-[#ede8df] disabled:opacity-40"
+                  className="w-full bg-[#0a0c10] border border-white/10 rounded-none px-3 py-2 text-xs text-white placeholder-zinc-600 focus:outline-hidden focus:border-[#e2e4e9] disabled:opacity-40"
                 />
               </div>
             </div>
@@ -379,7 +379,7 @@ export const BatchIptcModal: React.FC<BatchIptcModalProps> = ({
             <div
               className={`p-3.5 border transition-all ${
                 config.updateLocation
-                  ? 'bg-white/[0.03] border-[#ede8df]/40'
+                  ? 'bg-white/[0.03] border-[#e2e4e9]/40'
                   : 'bg-black/20 border-white/[0.06] opacity-75'
               }`}
             >
@@ -394,10 +394,10 @@ export const BatchIptcModal: React.FC<BatchIptcModalProps> = ({
                         updateLocation: e.target.checked,
                       }))
                     }
-                    className="rounded-none border-stone-600 bg-stone-900 text-[#ede8df] focus:ring-0 w-3.5 h-3.5"
+                    className="rounded-none border-zinc-600 bg-zinc-900 text-[#e2e4e9] focus:ring-0 w-3.5 h-3.5"
                   />
                   <span className="flex items-center gap-1.5">
-                    <MapPin className="w-3.5 h-3.5 text-stone-400" />
+                    <MapPin className="w-3.5 h-3.5 text-zinc-400" />
                     Lokalita / Místo pořízení (Location)
                   </span>
                 </label>
@@ -410,7 +410,7 @@ export const BatchIptcModal: React.FC<BatchIptcModalProps> = ({
                   setConfig((prev) => ({ ...prev, location: e.target.value }))
                 }
                 placeholder="Město, země nebo název ateliéru..."
-                className="w-full bg-[#0a0c10] border border-white/10 rounded-none px-3 py-2 text-xs text-white placeholder-stone-600 focus:outline-hidden focus:border-[#ede8df] disabled:opacity-40"
+                className="w-full bg-[#0a0c10] border border-white/10 rounded-none px-3 py-2 text-xs text-white placeholder-zinc-600 focus:outline-hidden focus:border-[#e2e4e9] disabled:opacity-40"
               />
             </div>
 
@@ -418,7 +418,7 @@ export const BatchIptcModal: React.FC<BatchIptcModalProps> = ({
             <div
               className={`p-3.5 border transition-all ${
                 config.updateKeywords
-                  ? 'bg-white/[0.03] border-[#ede8df]/40'
+                  ? 'bg-white/[0.03] border-[#e2e4e9]/40'
                   : 'bg-black/20 border-white/[0.06] opacity-75'
               }`}
             >
@@ -433,10 +433,10 @@ export const BatchIptcModal: React.FC<BatchIptcModalProps> = ({
                         updateKeywords: e.target.checked,
                       }))
                     }
-                    className="rounded-none border-stone-600 bg-stone-900 text-[#ede8df] focus:ring-0 w-3.5 h-3.5"
+                    className="rounded-none border-zinc-600 bg-zinc-900 text-[#e2e4e9] focus:ring-0 w-3.5 h-3.5"
                   />
                   <span className="flex items-center gap-1.5">
-                    <Tag className="w-3.5 h-3.5 text-[#ede8df]" />
+                    <Tag className="w-3.5 h-3.5 text-[#e2e4e9]" />
                     Klíčová slova (Keywords)
                   </span>
                 </label>
@@ -451,8 +451,8 @@ export const BatchIptcModal: React.FC<BatchIptcModalProps> = ({
                     }
                     className={`px-2 py-0.5 rounded-none font-medium transition-colors ${
                       config.keywordsMode === 'append'
-                        ? 'bg-[#ede8df] text-[#111317]'
-                        : 'text-stone-400 hover:text-white bg-white/5'
+                        ? 'bg-[#e2e4e9] text-[#111215]'
+                        : 'text-zinc-400 hover:text-white bg-white/5'
                     }`}
                     title="Přidá slova k existujícím bez duplicit"
                   >
@@ -466,8 +466,8 @@ export const BatchIptcModal: React.FC<BatchIptcModalProps> = ({
                     }
                     className={`px-2 py-0.5 rounded-none font-medium transition-colors ${
                       config.keywordsMode === 'replace'
-                        ? 'bg-[#ede8df] text-[#111317]'
-                        : 'text-stone-400 hover:text-white bg-white/5'
+                        ? 'bg-[#e2e4e9] text-[#111215]'
+                        : 'text-zinc-400 hover:text-white bg-white/5'
                     }`}
                     title="Přepíše všechna klíčová slova těmito novými"
                   >
@@ -482,7 +482,7 @@ export const BatchIptcModal: React.FC<BatchIptcModalProps> = ({
                     className={`px-2 py-0.5 rounded-none font-medium transition-colors ${
                       config.keywordsMode === 'remove'
                         ? 'bg-rose-500 text-white'
-                        : 'text-stone-400 hover:text-white bg-white/5'
+                        : 'text-zinc-400 hover:text-white bg-white/5'
                     }`}
                     title="Odstraní tato slova ze všech vybraných souborů"
                   >
@@ -499,7 +499,7 @@ export const BatchIptcModal: React.FC<BatchIptcModalProps> = ({
                     className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-none text-xs font-mono border ${
                       config.keywordsMode === 'remove'
                         ? 'bg-rose-950/40 text-rose-200 border-rose-800/40'
-                        : 'bg-white/[0.08] text-[#ede8df] border-white/10'
+                        : 'bg-white/[0.08] text-[#e2e4e9] border-white/10'
                     }`}
                   >
                     <span>{kw}</span>
@@ -514,7 +514,7 @@ export const BatchIptcModal: React.FC<BatchIptcModalProps> = ({
                 ))}
 
                 {config.keywords.length === 0 && (
-                  <span className="text-[11px] text-stone-600 italic">
+                  <span className="text-[11px] text-zinc-600 italic">
                     Žádná klíčová slova nebyla zadána. Zadejte slovo a stiskněte Enter nebo čárku.
                   </span>
                 )}
@@ -534,13 +534,13 @@ export const BatchIptcModal: React.FC<BatchIptcModalProps> = ({
                     }
                   }}
                   placeholder="Přidat klíčové slovo (oddělujte čárkou nebo Enterem)..."
-                  className="flex-1 bg-[#0a0c10] border border-white/10 rounded-none px-3 py-1.5 text-xs text-white placeholder-stone-600 focus:outline-hidden focus:border-[#ede8df] disabled:opacity-40 font-mono"
+                  className="flex-1 bg-[#0a0c10] border border-white/10 rounded-none px-3 py-1.5 text-xs text-white placeholder-zinc-600 focus:outline-hidden focus:border-[#e2e4e9] disabled:opacity-40 font-mono"
                 />
                 <button
                   type="button"
                   disabled={!config.updateKeywords || !keywordInput.trim()}
                   onClick={() => handleAddKeyword(keywordInput)}
-                  className="px-3 py-1.5 bg-[#ede8df] hover:bg-white text-[#111317] text-xs font-semibold rounded-none disabled:opacity-40 transition-colors"
+                  className="px-3 py-1.5 bg-[#e2e4e9] hover:bg-white text-[#111215] text-xs font-semibold rounded-none disabled:opacity-40 transition-colors"
                 >
                   Přidat
                 </button>
@@ -555,16 +555,16 @@ export const BatchIptcModal: React.FC<BatchIptcModalProps> = ({
                 <h4 className="text-xs font-semibold text-white tracking-wide uppercase font-mono">
                   Náhled aplikace na soubory
                 </h4>
-                <span className="text-[11px] text-stone-400 font-mono">
+                <span className="text-[11px] text-zinc-400 font-mono">
                   {selectedAssets.length} položek
                 </span>
               </div>
 
               {/* Summary of what will be modified */}
               <div className="my-3 p-3 bg-white/[0.02] border border-white/[0.06] text-xs space-y-1.5">
-                <div className="text-[11px] font-semibold text-stone-300">
+                <div className="text-[11px] font-semibold text-zinc-300">
                   {activeUpdatesCount > 0 ? (
-                    <span className="text-[#ede8df]">
+                    <span className="text-[#e2e4e9]">
                       Bude modifikováno {activeUpdatesCount} IPTC polí:
                     </span>
                   ) : (
@@ -575,32 +575,32 @@ export const BatchIptcModal: React.FC<BatchIptcModalProps> = ({
                 </div>
                 <div className="flex flex-wrap gap-1 text-[10px] font-mono">
                   {config.updateTitle && (
-                    <span className="px-1.5 py-0.5 bg-white/10 text-stone-200">
+                    <span className="px-1.5 py-0.5 bg-white/10 text-zinc-200">
                       Titulek: "{config.title || '(prázdný)'}"
                     </span>
                   )}
                   {config.updateCaption && (
-                    <span className="px-1.5 py-0.5 bg-white/10 text-stone-200">
+                    <span className="px-1.5 py-0.5 bg-white/10 text-zinc-200">
                       Popis ({config.captionMode === 'replace' ? 'přepsat' : 'připojit'})
                     </span>
                   )}
                   {config.updateCreator && (
-                    <span className="px-1.5 py-0.5 bg-white/10 text-stone-200">
+                    <span className="px-1.5 py-0.5 bg-white/10 text-zinc-200">
                       Autor: {config.creator || '(prázdný)'}
                     </span>
                   )}
                   {config.updateCopyright && (
-                    <span className="px-1.5 py-0.5 bg-white/10 text-stone-200">
+                    <span className="px-1.5 py-0.5 bg-white/10 text-zinc-200">
                       Copyright
                     </span>
                   )}
                   {config.updateLocation && (
-                    <span className="px-1.5 py-0.5 bg-white/10 text-stone-200">
+                    <span className="px-1.5 py-0.5 bg-white/10 text-zinc-200">
                       Lokalita: {config.location || '(prázdný)'}
                     </span>
                   )}
                   {config.updateKeywords && (
-                    <span className="px-1.5 py-0.5 bg-white/10 text-stone-200">
+                    <span className="px-1.5 py-0.5 bg-white/10 text-zinc-200">
                       Klíčová slova ({config.keywordsMode}): {config.keywords.length} slov
                     </span>
                   )}
@@ -624,7 +624,7 @@ export const BatchIptcModal: React.FC<BatchIptcModalProps> = ({
                         <div className="font-medium text-white truncate text-[11px]">
                           {asset.name}
                         </div>
-                        <div className="text-[10px] text-stone-400 truncate flex items-center gap-2 mt-0.5">
+                        <div className="text-[10px] text-zinc-400 truncate flex items-center gap-2 mt-0.5">
                           <span>
                             Stávající autor: {asset.iptc.creator || '(neuveden)'}
                           </span>
@@ -651,13 +651,13 @@ export const BatchIptcModal: React.FC<BatchIptcModalProps> = ({
                     <span>Přímý zápis do souborů na disku</span>
                     <span className="text-[10px] font-mono uppercase bg-blue-500/20 text-blue-300 px-1.5 py-0.2 border border-blue-500/30">Writeback</span>
                   </div>
-                  <p className="text-[11px] text-stone-400 mt-0.5 leading-relaxed">
+                  <p className="text-[11px] text-zinc-400 mt-0.5 leading-relaxed">
                     Vloží Adobe XMP segment do souboru a 100% zachová původní EXIF data fotoaparátu (clona, čas, ISO).
                   </p>
                 </div>
               </label>
 
-              <div className="text-[11px] text-stone-500">
+              <div className="text-[11px] text-zinc-500">
                 Změny se okamžitě projeví v aplikaci a v metadatovém inspektoru pro všechny vybrané položky.
               </div>
             </div>
@@ -666,7 +666,7 @@ export const BatchIptcModal: React.FC<BatchIptcModalProps> = ({
 
         {/* Modal Footer */}
         <div className="flex items-center justify-between px-6 py-3.5 border-t border-white/10 bg-[#171923]">
-          <div className="text-xs text-stone-400">
+          <div className="text-xs text-zinc-400">
             {activeUpdatesCount > 0 ? (
               <span>
                 Připraveno k aplikaci na{' '}
@@ -674,7 +674,7 @@ export const BatchIptcModal: React.FC<BatchIptcModalProps> = ({
                 {selectedAssets.length === 1 ? 'soubor' : 'souborů'}
               </span>
             ) : (
-              <span className="text-stone-500">
+              <span className="text-zinc-500">
                 Zaškrtněte alespoň jedno pole, které chcete upravit
               </span>
             )}
@@ -684,7 +684,7 @@ export const BatchIptcModal: React.FC<BatchIptcModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-medium text-stone-300 hover:text-white hover:bg-white/10 rounded-none transition-colors"
+              className="px-4 py-2 text-xs font-medium text-zinc-300 hover:text-white hover:bg-white/10 rounded-none transition-colors"
             >
               Zrušit
             </button>
@@ -694,8 +694,8 @@ export const BatchIptcModal: React.FC<BatchIptcModalProps> = ({
               onClick={handleExecute}
               className={`flex items-center gap-1.5 px-5 py-2 text-xs font-semibold rounded-none transition-all ${
                 activeUpdatesCount > 0
-                  ? 'bg-[#ede8df] hover:bg-white text-[#111317] shadow-lg cursor-pointer'
-                  : 'bg-stone-800 text-stone-500 cursor-not-allowed opacity-50'
+                  ? 'bg-[#e2e4e9] hover:bg-white text-[#111215] shadow-lg cursor-pointer'
+                  : 'bg-zinc-800 text-zinc-500 cursor-not-allowed opacity-50'
               }`}
             >
               <Check className="w-3.5 h-3.5" />

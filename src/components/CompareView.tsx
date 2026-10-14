@@ -111,7 +111,7 @@ export const CompareView: React.FC<CompareViewProps> = ({
                 <span className="mx-1.5">·</span>
                 <span>{asset.dimensions.width} × {asset.dimensions.height}</span>
               </div>
-              <span className="text-[11px] text-[#ede8df] font-mono font-medium">
+              <span className="text-[11px] text-[#e2e4e9] font-mono font-medium">
                 {asset.exif.colorProfile || 'sRGB IEC61966-2.1'}
               </span>
             </div>

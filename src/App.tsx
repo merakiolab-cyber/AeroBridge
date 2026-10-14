@@ -871,7 +871,7 @@ export default function App() {
 
   return (
     <div
-      className="flex flex-col h-screen w-screen overflow-hidden bg-[#131211] text-stone-100 font-sans select-none"
+      className="flex flex-col h-screen w-screen overflow-hidden bg-[#121316] text-zinc-100 font-sans select-none"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -955,8 +955,8 @@ export default function App() {
           onMouseDown={handleSidebarResizeStart}
           className={`w-1 relative z-20 cursor-col-resize select-none shrink-0 transition-colors group flex items-center justify-center ${
             isResizingSidebar
-              ? 'bg-[#ede8df] opacity-100'
-              : 'bg-transparent hover:bg-[#ede8df]/50'
+              ? 'bg-[#e2e4e9] opacity-100'
+              : 'bg-transparent hover:bg-[#e2e4e9]/50'
           }`}
           title="Tahem myši změnit šířku bočního panelu"
         >
@@ -964,7 +964,7 @@ export default function App() {
         </div>
 
         {/* Center Canvas */}
-        <main className="flex-1 flex flex-col min-w-0 bg-[#131211] relative overflow-hidden">
+        <main className="flex-1 flex flex-col min-w-0 bg-[#121316] relative overflow-hidden">
           {currentView === 'essentials' && (
             <AssetGrid
               assets={filteredAssets}

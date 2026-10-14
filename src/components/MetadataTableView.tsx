@@ -31,9 +31,9 @@ export const MetadataTableView: React.FC<MetadataTableViewProps> = ({
   const renderSortIndicator = (field: SortField) => {
     if (sortField !== field) return null;
     return sortOrder === 'asc' ? (
-      <ArrowUp className="w-3 h-3 text-[#ede8df] inline ml-1" />
+      <ArrowUp className="w-3 h-3 text-[#e2e4e9] inline ml-1" />
     ) : (
-      <ArrowDown className="w-3 h-3 text-[#ede8df] inline ml-1" />
+      <ArrowDown className="w-3 h-3 text-[#e2e4e9] inline ml-1" />
     );
   };
 
@@ -41,7 +41,7 @@ export const MetadataTableView: React.FC<MetadataTableViewProps> = ({
     <div className="flex-1 flex flex-col h-full bg-[#090a0f] select-none overflow-hidden">
       <div className="flex-1 overflow-auto">
         <table className="w-full border-collapse text-left text-xs">
-          <thead className="sticky top-0 bg-[#0e1015] border-b border-white/[0.06] text-[11px] font-semibold text-stone-400 z-10 backdrop-blur-md">
+          <thead className="sticky top-0 bg-[#0e1015] border-b border-white/[0.06] text-[11px] font-semibold text-zinc-400 z-10 backdrop-blur-md">
             <tr>
               <th
                 onClick={() => onSort?.('extension')}
@@ -89,10 +89,10 @@ export const MetadataTableView: React.FC<MetadataTableViewProps> = ({
                   onDoubleClick={() => onOpenQuickLook(asset.id)}
                   className={`transition-colors cursor-pointer ${
                     isSelected
-                      ? 'bg-[#332f2b] text-white border-l-4 border-l-[#ede8df] shadow-md font-medium'
+                      ? 'bg-[#2a2c32] text-white border-l-4 border-l-[#e2e4e9] shadow-md font-medium'
                       : isFocused
                       ? 'bg-white/[0.06] text-white'
-                      : 'hover:bg-white/[0.03] text-stone-300'
+                      : 'hover:bg-white/[0.03] text-zinc-300'
                   }`}
                 >
                   {/* Badge */}
@@ -115,29 +115,29 @@ export const MetadataTableView: React.FC<MetadataTableViewProps> = ({
                   </td>
 
                   {/* Dimensions */}
-                  <td className="py-2.5 px-4 font-mono text-[11px] text-stone-400 tabular-nums">
+                  <td className="py-2.5 px-4 font-mono text-[11px] text-zinc-400 tabular-nums">
                     {asset.dimensions.width > 0
                       ? `${asset.dimensions.width} × ${asset.dimensions.height}`
                       : 'N/A'}
                   </td>
 
                   {/* Size */}
-                  <td className="py-2.5 px-4 font-mono text-[11px] text-right text-stone-300 tabular-nums">
+                  <td className="py-2.5 px-4 font-mono text-[11px] text-right text-zinc-300 tabular-nums">
                     {formatBytes(asset.size)}
                   </td>
 
                   {/* Color Profile */}
-                  <td className="py-2.5 px-4 font-mono text-[11px] text-[#ede8df] truncate">
+                  <td className="py-2.5 px-4 font-mono text-[11px] text-[#e2e4e9] truncate">
                     {asset.exif.colorProfile || 'sRGB'}
                   </td>
 
                   {/* Date Modified */}
-                  <td className="py-2.5 px-4 font-mono text-[11px] text-stone-400 tabular-nums">
+                  <td className="py-2.5 px-4 font-mono text-[11px] text-zinc-400 tabular-nums">
                     {formatDate(asset.dateModified)}
                   </td>
 
                   {/* Camera / Software */}
-                  <td className="py-2.5 px-4 text-[11px] text-stone-400 truncate max-w-xs">
+                  <td className="py-2.5 px-4 text-[11px] text-zinc-400 truncate max-w-xs">
                     {asset.exif.camera || asset.exif.software || asset.format}
                   </td>
 
@@ -150,7 +150,7 @@ export const MetadataTableView: React.FC<MetadataTableViewProps> = ({
                           e.stopPropagation();
                           onCopyImage(asset);
                         }}
-                        className="p-1.5 hover:bg-white/10 rounded-full text-stone-400 hover:text-white transition-colors"
+                        className="p-1.5 hover:bg-white/10 rounded-full text-zinc-400 hover:text-white transition-colors"
                         title="Kopírovat obrázek do schránky (Ctrl+C)"
                       >
                         <Copy className="w-3.5 h-3.5" />
@@ -161,7 +161,7 @@ export const MetadataTableView: React.FC<MetadataTableViewProps> = ({
                           e.stopPropagation();
                           onCopyPath(asset);
                         }}
-                        className="p-1.5 hover:bg-white/10 rounded-full text-stone-400 hover:text-white transition-colors"
+                        className="p-1.5 hover:bg-white/10 rounded-full text-zinc-400 hover:text-white transition-colors"
                         title="Kopírovat cestu"
                       >
                         <FileText className="w-3.5 h-3.5" />
