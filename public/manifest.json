@@ -1,0 +1,21 @@
+{
+  "id": "/",
+  "name": "AeroBridge Studio",
+  "short_name": "AeroBridge",
+  "description": "Ultra-rychlý moderní digitální asset manažer a organizér médií — lehká offline alternativa k Adobe Bridge.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#090a0f",
+  "theme_color": "#14161e",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["utilities", "productivity", "photo"]
+}

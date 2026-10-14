@@ -1,0 +1,6 @@
+{
+  "name": "AeroBridge Studio",
+  "description": "Ultra-rychlý moderní digitální asset manažer a organizér médií navržený jako lehká, blesková a bezplatná alternativa k Adobe Bridge.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

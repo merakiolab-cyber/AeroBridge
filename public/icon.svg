@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" fill="#090a0f"/>
+  <rect x="32" y="32" width="448" height="448" fill="#14161e" stroke="#ffffff" stroke-opacity="0.1" stroke-width="4"/>
+  <!-- Bauhaus rectilinear composition -->
+  <rect x="72" y="72" width="160" height="160" fill="#ede8df"/>
+  <circle cx="360" cy="152" r="80" fill="#2d313d"/>
+  <rect x="72" y="272" width="368" height="168" fill="#1b1e29" stroke="#ede8df" stroke-width="2"/>
+  <line x1="72" y1="356" x2="440" y2="356" stroke="#ede8df" stroke-opacity="0.3" stroke-width="2"/>
+  <circle cx="152" cy="152" r="32" fill="#090a0f"/>
+  <polygon points="272,390 320,310 368,390" fill="#ede8df"/>
+</svg>
