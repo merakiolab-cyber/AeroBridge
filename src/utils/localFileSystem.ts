@@ -2,9 +2,13 @@ import JSZip from 'jszip';
 import { AssetItem, BatchExportConfig } from '../types';
 import {
   extractPsdThumbnail,
+  extractInddThumbnail,
+  extractAiThumbnail,
+  extractRawThumbnail,
   extractVideoThumbnail,
   getAdobeFileType,
   getImageDimensions,
+  generateDocumentPlaceholder,
 } from './adobeThumbnailExtractor';
 
 /**
@@ -86,14 +90,40 @@ export async function parseFilesToAssets(
 
     try {
       if (category === 'adobe-psd') {
-        const buffer = await file.slice(0, 1024 * 1024 * 5).arrayBuffer();
+        const buffer = await file.slice(0, 1024 * 1024 * 6).arrayBuffer();
         const psdThumb = extractPsdThumbnail(buffer);
         if (psdThumb) {
           previewUrl = psdThumb;
           dimensions = await getImageDimensions(previewUrl);
         } else {
-          // Fallback to object URL or generated placeholder
+          previewUrl = generateDocumentPlaceholder(file.name, extension, colorBadge, format);
+          dimensions = { width: 1200, height: 900 };
+        }
+      } else if (category === 'adobe-indd') {
+        const buffer = await file.slice(0, 1024 * 1024 * 10).arrayBuffer();
+        const inddRes = await extractInddThumbnail(buffer, file.name);
+        previewUrl = inddRes.url;
+        dimensions = { width: inddRes.width, height: inddRes.height };
+      } else if (category === 'adobe-ai') {
+        const buffer = await file.slice(0, 1024 * 1024 * 8).arrayBuffer();
+        const aiRes = await extractAiThumbnail(buffer, file.name);
+        previewUrl = aiRes.url;
+        dimensions = { width: aiRes.width, height: aiRes.height };
+      } else if (category === 'raw') {
+        const buffer = await file.slice(0, 1024 * 1024 * 16).arrayBuffer();
+        const rawRes = await extractRawThumbnail(buffer, file.name);
+        previewUrl = rawRes.url;
+        dimensions = { width: rawRes.width, height: rawRes.height };
+      } else if (category === 'vector') {
+        if (extension === 'EPS') {
+          const buffer = await file.slice(0, 1024 * 1024 * 6).arrayBuffer();
+          const epsRes = await extractAiThumbnail(buffer, file.name);
+          previewUrl = epsRes.url;
+          dimensions = { width: epsRes.width, height: epsRes.height };
+        } else {
+          // Standard SVG Vector
           previewUrl = URL.createObjectURL(file);
+          dimensions = await getImageDimensions(previewUrl);
         }
       } else if (category === 'video') {
         try {
@@ -102,18 +132,21 @@ export async function parseFilesToAssets(
           dimensions = { width: videoInfo.width, height: videoInfo.height };
           duration = videoInfo.duration;
         } catch {
-          previewUrl = URL.createObjectURL(file);
+          previewUrl = generateDocumentPlaceholder(file.name, extension, colorBadge, format);
+          dimensions = { width: 1200, height: 900 };
         }
-      } else if (category === 'image' || category === 'vector') {
+      } else if (category === 'image') {
         previewUrl = URL.createObjectURL(file);
         dimensions = await getImageDimensions(previewUrl);
       } else {
-        // AI, INDD, AEP, PR, PDF
-        previewUrl = URL.createObjectURL(file);
+        // PDF, After Effects, Premiere, and other formats
+        previewUrl = generateDocumentPlaceholder(file.name, extension, colorBadge, format);
+        dimensions = { width: 1200, height: 900 };
       }
     } catch (e) {
       console.warn(`Error generating preview for ${file.name}:`, e);
-      previewUrl = URL.createObjectURL(file);
+      previewUrl = generateDocumentPlaceholder(file.name, extension, colorBadge, format);
+      dimensions = { width: 1200, height: 900 };
     }
 
     const modifiedDate = new Date(file.lastModified).toISOString().replace('T', ' ').slice(0, 19);

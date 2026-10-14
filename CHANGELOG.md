@@ -2,7 +2,22 @@
 
 ## Changelog
 
-### Version 2.6.0 (Aktuální verze — Fáze 1: Windows 11 UX & Virtualizace)
+### Version 2.7.0 (Aktuální verze — Nativní dekódování InDesign, Adobe & RAW)
+- **Nativní podpora Adobe InDesign (`.indd`, `.idml`):**
+  - Implementována klientská extrakce náhledů z InDesign dokumentů v [adobeThumbnailExtractor.ts](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/utils/adobeThumbnailExtractor.ts).
+  - Parsování XMP metadatových packetů (`<xmpGImg:image>` base64 JPEG) a vyhledávání embedded page streamů.
+- **Podpora Camera RAW formátů:**
+  - Přidána rychlá extrakce náhledů pro Canon (`.cr2`, `.cr3`), Nikon (`.nef`), Sony (`.arw`), Adobe DNG (`.dng`), Fuji (`.raf`), Olympus (`.orf`), Panasonic (`.rw2`).
+  - Přímé O(1) čtení TIFF IFD tagů `0x0201` (`JPEGInterchangeFormat`) a `0x0202` (`JPEGInterchangeFormatLength`) s automatickým fallbackem na SOI skener.
+- **Podpora vektorů a Adobe Illustrator:**
+  - Extrakce náhledů pro `.ai` a `.eps` soubory.
+  - Okamžité vykreslení vektorových SVG souborů s detekcí rozměrů.
+- **Bauhaus generátor grafických karet:**
+  - Automatické generování ostrých grafických karet v tmavém Bauhaus stylu s typografickým odznakem, barevným pruhem a názvem souboru pro dokumenty, které neobsahují vložený náhled.
+
+---
+
+### Version 2.6.0
 - **Virtualizace mřížky (High-Performance DOM Virtual Scrolling):**
   - Implementován lehký virtuální scroll v [AssetGrid.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/AssetGrid.tsx).
   - Vykresluje pouze viditelnou část mřížky (+ 2 řádky overscan buffer).

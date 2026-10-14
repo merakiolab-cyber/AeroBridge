@@ -32,7 +32,7 @@ export interface AssetItem {
   fullPath?: string;
   url: string;
   type: AssetType;
-  category: 'image' | 'adobe-psd' | 'adobe-ai' | 'adobe-indd' | 'adobe-ae' | 'adobe-pr' | 'pdf' | 'video' | 'vector' | 'other';
+  category: 'image' | 'raw' | 'adobe-psd' | 'adobe-ai' | 'adobe-indd' | 'adobe-ae' | 'adobe-pr' | 'pdf' | 'video' | 'vector' | 'other';
   format: string;
   extension: string;
   colorBadge: string;
