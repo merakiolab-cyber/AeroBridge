@@ -2,6 +2,24 @@
 
 ## Changelog
 
+### Version 3.2.0 (Desktop Průzkumník disků, skutečné náhledy PDF/INDD & nová ikona)
+- **Oprava: nezobrazující se náhledy PNG/JPG v desktopové aplikaci** — zapnut Tauri `asset` protokol (`protocol-asset` + `assetProtocol` scope), bez kterého WebView nenačetl lokální soubory.
+- **Procházení disků jako v Průzkumníku:**
+  - Strom „Tento počítač“ (Plocha, Dokumenty, Stažené, Obrázky, Videa, Hudba + všechny disky) s líným rozbalováním ([NativeExplorerTree.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/NativeExplorerTree.tsx)).
+  - Adresní lišta Zpět / Vpřed / Nahoru / Obnovit, klikací cesta, ruční zadání cesty a čipy podsložek ([NativePathBar.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/NativePathBar.tsx)); zkratky `Alt+←/→/↑`, `F5`.
+  - Skryté a systémové soubory Windows se nezobrazují; obnovení poslední otevřené složky po startu.
+  - Nové Rust příkazy: `list_drives`, `get_user_places`, `list_subdirs`; skenování běží asynchronně mimo hlavní vlákno.
+- **Skutečné náhledy dokumentů** ([nativeThumbnails.ts](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/utils/nativeThumbnails.ts)):
+  - PDF — vykreslení první stránky přes pdf.js (offline, worker inline).
+  - InDesign — Rust příkaz `extract_xmp_thumbnail` streamuje soubor a čte XMP náhled; opravena chyba s entitami `&#xA;` v base64, kvůli které se náhled dříve nenašel. IDML — náhled z ZIP balíčku.
+  - Illustrator (PDF-kompatibilní render), Photoshop (XMP / JFIF), RAW, EPS a snímky z videí.
+  - Náhledy se generují na pozadí (3 souběžně), složka se otevře okamžitě.
+  - `read_file_binary` nyní používá binární IPC (`tauri::ipc::Response`) a volitelný limit bajtů.
+- **Nová ikona aplikace** (monogram „Ab“) pro Windows, macOS a web/PWA.
+- `tsconfig.json`: omezen rozsah `tsc` na zdrojové soubory (neprochází `src-tauri/target`).
+
+---
+
 ### Version 3.1.0 (Čistá neutrální šedá paleta — Neutral Studio Gray)
 - **Profesionální vizuální redesign barev:**
   - Odstraněny teplé pískové a hnědé odstíny (`stone-*`, `#ede8df`, `#131211`, `#161513`) napříč celou aplikací.

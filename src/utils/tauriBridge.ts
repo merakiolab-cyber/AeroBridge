@@ -56,13 +56,71 @@ export async function scanNativeFolder(dirPath: string): Promise<NativeFileEntry
 }
 
 /**
- * Reads binary file data into a Uint8Array via Tauri IPC for native RAW / Adobe parsing.
+ * Reads (the head of) a file as an ArrayBuffer through Tauri's binary IPC channel.
  */
-export async function readNativeFileBinary(filePath: string): Promise<Uint8Array> {
+export async function readNativeFileBinary(filePath: string, maxBytes?: number): Promise<ArrayBuffer> {
   if (!isDesktopApp()) throw new Error('Native binary reading requires desktop environment');
-  const buffer = await invoke<number[]>('read_file_binary', { path: filePath });
-  return new Uint8Array(buffer);
+  const res = await invoke<ArrayBuffer>('read_file_binary', {
+    path: filePath,
+    maxBytes: maxBytes ?? null,
+  });
+  return res instanceof ArrayBuffer ? res : new Uint8Array(res as unknown as number[]).buffer;
 }
+
+export interface NativePlace {
+  name: string;
+  path: string;
+}
+
+/** Lists available drives (C:\, D:\, ...). */
+export async function listNativeDrives(): Promise<NativePlace[]> {
+  if (!isDesktopApp()) return [];
+  try {
+    return await invoke<NativePlace[]>('list_drives');
+  } catch (err) {
+    console.warn('[TauriBridge] list_drives failed:', err);
+    return [];
+  }
+}
+
+/** Quick access folders: Desktop, Documents, Downloads, Pictures, ... */
+export async function listNativePlaces(): Promise<NativePlace[]> {
+  if (!isDesktopApp()) return [];
+  try {
+    return await invoke<NativePlace[]>('get_user_places');
+  } catch (err) {
+    console.warn('[TauriBridge] get_user_places failed:', err);
+    return [];
+  }
+}
+
+/** Lists only subdirectories of a folder (for lazy tree expansion). */
+export async function listNativeSubdirs(dirPath: string): Promise<NativeFileEntry[]> {
+  if (!isDesktopApp()) return [];
+  try {
+    return await invoke<NativeFileEntry[]>('list_subdirs', { path: dirPath });
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Extracts the embedded XMP JPEG preview (InDesign / Illustrator / Photoshop) in Rust.
+ * Returns a data URL or null.
+ */
+export async function extractNativeXmpThumbnail(filePath: string, maxScanMb: number): Promise<string | null> {
+  if (!isDesktopApp()) return null;
+  try {
+    const b64 = await invoke<string | null>('extract_xmp_thumbnail', {
+      path: filePath,
+      maxScanMb,
+    });
+    return b64 ? `data:image/jpeg;base64,${b64}` : null;
+  } catch {
+    return null;
+  }
+}
+
 
 /**
  * Reveals a file or folder in Windows File Explorer (equivalent to Right Click -> Show in Explorer).

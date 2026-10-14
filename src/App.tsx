@@ -25,7 +25,11 @@ import {
   pickNativeFolder,
   scanNativeFolder,
   revealInWindowsExplorer,
+  type NativeFileEntry,
 } from './utils/tauriBridge';
+import { hydrateNativeThumbnails, type ThumbJob } from './utils/nativeThumbnails';
+import { pathAncestors } from './components/NativeExplorerTree';
+import { NativePathBar } from './components/NativePathBar';
 import { writeMetadataBackToAsset } from './utils/metadataWriter';
 import {
   saveDirectoryHandle,
@@ -111,6 +115,14 @@ export default function App() {
   const filesInputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
+  // --- Native (desktop) Explorer-style navigation state ---
+  const [nativeDir, setNativeDir] = useState<string | null>(null);
+  const [nativeSubdirs, setNativeSubdirs] = useState<NativeFileEntry[]>([]);
+  const [nativeLoading, setNativeLoading] = useState(false);
+  const [navHistory, setNavHistory] = useState<{ stack: string[]; index: number }>({ stack: [], index: -1 });
+  const navHistoryRef = useRef(navHistory);
+  const thumbJobRef = useRef<ThumbJob | null>(null);
+
   // --- Notification Toast Helper ---
   const addToast = useCallback((title: string, description?: string, type: 'success' | 'info' | 'warning' = 'success') => {
     const id = `toast-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
@@ -129,7 +141,9 @@ export default function App() {
     const list = assets.filter((asset) => {
       // Folder filtering
       if (activeFolder !== '/') {
-        if (!asset.folder.startsWith(activeFolder)) {
+        if (activeFolder.startsWith('native:')) {
+          if (asset.folder !== activeFolder) return false;
+        } else if (!asset.folder.startsWith(activeFolder)) {
           return false;
         }
       }
@@ -379,7 +393,9 @@ export default function App() {
         }
 
         // 2. Load stored custom assets
-        const savedAssets = await loadAssetsFromIndexedDB();
+        const savedAssets = (await loadAssetsFromIndexedDB()).filter(
+          (a) => !a.id.startsWith('native-')
+        );
         if (isMounted && savedAssets.length > 0) {
           setAssets((prev) => {
             const existingIds = new Set(prev.map((a) => a.id));
@@ -424,6 +440,120 @@ export default function App() {
     saveWorkspaceSession(favoriteFolders, activeFolder, sortField, sortOrder);
   }, [favoriteFolders, activeFolder, sortField, sortOrder, isInitialLoadDone]);
 
+  // --- Native Explorer-style navigation (Windows desktop) ---
+  const navigateNative = useCallback(
+    async (rawPath: string, opts?: { historyIndex?: number }) => {
+      const path = rawPath.trim();
+      if (!path) return;
+      setNativeLoading(true);
+      try {
+        const entries = await scanNativeFolder(path);
+        if (thumbJobRef.current) thumbJobRef.current.cancelled = true;
+
+        const name = path.replace(/[\\/]+$/, '').split(/[\\/]/).filter(Boolean).pop() || path;
+        const imported = parseNativeEntriesToAssets(entries, name, path);
+
+        setAssets((prev) => [...imported, ...prev.filter((a) => !a.id.startsWith('native-'))]);
+        setNativeDir(path);
+        setNativeSubdirs(entries.filter((e) => e.is_dir));
+        setActiveFolder(`native:${path}`);
+        setSelectedIds(new Set(imported[0] ? [imported[0].id] : []));
+        setFocusedId(imported[0]?.id ?? null);
+        try {
+          localStorage.setItem('aerobridge_last_native_dir', path);
+        } catch {}
+
+        // History bookkeeping
+        const h = navHistoryRef.current;
+        let nextHistory = h;
+        if (opts?.historyIndex !== undefined) {
+          nextHistory = { stack: h.stack, index: opts.historyIndex };
+        } else if (h.stack[h.index] !== path) {
+          const stack = [...h.stack.slice(0, h.index + 1), path];
+          nextHistory = { stack, index: stack.length - 1 };
+        }
+        navHistoryRef.current = nextHistory;
+        setNavHistory(nextHistory);
+
+        // Real previews (PDF, INDD, AI, PSD, RAW, video) are generated in the background
+        thumbJobRef.current = hydrateNativeThumbnails(imported, (patches) => {
+          setAssets((prev) =>
+            prev.map((a) => {
+              const p = patches.get(a.id);
+              return p
+                ? { ...a, url: p.url, dimensions: p.dimensions, duration: p.duration ?? a.duration }
+                : a;
+            })
+          );
+        });
+      } catch (err) {
+        addToast('Složku nelze otevřít', String(err), 'warning');
+      } finally {
+        setNativeLoading(false);
+      }
+    },
+    [addToast]
+  );
+
+  const handleNativeBack = useCallback(() => {
+    const h = navHistoryRef.current;
+    if (h.index > 0) void navigateNative(h.stack[h.index - 1], { historyIndex: h.index - 1 });
+  }, [navigateNative]);
+
+  const handleNativeForward = useCallback(() => {
+    const h = navHistoryRef.current;
+    if (h.index < h.stack.length - 1) {
+      void navigateNative(h.stack[h.index + 1], { historyIndex: h.index + 1 });
+    }
+  }, [navigateNative]);
+
+  const handleNativeUp = useCallback(() => {
+    if (!nativeDir) return;
+    const ancestors = pathAncestors(nativeDir);
+    if (ancestors.length > 1) void navigateNative(ancestors[ancestors.length - 2]);
+  }, [nativeDir, navigateNative]);
+
+  const handleNativeRefresh = useCallback(() => {
+    if (nativeDir) {
+      void navigateNative(nativeDir, { historyIndex: navHistoryRef.current.index });
+    }
+  }, [nativeDir, navigateNative]);
+
+  // Keyboard: Alt+Left/Right/Up, F5 (Explorer-like)
+  useEffect(() => {
+    if (!isDesktopApp()) return;
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
+      if (e.altKey && e.key === 'ArrowLeft') {
+        e.preventDefault();
+        handleNativeBack();
+      } else if (e.altKey && e.key === 'ArrowRight') {
+        e.preventDefault();
+        handleNativeForward();
+      } else if (e.altKey && e.key === 'ArrowUp') {
+        e.preventDefault();
+        handleNativeUp();
+      } else if (e.key === 'F5' && activeFolder.startsWith('native:')) {
+        e.preventDefault();
+        handleNativeRefresh();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [handleNativeBack, handleNativeForward, handleNativeUp, handleNativeRefresh, activeFolder]);
+
+  // Restore the last browsed native folder on desktop start
+  useEffect(() => {
+    if (!isInitialLoadDone || !isDesktopApp()) return;
+    let last: string | null = null;
+    try {
+      last = localStorage.getItem('aerobridge_last_native_dir');
+    } catch {}
+    if (last) void navigateNative(last);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isInitialLoadDone]);
+
   // --- Open Folder & Local File System Access ---
   const handleOpenLocalFolder = async () => {
     // 1. Native Windows 11 Desktop workflow (Tauri v2)
@@ -431,25 +561,7 @@ export default function App() {
       try {
         const nativePath = await pickNativeFolder();
         if (nativePath) {
-          const folderName = nativePath.split(/[/\\]/).filter(Boolean).pop() || 'Složka';
-          addToast('Prohledávám disk Windows...', folderName, 'info');
-          const entries = await scanNativeFolder(nativePath);
-          const imported = parseNativeEntriesToAssets(entries, folderName);
-          if (imported.length > 0) {
-            setAssets((prev) => [...imported, ...prev]);
-            setSelectedIds(new Set([imported[0].id]));
-            setFocusedId(imported[0].id);
-            setActiveFolder(`/${folderName}`);
-            saveAssetsToIndexedDB(imported);
-            addToast(
-              'Složka načtena přímo z disku',
-              `Načteno ${imported.length} souborů z ${folderName}`
-            );
-            return;
-          } else {
-            addToast('Složka je prázdná', folderName, 'info');
-            return;
-          }
+          await navigateNative(nativePath);
         }
         return;
       } catch (err) {
@@ -948,6 +1060,8 @@ export default function App() {
           onRescanDirectory={handleRescanSavedDirectory}
           onRemoveSavedDirectory={handleRemoveSavedDirectory}
           onOpenNativeFolder={handleOpenLocalFolder}
+          nativeActivePath={activeFolder.startsWith('native:') ? nativeDir : null}
+          onNavigateNative={isDesktopApp() ? navigateNative : undefined}
         />
 
         {/* Dynamic Sidebar Resize Handle (Tahem myši rozšiřovat/zužovat) */}
@@ -965,6 +1079,20 @@ export default function App() {
 
         {/* Center Canvas */}
         <main className="flex-1 flex flex-col min-w-0 bg-[#121316] relative overflow-hidden">
+          {isDesktopApp() && nativeDir && activeFolder.startsWith('native:') && (
+            <NativePathBar
+              path={nativeDir}
+              subdirs={nativeSubdirs}
+              canBack={navHistory.index > 0}
+              canForward={navHistory.index < navHistory.stack.length - 1}
+              isLoading={nativeLoading}
+              onBack={handleNativeBack}
+              onForward={handleNativeForward}
+              onUp={handleNativeUp}
+              onRefresh={handleNativeRefresh}
+              onNavigate={navigateNative}
+            />
+          )}
           {currentView === 'essentials' && (
             <AssetGrid
               assets={filteredAssets}

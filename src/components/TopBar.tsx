@@ -131,6 +131,8 @@ export const TopBar: React.FC<TopBarProps> = ({
             <span className="text-[#e2e4e9] font-medium truncate">
               {activeFolder === '/'
                 ? 'Všechna média'
+                : activeFolder.startsWith('native:')
+                ? activeFolder.slice(7)
                 : activeFolder.replace(/^\//, '').replace(/\//g, ' / ')}
             </span>
             <span className="text-zinc-500 font-mono text-[11px] tabular-nums">

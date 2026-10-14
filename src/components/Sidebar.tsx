@@ -13,6 +13,7 @@ import {
   RefreshCw,
   FolderPlus,
 } from 'lucide-react';
+import { NativeExplorerTree } from './NativeExplorerTree';
 
 interface SidebarProps {
   folders: FolderNode[];
@@ -31,6 +32,8 @@ interface SidebarProps {
   onRescanDirectory?: (dir: SavedDirectoryRecord) => void;
   onRemoveSavedDirectory?: (id: string) => void;
   onOpenNativeFolder?: () => void;
+  nativeActivePath?: string | null;
+  onNavigateNative?: (path: string) => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -50,6 +53,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onRescanDirectory,
   onRemoveSavedDirectory,
   onOpenNativeFolder,
+  nativeActivePath = null,
+  onNavigateNative,
 }) => {
   const [dragOverPath, setDragOverPath] = useState<string | null>(null);
 
@@ -212,6 +217,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       style={{ width: `${width}px` }}
       className="bg-[#16171a] border-r border-white/[0.06] flex flex-col h-full shrink-0 select-none overflow-y-auto"
     >
+      {/* 0. NATIVE FILE EXPLORER (desktop only): places + drives */}
+      {onNavigateNative && (
+        <NativeExplorerTree activePath={nativeActivePath} onNavigate={onNavigateNative} />
+      )}
+
       {/* 1. FAVORITES SECTION (Oblíbené) */}
       <div className="p-3 border-b border-white/[0.06]">
         <div className="flex items-center justify-between px-2 mb-2">

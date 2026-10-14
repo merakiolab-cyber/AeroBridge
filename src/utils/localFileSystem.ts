@@ -11,6 +11,7 @@ import {
   generateDocumentPlaceholder,
 } from './adobeThumbnailExtractor';
 import { toDesktopAssetUrl, type NativeFileEntry } from './tauriBridge';
+import { getCachedPlaceholder } from './nativeThumbnails';
 
 /**
  * Format raw bytes into human-readable representation (e.g. 4.2 MB)
@@ -435,15 +436,16 @@ export async function downloadAssetsAsZip(
  */
 export function parseNativeEntriesToAssets(
   entries: NativeFileEntry[],
-  folderName: string
+  folderName: string,
+  dirPath?: string
 ): AssetItem[] {
   const results: AssetItem[] = [];
-  const imageExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg', 'bmp', 'ico'];
-  const videoExtensions = ['mp4', 'webm', 'ogg', 'mov', 'm4v'];
+  const imageExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg', 'bmp', 'ico', 'avif'];
+  const folderKey = dirPath ? `native:${dirPath}` : `/${folderName}`;
 
   for (let i = 0; i < entries.length; i++) {
     const entry = entries[i];
-    if (entry.is_dir) continue; // skip subdirectories in the flat asset grid
+    if (entry.is_dir) continue; // subdirectories are navigated through the explorer bar / tree
 
     const ext = entry.extension.toLowerCase();
     const typeInfo = getAdobeFileType(entry.name);
@@ -451,20 +453,20 @@ export function parseNativeEntriesToAssets(
       ? new Date(entry.modified_ms).toISOString().replace('T', ' ').slice(0, 19)
       : new Date().toISOString().replace('T', ' ').slice(0, 19);
 
-    const isStandardMedia = imageExtensions.includes(ext) || videoExtensions.includes(ext);
-    const previewUrl = isStandardMedia
+    const isDirectImage = imageExtensions.includes(ext);
+    const previewUrl = isDirectImage
       ? toDesktopAssetUrl(entry.path)
-      : generateDocumentPlaceholder(
-          entry.name,
+      : getCachedPlaceholder(
           typeInfo.extension || ext.toUpperCase(),
           typeInfo.colorBadge,
-          formatBytes(entry.size)
+          typeInfo.format
         );
+
 
     const asset: AssetItem = {
       id: `native-${Date.now()}-${i}-${Math.random().toString(36).substring(2, 7)}`,
       name: entry.name,
-      folder: `/${folderName}`,
+      folder: folderKey,
       fullPath: entry.path,
       url: previewUrl,
       type: typeInfo.category as any,

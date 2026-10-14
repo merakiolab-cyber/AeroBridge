@@ -60,6 +60,16 @@
 
 ---
 
+## 🗂️ Fáze 4: Desktop Průzkumník & nativní náhledy (ZÁKLAD HOTOV ✅, ladění pokračuje)
+- [x] Procházení všech disků a složek jako v Průzkumníku (strom, adresní lišta, historie, zkratky)
+- [x] Náhledy PDF (pdf.js), InDesign (XMP), Illustrator, Photoshop, RAW a videí přímo z disku
+- [x] Nová ikona aplikace a standalone .exe + instalátor
+- [ ] Ověřit náhledy na reálných souborech (velké INDD / PDF, INDD bez vloženého náhledu)
+- [ ] Cache náhledů na disku, aby se při opakovaném otevření složky negenerovaly znovu
+- [ ] Dvojklik na soubor = otevření v systémové aplikaci; podsložky přímo v mřížce
+
+---
+
 ## 🚫 Vyřazené funkce ze záměru (Out of Scope / Záměrně neimplementovat)
 - ❌ **Typografie & OpenType (Font preview / Glyphs / Font management):** Zcela vyřazeno z DAM workflow jako zbytečné. AeroBridge se soustředí výhradně na kreativní média (foto, video, Adobe formáty, vektorovou grafiku).
 - ❌ **Barevné štítky & hodnocení hvězdičkami (Rating 1–5, Labels):** Odmítnuto pro zachování minimalistického, nerušivého prostředí bez vizuálního smogu.

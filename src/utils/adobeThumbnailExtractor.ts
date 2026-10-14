@@ -26,10 +26,12 @@ export function extractXmpThumbnail(buffer: ArrayBuffer, maxScanBytes = 1024 * 1
     const scanLimit = Math.min(bytes.length, maxScanBytes);
     const textChunk = new TextDecoder('utf-8', { fatal: false }).decode(bytes.subarray(0, scanLimit));
 
-    // Match <xmpGImg:image> or <xapGImg:image> or <photoshop:Thumbnail>
-    const match = textChunk.match(/<x[ma]pGImg:image>\s*([A-Za-z0-9+/=\s]{100,})\s*<\/x[ma]pGImg:image>/i);
+    // Match <xmpGImg:image>...</xmpGImg:image>; Adobe writes line breaks as &#xA; entities
+    const match = textChunk.match(/<x[ma]pGImg:image>([\s\S]{100,}?)<\/x[ma]pGImg:image>/i);
     if (match && match[1]) {
-      const cleanBase64 = match[1].replace(/\s+/g, '');
+      const cleanBase64 = match[1]
+        .replace(/&#x?[0-9a-f]+;/gi, '')
+        .replace(/[^A-Za-z0-9+/=]/g, '');
       if (cleanBase64.length > 100) {
         return `data:image/jpeg;base64,${cleanBase64}`;
       }

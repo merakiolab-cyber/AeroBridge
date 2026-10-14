@@ -61,3 +61,6 @@ $RECYCLE.BIN/
 # Tauri & Rust build artifacts
 src-tauri/target/
 src-tauri/gen/
+
+# Local desktop build output
+dist-desktop/
