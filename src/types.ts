@@ -53,6 +53,7 @@ export interface AssetItem {
   isCustomUploaded?: boolean;
   blob?: Blob;
   fileRef?: File;
+  fileHandle?: any;
 }
 
 export interface FilterState {
@@ -111,4 +112,5 @@ export interface BatchIptcConfig {
   updateKeywords: boolean;
   keywordsMode: 'append' | 'replace' | 'remove';
   keywords: string[];
+  writebackToDisk?: boolean;
 }

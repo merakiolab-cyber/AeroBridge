@@ -183,6 +183,7 @@ export async function parseFilesToAssets(
       isCustomUploaded: true,
       blob: file,
       fileRef: file,
+      fileHandle: (file as any).fileHandle,
     };
 
     results.push(asset);
@@ -229,6 +230,7 @@ export async function scanDirectoryHandle(dirHandle: any): Promise<File[]> {
           value: currentPath ? `${currentPath}/${file.name}` : file.name,
           writable: false,
         });
+        (file as any).fileHandle = entry;
         files.push(file);
       } else if (entry.kind === 'directory') {
         // Scan first level subdirectories

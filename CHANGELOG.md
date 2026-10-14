@@ -2,7 +2,19 @@
 
 ## Changelog
 
-### Version 2.7.0 (Aktuální verze — Nativní dekódování InDesign, Adobe & RAW)
+### Version 2.8.0 (Aktuální verze — Zápis metadat přímo do souborů na disku / Writeback)
+- **Binární injektor Adobe XMP packetů ([metadataWriter.ts](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/utils/metadataWriter.ts)):**
+  - Implementován modul pro generování validních XMP ISO 16684-1 XML packetů (Dublin Core a Photoshop jmenné prostory: titulek, popis, autor, copyright, lokalita, klíčová slova).
+  - Přímý binární zápis do JPEG APP1 segmentu bez re-enkódování pixelů a bez ztráty obrazové kvality.
+  - **100% zachování EXIF dat fotoaparátu:** Původní EXIF segmenty (čas expozice, clona, ISO, ohnisko, objektiv, datum pořízení) zůstávají nedotčeny.
+- **Přímý fyzický zápis na disk přes File System Access API:**
+  - Napojení `FileSystemFileHandle.createWritable()` do procesu dávkových IPTC úprav.
+  - V [BatchIptcModal.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/BatchIptcModal.tsx) přidán volitelný přepínač *„Přímý zápis do souborů na disku (Writeback)“*.
+  - Okamžitá synchronizace fyzického souboru na disku a IndexedDB cache s toastovým potvrzením.
+
+---
+
+### Version 2.7.0
 - **Nativní podpora Adobe InDesign (`.indd`, `.idml`):**
   - Implementována klientská extrakce náhledů z InDesign dokumentů v [adobeThumbnailExtractor.ts](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/utils/adobeThumbnailExtractor.ts).
   - Parsování XMP metadatových packetů (`<xmpGImg:image>` base64 JPEG) a vyhledávání embedded page streamů.

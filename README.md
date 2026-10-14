@@ -13,6 +13,10 @@
 
 </div>
 
+<p align="center">
+  <img src="docs/screenshot.png" alt="AeroBridge Studio – náhled aplikace" width="900">
+</p>
+
 ---
 
 ## 📸 O projektu

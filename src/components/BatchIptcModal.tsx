@@ -45,6 +45,7 @@ export const BatchIptcModal: React.FC<BatchIptcModalProps> = ({
     updateKeywords: false,
     keywordsMode: 'append',
     keywords: [],
+    writebackToDisk: true,
   });
 
   const [keywordInput, setKeywordInput] = useState('');
@@ -637,8 +638,28 @@ export const BatchIptcModal: React.FC<BatchIptcModalProps> = ({
               </div>
             </div>
 
-            <div className="pt-4 border-t border-white/[0.08] text-[11px] text-stone-500">
-              Změny se okamžitě projeví v aplikaci a v metadatovém inspektoru pro všechny vybrané položky.
+            <div className="pt-4 border-t border-white/[0.08] space-y-3">
+              <label className="flex items-start gap-2.5 p-3 bg-white/[0.03] border border-white/10 cursor-pointer hover:bg-white/[0.05] transition-colors">
+                <input
+                  type="checkbox"
+                  checked={!!config.writebackToDisk}
+                  onChange={(e) => setConfig({ ...config, writebackToDisk: e.target.checked })}
+                  className="rounded-none text-blue-500 focus:ring-0 w-4 h-4 mt-0.5"
+                />
+                <div className="flex-1">
+                  <div className="text-xs font-medium text-white flex items-center gap-1.5">
+                    <span>Přímý zápis do souborů na disku</span>
+                    <span className="text-[10px] font-mono uppercase bg-blue-500/20 text-blue-300 px-1.5 py-0.2 border border-blue-500/30">Writeback</span>
+                  </div>
+                  <p className="text-[11px] text-stone-400 mt-0.5 leading-relaxed">
+                    Vloží Adobe XMP segment do souboru a 100% zachová původní EXIF data fotoaparátu (clona, čas, ISO).
+                  </p>
+                </div>
+              </label>
+
+              <div className="text-[11px] text-stone-500">
+                Změny se okamžitě projeví v aplikaci a v metadatovém inspektoru pro všechny vybrané položky.
+              </div>
             </div>
           </div>
         </div>

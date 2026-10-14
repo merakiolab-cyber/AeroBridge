@@ -19,6 +19,7 @@ import {
   copyImageToClipboard,
   copyTextToClipboard,
 } from './utils/localFileSystem';
+import { writeMetadataBackToAsset } from './utils/metadataWriter';
 import {
   saveDirectoryHandle,
   getSavedDirectoryHandles,
@@ -770,6 +771,29 @@ export default function App() {
       });
 
       saveAssetsToIndexedDB(updated);
+
+      // Direct disk writeback if enabled
+      if (config.writebackToDisk) {
+        (async () => {
+          let writtenDiskCount = 0;
+          for (const assetId of assetIds) {
+            const item = updated.find((x) => x.id === assetId);
+            if (item) {
+              const res = await writeMetadataBackToAsset(item, item.iptc);
+              if (res.success && item.fileHandle) {
+                writtenDiskCount++;
+              }
+            }
+          }
+          if (writtenDiskCount > 0) {
+            addToast(
+              'Zápis na disk dokončen',
+              `Metadata fyzicky zapsána do ${writtenDiskCount} souborů na disku`
+            );
+          }
+        })();
+      }
+
       return updated;
     });
 

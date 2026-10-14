@@ -35,15 +35,16 @@
 
 ---
 
-## 🚀 Fáze 2: Pokročilá správa médií & Adobe / RAW Ekosystém
+## 🚀 Fáze 2: Pokročilá správa médií & Adobe / RAW Ekosystém (DOKONČENO ✅)
 - [x] **Nativní dekódování Adobe & RAW formátů:**
   - [x] **Adobe InDesign (`.indd`, `.idml`)**: nativní klientská extrakce náhledů z XMP packetů (`<xmpGImg:image>`) a binárního JPEG streamu
   - [x] **Camera RAW formáty**: rychlá extrakce náhledů pro Canon (`.cr2`, `.cr3`), Nikon (`.nef`), Sony (`.arw`), Adobe (`.dng`), Fuji (`.raf`) přes TIFF IFD tagy (`0x0201` / `0x0202`) a JPEG SOI sken
   - [x] **Adobe Illustrator & Vektory**: podpora `.ai`, `.eps` a nativní `.svg`
   - [x] **Bauhaus generátor grafických karet**: okamžitý generátor vysokorozlišovacích náhledů pro dokumenty bez vloženého náhledu
-- [ ] **Zápis metadat přímo do souborů (Writeback):**
-  - Přímý zápis upravených IPTC/XMP metadat do JPEG/TIFF/WebP souborů přes File System Access API
-  - Zachování původních EXIF dat fotoaparátu při zápisu metadat
+- [x] **Zápis metadat přímo do souborů (Writeback):**
+  - [x] Přímý binární zápis Adobe XMP metadat do JPEG souborů přes File System Access API
+  - [x] 100% zachování původních EXIF dat fotoaparátu (clona, čas, ISO, objektiv, datum)
+  - [x] Přepínač přímého zápisu na disk integrován do modálního dialogu Dávkové úpravy IPTC
 
 ---
 
