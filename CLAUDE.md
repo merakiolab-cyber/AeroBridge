@@ -33,16 +33,22 @@ Guide for Claude Code Pro and AI assistants working on **AeroBridge Studio**.
 ## 3. Quick Reference Commands
 
 ```bash
-# Run local development server (port 3000, 0.0.0.0)
+# Run local development server (web)
 npm run dev
+
+# Run as native Windows 11 desktop app (Tauri v2 + live reload)
+npm run desktop:dev
+
+# Build native standalone Windows 11 executable / installer (.exe / MSI)
+npm run desktop:build
 
 # Type check / Lint
 npm run lint
 
-# Production build
+# Web production build
 npm run build
 
-# Preview build locally
+# Preview web build locally
 npm run preview
 ```
 

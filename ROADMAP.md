@@ -48,10 +48,9 @@
 
 ---
 
-## 🖥️ Fáze 3: Samostatná nativní desktopová aplikace pro Windows 11 (Tauri v2)
-- [ ] **Přechod na Tauri v2 (Rust + WebView2):**
-  - Minimální binární soubor (.exe instalátor pro Windows 11, velikost do 15 MB)
-  - Přímý a trvalý přístup ke všem diskům (interní SSD, externí disky, NAS) bez nutnosti webových bezpečnostních potvrzení
-  - Integrace do kontextového menu Windows Průzkumníka (*„Otevřít v AeroBridge Studio“*)
-  - Hardwarově akcelerované generování náhledů na pozadí pomocí vícevláknového Rust workeru
-  - Nativní Windows okno (podpora Snap Layouts, mica/acrylic efektů Windows 11)
+## 🖥️ Fáze 3: Samostatná nativní desktopová aplikace pro Windows 11 (Tauri v2) (PROBÍHÁ ⚙️)
+- [x] **Přechod na Tauri v2 (Rust + WebView2):**
+  - [x] Inicializace Tauri v2 architektury (`src-tauri`) a konfigurace nativního okna (1400×900, centrované, resizovatelné)
+  - [x] Přidání desktopových npm skriptů (`npm run desktop:dev`, `npm run desktop:build`)
+  - [ ] Nativní Windows okno se Snap Layouts podporou a přímým přístupem k diskům bez webových dialogů
+  - [ ] Kompilace standalone .exe balíčku (velikost do 15 MB)

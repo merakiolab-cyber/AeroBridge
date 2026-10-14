@@ -57,3 +57,7 @@ $RECYCLE.BIN/
 # Temporary test export archives
 *.zip
 *.tar.gz
+
+# Tauri & Rust build artifacts
+src-tauri/target/
+src-tauri/gen/

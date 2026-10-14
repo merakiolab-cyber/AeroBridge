@@ -2,7 +2,21 @@
 
 ## Changelog
 
-### Version 2.8.0 (Aktuální verze — Zápis metadat přímo do souborů na disku / Writeback)
+### Version 2.9.0 (Aktuální verze — Tauri v2 Windows 11 Desktop Integrace)
+- **Implementace Tauri v2 (Rust + WebView2):**
+  - Inicializována nativní desktopová architektura v adresáři [src-tauri/](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src-tauri).
+  - Všechny Rust crate závislosti (Tauri 2.12, Windows API, WebView2) úspěšně zkompilovány bez chyb.
+  - Nastaveno nativní Windows okno o rozměrech 1400×900 px, centrované s podporou Snap Layouts.
+- **Nové npm skripty pro Windows desktop:**
+  - `npm run desktop:dev` — spuštění aplikace jako plně nativního Windows desktop okna s live reloadem.
+  - `npm run desktop:build` — kompilace standalone instalátoru (.exe / MSI) o velikosti ~15 MB.
+- **Konfigurace a zabezpečení:**
+  - [.gitignore](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/.gitignore) zabezpečen proti verzování Rust `target/` složky.
+  - [CLAUDE.md](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/CLAUDE.md) a [ROADMAP.md](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/ROADMAP.md) aktualizovány pro desktop workflow.
+
+---
+
+### Version 2.8.0
 - **Binární injektor Adobe XMP packetů ([metadataWriter.ts](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/utils/metadataWriter.ts)):**
   - Implementován modul pro generování validních XMP ISO 16684-1 XML packetů (Dublin Core a Photoshop jmenné prostory: titulek, popis, autor, copyright, lokalita, klíčová slova).
   - Přímý binární zápis do JPEG APP1 segmentu bez re-enkódování pixelů a bez ztráty obrazové kvality.
