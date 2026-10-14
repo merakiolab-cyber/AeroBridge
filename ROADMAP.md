@@ -35,32 +35,21 @@
 
 ---
 
-## 🚀 Fáze 2: Pokročilá správa médií & Adobe Ekosystém
+## 🚀 Fáze 2: Pokročilá správa médií & Adobe / RAW Ekosystém
 - [ ] **Nativní dekódování Adobe & RAW formátů:**
-  - Hlubší podpora PSD (vrstvy, kompozity)
-  - Podpora RAW formátů digitálních zrcadlovek (CR2, CR3, NEF, ARW, DNG) přes WebAssembly (libraw / dcraw)
-  - Rychlé náhledy vektorů SVG / AI / EPS
-- [ ] **Barevné štítky a hodnocení hvězdičkami (Rating & Labels):**
-  - Rychlé hodnocení klávesami `1`–`5` (hvězdičky) a `6`–`9` (barevné štítky: červená, žlutá, zelená, modrá, fialová)
-  - Filtrování podle hodnocení a barevných štítků v horní liště
+  - Hlubší podpora PSD (extrakce vrstev a kompozitních náhledů)
+  - Podpora RAW formátů digitálních fotoaparátů (CR2, CR3, NEF, ARW, DNG, RAF) přes offline WebAssembly dekodér
+  - Rychlé zobrazení vektorové grafiky (SVG, AI, EPS) bez nutnosti instalovaného Illustratoru
 - [ ] **Zápis metadat přímo do souborů (Writeback):**
-  - Zápis upravených IPTC/XMP metadat přímo do JPEG/WebP/TIFF souborů přes File System Access API
+  - Přímý zápis upravených IPTC/XMP metadat do JPEG/TIFF/WebP souborů přes File System Access API
+  - Zachování původních EXIF dat fotoaparátu při zápisu metadat
 
 ---
 
-## 💡 Fáze 3: AI Asistence & Chytré funkce (Google Gemini)
-- [ ] **Automatické tagování a klíčová slova:**
-  - Analýza vizuálního obsahu pomocí Gemini API (automatické rozpoznání objektů, nálady, barev, stylu)
-- [ ] **Sémantické vyhledávání v češtině i angličtině:**
-  - Hledání např. *"západ slunce u moře bez lidí"* nebo *"fotka s červeným autem v noci"*
-- [ ] **AI generování popisků pro stock fotobanky:**
-  - Automatické vygenerování SEO titulků a anotací pro Adobe Stock, Shutterstock atd.
-
----
-
-## 🖥️ Fáze 4: Samostatná nativní desktopová aplikace (Tauri v2)
+## 🖥️ Fáze 3: Samostatná nativní desktopová aplikace pro Windows 11 (Tauri v2)
 - [ ] **Přechod na Tauri v2 (Rust + WebView2):**
-  - Minimální binární soubor (.exe instalační balíček pro Windows 11, velikost do 15 MB)
-  - Přímý přístup k diskům bez nutnosti dotazování browser oprávnění
-  - Integrace do kontextového menu Windows Průzkumníka (*„Otevřít v AeroBridge“*)
-  - Hardwarově akcelerované generování náhledů na pozadí
+  - Minimální binární soubor (.exe instalátor pro Windows 11, velikost do 15 MB)
+  - Přímý a trvalý přístup ke všem diskům (interní SSD, externí disky, NAS) bez nutnosti webových bezpečnostních potvrzení
+  - Integrace do kontextového menu Windows Průzkumníka (*„Otevřít v AeroBridge Studio“*)
+  - Hardwarově akcelerované generování náhledů na pozadí pomocí vícevláknového Rust workeru
+  - Nativní Windows okno (podpora Snap Layouts, mica/acrylic efektů Windows 11)

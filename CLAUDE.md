@@ -26,7 +26,7 @@ Guide for Claude Code Pro and AI assistants working on **AeroBridge Studio**.
   - HTML5 Canvas for format conversion (JPEG/PNG/WebP), downsampling, and watermark overlay
   - Custom PSD thumbnail parser (`src/utils/adobeThumbnailExtractor.ts`)
   - Video HTML5 canvas frame grabber
-- **AI Integration (Ready):** `@google/genai` (SDK configured for optional server/local AI assistance like auto-tagging and smart categorization)
+- **Philosophy:** 100% offline, local-first, zero cloud dependencies, zero telemetry, maximum privacy.
 
 ---
 
