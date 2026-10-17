@@ -5,13 +5,17 @@ import {
   extractInddThumbnail,
   extractAiThumbnail,
   extractRawThumbnail,
+  extractPainterThumbnail,
+  extractFigmaThumbnail,
+  extractKritaThumbnail,
+  extractSvgThumbnail,
+  extractHtmlThumbnail,
+  extractTiffThumbnail,
   extractVideoThumbnail,
   getAdobeFileType,
   getImageDimensions,
-  generateDocumentPlaceholder,
 } from './adobeThumbnailExtractor';
-import { toDesktopAssetUrl, type NativeFileEntry } from './tauriBridge';
-import { getCachedPlaceholder } from './nativeThumbnails';
+import { toDesktopAssetUrl, getCachedNativeFileIcon, type NativeFileEntry } from './tauriBridge';
 
 /**
  * Format raw bytes into human-readable representation (e.g. 4.2 MB)
@@ -98,8 +102,8 @@ export async function parseFilesToAssets(
           previewUrl = psdThumb;
           dimensions = await getImageDimensions(previewUrl);
         } else {
-          previewUrl = generateDocumentPlaceholder(file.name, extension, colorBadge, format);
-          dimensions = { width: 1200, height: 900 };
+          previewUrl = '';
+          dimensions = { width: 0, height: 0 };
         }
       } else if (category === 'adobe-indd') {
         const buffer = await file.slice(0, 1024 * 1024 * 10).arrayBuffer();
@@ -107,7 +111,9 @@ export async function parseFilesToAssets(
         previewUrl = inddRes.url;
         dimensions = { width: inddRes.width, height: inddRes.height };
       } else if (category === 'adobe-ai') {
-        const buffer = await file.slice(0, 1024 * 1024 * 8).arrayBuffer();
+        const buffer = file.size <= 100 * 1024 * 1024
+          ? await file.arrayBuffer()
+          : await file.slice(0, 1024 * 1024 * 32).arrayBuffer();
         const aiRes = await extractAiThumbnail(buffer, file.name);
         previewUrl = aiRes.url;
         dimensions = { width: aiRes.width, height: aiRes.height };
@@ -116,6 +122,21 @@ export async function parseFilesToAssets(
         const rawRes = await extractRawThumbnail(buffer, file.name);
         previewUrl = rawRes.url;
         dimensions = { width: rawRes.width, height: rawRes.height };
+      } else if (category === 'painter') {
+        const buffer = await file.slice(0, 1024 * 1024 * 16).arrayBuffer();
+        const painterRes = await extractPainterThumbnail(buffer, file.name);
+        previewUrl = painterRes.url;
+        dimensions = { width: painterRes.width, height: painterRes.height };
+      } else if (category === 'figma') {
+        const buffer = await file.slice(0, 1024 * 1024 * 64).arrayBuffer();
+        const figmaRes = await extractFigmaThumbnail(buffer, file.name);
+        previewUrl = figmaRes.url;
+        dimensions = { width: figmaRes.width, height: figmaRes.height };
+      } else if (category === 'krita') {
+        const buffer = await file.slice(0, 1024 * 1024 * 64).arrayBuffer();
+        const kraRes = await extractKritaThumbnail(buffer, file.name);
+        previewUrl = kraRes.url;
+        dimensions = { width: kraRes.width, height: kraRes.height };
       } else if (category === 'vector') {
         if (extension === 'EPS') {
           const buffer = await file.slice(0, 1024 * 1024 * 6).arrayBuffer();
@@ -124,9 +145,16 @@ export async function parseFilesToAssets(
           dimensions = { width: epsRes.width, height: epsRes.height };
         } else {
           // Standard SVG Vector
-          previewUrl = URL.createObjectURL(file);
-          dimensions = await getImageDimensions(previewUrl);
+          const buffer = await file.arrayBuffer();
+          const svgRes = await extractSvgThumbnail(buffer, file.name);
+          previewUrl = svgRes.url;
+          dimensions = { width: svgRes.width, height: svgRes.height };
         }
+      } else if (category === 'html') {
+        const buffer = await file.slice(0, 1024 * 1024 * 16).arrayBuffer();
+        const htmlRes = await extractHtmlThumbnail(buffer, file.name);
+        previewUrl = htmlRes.url;
+        dimensions = { width: htmlRes.width, height: htmlRes.height };
       } else if (category === 'video') {
         try {
           const videoInfo = await extractVideoThumbnail(file);
@@ -134,21 +162,38 @@ export async function parseFilesToAssets(
           dimensions = { width: videoInfo.width, height: videoInfo.height };
           duration = videoInfo.duration;
         } catch {
-          previewUrl = generateDocumentPlaceholder(file.name, extension, colorBadge, format);
-          dimensions = { width: 1200, height: 900 };
+          previewUrl = '';
+          dimensions = { width: 0, height: 0 };
         }
       } else if (category === 'image') {
-        previewUrl = URL.createObjectURL(file);
-        dimensions = await getImageDimensions(previewUrl);
+        if (extension === 'TIF' || extension === 'TIFF') {
+          try {
+            const buffer = await file.slice(0, 1024 * 1024 * 64).arrayBuffer();
+            const tiffRes = await extractTiffThumbnail(buffer, file.name);
+            if (tiffRes) {
+              previewUrl = tiffRes.url;
+              dimensions = { width: tiffRes.width, height: tiffRes.height };
+            } else {
+              previewUrl = '';
+              dimensions = { width: 0, height: 0 };
+            }
+          } catch {
+            previewUrl = '';
+            dimensions = { width: 0, height: 0 };
+          }
+        } else {
+          previewUrl = URL.createObjectURL(file);
+          dimensions = await getImageDimensions(previewUrl);
+        }
       } else {
         // PDF, After Effects, Premiere, and other formats
-        previewUrl = generateDocumentPlaceholder(file.name, extension, colorBadge, format);
-        dimensions = { width: 1200, height: 900 };
+        previewUrl = '';
+        dimensions = { width: 0, height: 0 };
       }
     } catch (e) {
       console.warn(`Error generating preview for ${file.name}:`, e);
-      previewUrl = generateDocumentPlaceholder(file.name, extension, colorBadge, format);
-      dimensions = { width: 1200, height: 900 };
+      previewUrl = '';
+      dimensions = { width: 0, height: 0 };
     }
 
     const modifiedDate = new Date(file.lastModified).toISOString().replace('T', ' ').slice(0, 19);
@@ -445,22 +490,54 @@ export function parseNativeEntriesToAssets(
 
   for (let i = 0; i < entries.length; i++) {
     const entry = entries[i];
-    if (entry.is_dir) continue; // subdirectories are navigated through the explorer bar / tree
-
-    const ext = entry.extension.toLowerCase();
+    const ext = entry.extension ? entry.extension.toLowerCase() : '';
     const typeInfo = getAdobeFileType(entry.name);
     const dateModified = entry.modified_ms > 0
       ? new Date(entry.modified_ms).toISOString().replace('T', ' ').slice(0, 19)
       : new Date().toISOString().replace('T', ' ').slice(0, 19);
 
+    if (entry.is_dir) {
+      const folderIcon = getCachedNativeFileIcon('', true);
+      results.push({
+        id: `native-folder-${Date.now()}-${i}-${entry.name.replace(/[^a-zA-Z0-9_-]/g, '_')}`,
+        name: entry.name,
+        folder: folderKey,
+        fullPath: entry.path,
+        url: folderIcon || '',
+        type: 'other',
+        category: 'other',
+        format: 'Složka',
+        extension: 'SLOŽKA',
+        colorBadge: '#e2e4e9',
+        size: 0,
+        dimensions: { width: 0, height: 0 },
+        dateModified,
+        dateCreated: dateModified,
+        rating: 0,
+        label: 'none',
+        flag: 'unflagged',
+        exif: {
+          resolutionDpi: 0,
+          bitDepth: 'Složka souborů',
+          colorProfile: 'Systém souborů Windows',
+        },
+        iptc: {
+          title: entry.name,
+          caption: `Složka ${entry.name}`,
+          keywords: ['složka', 'folder'],
+        },
+        isFolder: true,
+        isIcon: true,
+        isCustomUploaded: true,
+      });
+      continue;
+    }
+
     const isDirectImage = imageExtensions.includes(ext);
+    const cachedIcon = !isDirectImage ? getCachedNativeFileIcon(ext) : null;
     const previewUrl = isDirectImage
       ? toDesktopAssetUrl(entry.path)
-      : getCachedPlaceholder(
-          typeInfo.extension || ext.toUpperCase(),
-          typeInfo.colorBadge,
-          typeInfo.format
-        );
+      : (cachedIcon || '');
 
 
     const asset: AssetItem = {
@@ -491,6 +568,7 @@ export function parseNativeEntriesToAssets(
         caption: `Soubor ${entry.name} (${formatBytes(entry.size)})`,
         keywords: [ext, 'windows', folderName.toLowerCase()],
       },
+      isIcon: !isDirectImage,
       isCustomUploaded: true,
     };
 

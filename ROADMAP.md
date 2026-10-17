@@ -4,18 +4,18 @@
 
 ---
 
-## 🧭 Aktuální stav: Verze 2.5.0 (Stabilní základ)
-- [x] Základní architektura v React 19 + TypeScript + Vite 8 + Tailwind CSS v4
-- [x] 4 pracovní režimy (Essentials, Filmstrip, Porovnání / Compare, Metadata Table)
+## 🧭 Aktuální stav: Verze 3.27.12 (Dvoupanelový Commander & Nativní Windows 11 DAM)
+- [x] Základní architektura v React 19 + TypeScript + Vite 8 + Tailwind CSS v4 + Tauri v2 (Rust)
+- [x] 5 pracovních režimů (Prohlížeč Mřížka/Seznam, Filmstrip, Porovnání / Compare, Commander dvoupanel)
 - [x] Bauhaus vizuální styl (tmavý motiv, JetBrains Mono + Plus Jakarta Sans, jemné dělicí linie)
-- [x] Pravý inspekční panel (zvětšený náhled 400px, EXIF data, IPTC, histogram)
+- [x] Pravý inspekční panel (zvětšený náhled 400px, EXIF data, IPTC, histogram, rozlišení & MP)
 - [x] Bezkontaktní výběr souborů (decentní 10% bílý závoj místo rušivého obrysu)
 - [x] Resizovatelný levý postranní panel (180–500 px s pamětí v LocalStorage)
 - [x] File System Access API + IndexedDB trvalé ukládání složek a sezení
 - [x] Dávkové přejmenování souborů (Prefix, Datum, Číselná řada, Suffix, Find & Replace)
 - [x] Dávková úprava IPTC metadat (Titulek, Popis, Autor, Copyright, Místo, Klíčová slova)
 - [x] Rychlý export do ZIP s klientským přepočtem (WebP, JPEG, PNG, vodoznak, resize)
-- [x] Klávesové zkratky (`Mezerník` pro QuickLook, `Ctrl+M` pro IPTC, `Ctrl+I` pro info, šipky pro navigaci)
+- [x] Klávesové zkratky (`Mezerník` pro QuickLook, `Ctrl+M` pro IPTC, `Ctrl+T` / `Ctrl+I` pro zobrazení názvů a přípon jako v Adobe Bridge, šipky pro navigaci)
 - [x] Základní PWA (Manifest, Service Worker, offline cache)
 
 ---
@@ -57,16 +57,50 @@
   - [x] Tlačítko „Složka / Průzkumník“ v pravém inspekčním panelu pro okamžité zvýraznění souboru ve Windows File Exploreru
   - [x] Podpora kompilace standalone .exe balíčku (velikost do 15 MB)
 
+---
+
+## 🗂️ Fáze 4: Desktop Průzkumník & nativní náhledy (DOKONČENO ✅)
+- [x] Procházení všech disků a složek jako v Průzkumníku (strom, adresní lišta, historie, zkratky)
+- [x] Náhledy PDF (pdf.js s listováním stran), InDesign (XMP), Illustrator, Photoshop, RAW a videí přímo z disku
+- [x] Náhledy souborů Corel Painter (`.rif`, `.riff`) — Windows Shell `IShellItemImageFactory` + offline RIFF/DIB/JPEG dekodér
+- [x] Náhledy souborů TIFF (`.tif`, `.tiff`) — Windows Shell WIC + offline Photopea UTIF engine (i pro vícestránkové TIFFy)
+- [x] Náhledy souborů Figma (`.fig`) — extrakce vloženého `thumbnail.png` z ZIP kontejneru + kiwi stream / Windows Shell + fialový odznak (`#a259ff`)
+- [x] Náhledy souborů SVG (`.svg`) — XML validace, viewBox/width/height extrakce, xmlns normalizace a šachovnice průhlednosti
+- [x] Plnohodnotné kontextové menu Průzkumníka Windows (Otevřít, Přejmenovat, Kopírovat, Vyjmout, Smazat, Nová složka, Vlastnosti)
+- [x] Dvojklik na soubor = otevření v systémové aplikaci; podsložky přímo v mřížce
+- [x] Nová ikona aplikace a standalone .exe + instalátor
+- [x] Cache náhledů v paměti / LRU s okamžitým 0ms načtením, aby se při opakovaném otevření složky negenerovaly znovu
+- [x] Čistý strom navigačního panelu: ponechány klíčové složky (Plocha, Stažené, Obrázky, Oblíbené), odstraněna Videa, Hudba a Dokumenty
 
 ---
 
-## 🗂️ Fáze 4: Desktop Průzkumník & nativní náhledy (ZÁKLAD HOTOV ✅, ladění pokračuje)
-- [x] Procházení všech disků a složek jako v Průzkumníku (strom, adresní lišta, historie, zkratky)
-- [x] Náhledy PDF (pdf.js), InDesign (XMP), Illustrator, Photoshop, RAW a videí přímo z disku
-- [x] Nová ikona aplikace a standalone .exe + instalátor
-- [ ] Ověřit náhledy na reálných souborech (velké INDD / PDF, INDD bez vloženého náhledu)
-- [ ] Cache náhledů na disku, aby se při opakovaném otevření složky negenerovaly znovu
-- [ ] Dvojklik na soubor = otevření v systémové aplikaci; podsložky přímo v mřížce
+## ⚡ Fáze 5: Dvoupanelový správce souborů Commander (Total Commander styl) (DOKONČENO ✅)
+- [x] **Dvoupanelové zobrazení (CommanderView):**
+  - [x] Autonomní levý a pravý panel s nezávislým procházením, posuvným splitterem a pamětí otevřených cest
+  - [x] Rychlá tlačítka diskových jednotek (`C:`, `D:`, ...), systémová místa a tlačítko otevření terminálu (PowerShell / CMD)
+  - [x] Řaditelné sloupce (Název, Přípona, Velikost, Změněno) a řádek nadřazené složky `[ .. ]`
+  - [x] Stavový řádek Total Commanderu s počty vybraných souborů a celkovou velikostí v bajtech
+- [x] **Kompletní souborové operace & klávesové zkratky:**
+  - [x] <kbd>F5</kbd> Kopírování do protějšího panelu / <kbd>F6</kbd> Přesun do protějšího panelu
+  - [x] <kbd>F7</kbd> Vytvoření nové složky / <kbd>F8</kbd> a <kbd>Delete</kbd> Smazání do Koše Windows
+  - [x] <kbd>F2</kbd> / <kbd>Shift+F6</kbd> Rychlé přejmenování položky
+  - [x] <kbd>F3</kbd> Rychlý náhled (QuickLook) / <kbd>F4</kbd> a <kbd>Enter</kbd> Otevření v asociované aplikaci
+  - [x] <kbd>Tab</kbd> Přepínání mezi levým a pravým panelem s automatickým fokusem
+  - [x] <kbd>Space</kbd> / <kbd>Insert</kbd> Označení položky s posunem dolů
+  - [x] <kbd>Ctrl+A</kbd> Označit vše / <kbd>Ctrl+D</kbd> Zrušit označení
+  - [x] <kbd>Ctrl+U</kbd> Prohození cest levého a pravého panelu / Tlačítko `=` Synchronizace složky
+- [x] **HTML5 Drag & Drop přetahování myší mezi panely:**
+  - [x] Přetažení myší z panelu do panelu (přesun jako výchozí, podržením <kbd>Ctrl</kbd> kopírování)
+  - [x] Pustit do konkrétní podsložky i do nadřazeného řádku `[ .. ]`
+  - [x] Vypnutí nativního `dragDropEnabled: false` v Tauri pro plnou kompatibilitu s WebView2 HTML5 událostmi
+- [x] **Plná podpora bočních tlačítek myši (XButton1 / XButton2):**
+  - [x] Tlačítko Zpět / Vpřed na myši kontextově naviguje v historii panelu, nad kterým se nachází kurzor myši
+  - [x] Klávesová navigace historií <kbd>Alt+Vlevo</kbd>, <kbd>Alt+Vpravo</kbd>, <kbd>Alt+Nahoru</kbd>
+- [x] **Spolehlivé systémové kopírování a schránka (<kbd>Ctrl+C</kbd>, <kbd>Ctrl+X</kbd>, <kbd>Ctrl+V</kbd>):**
+  - [x] Capture fáze listeneru a ochrana proti uvíznutí fokusu v textových polích
+  - [x] Stabilní reference bez stale closures (`stateRef`, `clipboardRef`)
+  - [x] Automatické zacílení na první reálný soubor při vstupu do složky
+  - [x] Obousměrná integrace se systémovou schránkou Windows (vkládání souborů z Průzkumníka Windows)
 
 ---
 

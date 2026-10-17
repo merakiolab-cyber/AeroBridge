@@ -9,6 +9,7 @@ import {
   FilterState,
   FolderNode,
   WorkspaceView,
+  BrowserViewMode,
   BatchIptcConfig,
 } from './types';
 import { INITIAL_ASSETS, INITIAL_FOLDERS } from './data/mockAssets';
@@ -16,43 +17,42 @@ import {
   parseFilesToAssets,
   parseNativeEntriesToAssets,
   pickLocalDirectory,
-  scanDirectoryHandle,
   copyImageToClipboard,
   copyTextToClipboard,
 } from './utils/localFileSystem';
 import {
   isDesktopApp,
   pickNativeFolder,
-  scanNativeFolder,
   revealInWindowsExplorer,
-  type NativeFileEntry,
 } from './utils/tauriBridge';
-import { hydrateNativeThumbnails, type ThumbJob } from './utils/nativeThumbnails';
-import { pathAncestors } from './components/NativeExplorerTree';
 import { NativePathBar } from './components/NativePathBar';
 import { writeMetadataBackToAsset } from './utils/metadataWriter';
 import {
-  saveDirectoryHandle,
-  getSavedDirectoryHandles,
-  removeSavedDirectory,
-  verifyDirectoryPermission,
   saveAssetsToIndexedDB,
   loadAssetsFromIndexedDB,
   saveWorkspaceSession,
   loadWorkspaceSession,
-  SavedDirectoryRecord,
 } from './utils/indexedDbStorage';
+import {
+  useNativeNavigation,
+  useFileOperations,
+  useKeyboardShortcuts,
+} from './hooks';
 import { TopBar } from './components/TopBar';
 import { Sidebar } from './components/Sidebar';
 import { AssetGrid } from './components/AssetGrid';
 import { FilmstripView } from './components/FilmstripView';
 import { CompareView } from './components/CompareView';
 import { MetadataTableView } from './components/MetadataTableView';
+import { CommanderView } from './components/CommanderView';
 import { PreviewInspector } from './components/PreviewInspector';
 import { QuickLookModal } from './components/QuickLookModal';
 import { BatchRenameModal } from './components/BatchRenameModal';
 import { BatchExportModal } from './components/BatchExportModal';
 import { BatchIptcModal } from './components/BatchIptcModal';
+import { FileContextMenu } from './components/FileContextMenu';
+import { InputDialog } from './components/InputDialog';
+import { renderPdfPage } from './utils/pdfPreview';
 import { ToastContainer, ToastMessage } from './components/Toast';
 
 export default function App() {
@@ -60,13 +60,27 @@ export default function App() {
   const [assets, setAssets] = useState<AssetItem[]>(INITIAL_ASSETS);
   const [folders, setFolders] = useState<FolderNode[]>(INITIAL_FOLDERS);
   const [activeFolder, setActiveFolder] = useState<string>('/');
-  const [favoriteFolders, setFavoriteFolders] = useState<string[]>([
-    '/adobe-projects',
-    '/commercial',
-  ]);
-  const [savedDirectories, setSavedDirectories] = useState<SavedDirectoryRecord[]>([]);
+  const [favoriteFolders, setFavoriteFolders] = useState<string[]>([]);
   const [isInitialLoadDone, setIsInitialLoadDone] = useState(false);
-  const [currentView, setCurrentView] = useState<WorkspaceView>('essentials');
+  const [currentView, setCurrentView] = useState<WorkspaceView>('browser');
+  const [browserViewMode, setBrowserViewMode] = useState<BrowserViewMode>(() => {
+    try {
+      const saved = localStorage.getItem('aerobridge_browser_view_mode');
+      return saved === 'table' ? 'table' : 'grid';
+    } catch {
+      return 'grid';
+    }
+  });
+
+  const handleBrowserViewModeChange = useCallback((mode: BrowserViewMode) => {
+    setBrowserViewMode(mode);
+    if (currentView !== 'browser' && currentView !== 'essentials') {
+      setCurrentView('browser');
+    }
+    try {
+      localStorage.setItem('aerobridge_browser_view_mode', mode);
+    } catch {}
+  }, [currentView]);
 
   // --- Selection State ---
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
@@ -86,9 +100,25 @@ export default function App() {
     }
   });
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
+  const [inspectorWidth, setInspectorWidth] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('aerobridge_inspector_width');
+      return saved ? Math.max(260, Math.min(950, parseInt(saved, 10))) : 440;
+    } catch {
+      return 440;
+    }
+  });
+  const [isResizingInspector, setIsResizingInspector] = useState(false);
   const [thumbnailSize, setThumbnailSize] = useState<number>(200);
   const [fitMode, setFitMode] = useState<'cover' | 'contain'>('cover');
-  const [showAllInfo, setShowAllInfo] = useState<boolean>(false);
+  const [showAllInfo, setShowAllInfo] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('aerobridge_show_file_info');
+      return saved !== null ? saved === 'true' : false;
+    } catch {
+      return false;
+    }
+  });
 
   // --- Sorting State ---
   const [sortField, setSortField] = useState<'name' | 'dateModified' | 'size' | 'extension' | 'dimensions'>('name');
@@ -115,16 +145,8 @@ export default function App() {
   const filesInputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // --- Native (desktop) Explorer-style navigation state ---
-  const [nativeDir, setNativeDir] = useState<string | null>(null);
-  const [nativeSubdirs, setNativeSubdirs] = useState<NativeFileEntry[]>([]);
-  const [nativeLoading, setNativeLoading] = useState(false);
-  const [navHistory, setNavHistory] = useState<{ stack: string[]; index: number }>({ stack: [], index: -1 });
-  const navHistoryRef = useRef(navHistory);
-  const thumbJobRef = useRef<ThumbJob | null>(null);
-
   // --- Notification Toast Helper ---
-  const addToast = useCallback((title: string, description?: string, type: 'success' | 'info' | 'warning' = 'success') => {
+  const addToast = useCallback((title: string, description?: string, type: 'success' | 'info' | 'warning' | 'error' = 'success') => {
     const id = `toast-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
     setToasts((prev) => [...prev, { id, title, description, type }]);
     setTimeout(() => {
@@ -135,6 +157,25 @@ export default function App() {
   const dismissToast = (id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
+
+  // --- Native Navigation Hook (Explorer-like folder traversal, history, thumbnails) ---
+  const {
+    nativeDir,
+    nativeSubdirs,
+    nativeLoading,
+    navHistory,
+    navigateNative,
+    handleNativeBack,
+    handleNativeForward,
+    handleNativeUp,
+    handleNativeRefresh,
+  } = useNativeNavigation({
+    setAssets,
+    setActiveFolder,
+    setSelectedIds,
+    setFocusedId,
+    addToast,
+  });
 
   // --- Filtered & Sorted Assets Computation ---
   const filteredAssets = useMemo(() => {
@@ -164,11 +205,30 @@ export default function App() {
 
       // Format category filter
       if (filters.formatFilter !== null) {
-        if (asset.category !== filters.formatFilter) return false;
+        if (asset.isFolder) return false;
+        const ext = (asset.extension || asset.name.split('.').pop() || '').toLowerCase();
+        if (filters.formatFilter === 'tiff') {
+          if (ext !== 'tif' && ext !== 'tiff') return false;
+        } else if (filters.formatFilter === 'jpg') {
+          if (ext !== 'jpg' && ext !== 'jpeg') return false;
+        } else if (filters.formatFilter === 'png') {
+          if (ext !== 'png') return false;
+        } else if (filters.formatFilter === 'webp') {
+          if (ext !== 'webp') return false;
+        } else if (filters.formatFilter === 'pptx') {
+          if (ext !== 'pptx' && ext !== 'ppt' && ext !== 'ppsx' && ext !== 'pps') return false;
+        } else if (filters.formatFilter === 'html') {
+          if (ext !== 'html' && ext !== 'htm' && asset.category !== 'html') return false;
+        } else if (filters.formatFilter === 'krita') {
+          if (ext !== 'kra' && asset.category !== 'krita') return false;
+        } else if (asset.category !== filters.formatFilter) {
+          return false;
+        }
       }
 
       // Orientation filter
       if (filters.orientationFilter !== 'all') {
+        if (asset.isFolder) return false;
         const isLandscape = asset.dimensions.width > asset.dimensions.height;
         const isPortrait = asset.dimensions.height > asset.dimensions.width;
         const isSquare = asset.dimensions.width === asset.dimensions.height;
@@ -180,8 +240,11 @@ export default function App() {
       return true;
     });
 
-    // Apply Sorting
+    // Apply Sorting: Folders always placed at the top (like Adobe Bridge)
     list.sort((a, b) => {
+      if (a.isFolder && !b.isFolder) return -1;
+      if (!a.isFolder && b.isFolder) return 1;
+
       let comparison = 0;
       switch (sortField) {
         case 'name':
@@ -225,6 +288,43 @@ export default function App() {
   const selectedAssets = useMemo(() => {
     return assets.filter((a) => selectedIds.has(a.id));
   }, [assets, selectedIds]);
+
+  // --- File Operations Hook (Clipboard, Context Menu, Dialogs, Deletes, Renames) ---
+  const {
+    clipboard,
+    contextMenuPos,
+    contextMenuTarget,
+    inputDialog,
+    setInputDialog,
+    closeContextMenu,
+    handleContextMenu,
+    handleContextMenuFolder,
+    handleOpenAsset,
+    handleOpenContextMenuTarget,
+    handleCopyFiles,
+    handleCutFiles,
+    handlePasteFiles,
+    handleRenameRequest,
+    handleCreateFolderRequest,
+    handleDeleteRequest,
+    handleExecuteDelete,
+    handleDialogSubmit,
+    handleDeleteSelected,
+    handleShowProperties,
+    handleOpenTerminal,
+  } = useFileOperations({
+    assets,
+    setAssets,
+    filteredAssets,
+    selectedIds,
+    setSelectedIds,
+    setFocusedId,
+    setQuickLookOpen,
+    setBatchRenameOpen,
+    nativeDir,
+    navigateNative,
+    addToast,
+  });
 
   // --- Handlers: Selection ---
   const handleSelect = useCallback((id: string, e?: React.MouseEvent) => {
@@ -352,6 +452,8 @@ export default function App() {
     (e: React.MouseEvent) => {
       e.preventDefault();
       setIsResizingSidebar(true);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
       const startX = e.clientX;
       const startW = sidebarWidth;
 
@@ -363,6 +465,8 @@ export default function App() {
 
       const onMouseUp = (upEvent: MouseEvent) => {
         setIsResizingSidebar(false);
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
         window.removeEventListener('mousemove', onMouseMove);
         window.removeEventListener('mouseup', onMouseUp);
         const delta = upEvent.clientX - startX;
@@ -378,6 +482,51 @@ export default function App() {
     [sidebarWidth]
   );
 
+  // --- Dynamic Right Inspector Resizing Handler ---
+  const handleInspectorResizeStart = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      setIsResizingInspector(true);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      const startX = e.clientX;
+      const startW = inspectorWidth;
+
+      const onMouseMove = (moveEvent: MouseEvent) => {
+        // Dragging to the left increases width of the right panel
+        const delta = startX - moveEvent.clientX;
+        const maxW = Math.max(440, Math.min(1000, window.innerWidth - 320));
+        const nextW = Math.max(260, Math.min(maxW, startW + delta));
+        setInspectorWidth(nextW);
+      };
+
+      const onMouseUp = (upEvent: MouseEvent) => {
+        setIsResizingInspector(false);
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        window.removeEventListener('mousemove', onMouseMove);
+        window.removeEventListener('mouseup', onMouseUp);
+        const delta = startX - upEvent.clientX;
+        const maxW = Math.max(440, Math.min(1000, window.innerWidth - 320));
+        const finalW = Math.max(260, Math.min(maxW, startW + delta));
+        try {
+          localStorage.setItem('aerobridge_inspector_width', String(finalW));
+        } catch {}
+      };
+
+      window.addEventListener('mousemove', onMouseMove);
+      window.addEventListener('mouseup', onMouseUp);
+    },
+    [inspectorWidth]
+  );
+
+  const handleInspectorResetWidth = useCallback(() => {
+    setInspectorWidth(440);
+    try {
+      localStorage.setItem('aerobridge_inspector_width', '440');
+    } catch {}
+  }, []);
+
 
   // --- Open Folder & File Import ---
   // --- IndexedDB Hydration & Synchronization ---
@@ -386,13 +535,7 @@ export default function App() {
 
     async function hydrateFromIndexedDB() {
       try {
-        // 1. Load saved local directory handles
-        const dirs = await getSavedDirectoryHandles();
-        if (isMounted && dirs.length > 0) {
-          setSavedDirectories(dirs);
-        }
-
-        // 2. Load stored custom assets
+        // 1. Load stored custom assets
         const savedAssets = (await loadAssetsFromIndexedDB()).filter(
           (a) => !a.id.startsWith('native-')
         );
@@ -407,8 +550,11 @@ export default function App() {
         // 3. Load workspace session state
         const session = await loadWorkspaceSession();
         if (isMounted && session) {
-          if (session.favoriteFolders && session.favoriteFolders.length > 0) {
-            setFavoriteFolders(session.favoriteFolders);
+          if (Array.isArray(session.favoriteFolders)) {
+            const cleaned = session.favoriteFolders.filter(
+              (p) => p !== '/adobe-projects' && p !== '/commercial'
+            );
+            setFavoriteFolders(cleaned);
           }
           if (session.activeFolder) {
             setActiveFolder(session.activeFolder);
@@ -440,117 +586,86 @@ export default function App() {
     saveWorkspaceSession(favoriteFolders, activeFolder, sortField, sortOrder);
   }, [favoriteFolders, activeFolder, sortField, sortOrder, isInitialLoadDone]);
 
-  // --- Native Explorer-style navigation (Windows desktop) ---
-  const navigateNative = useCallback(
-    async (rawPath: string, opts?: { historyIndex?: number }) => {
-      const path = rawPath.trim();
-      if (!path) return;
-      setNativeLoading(true);
-      try {
-        const entries = await scanNativeFolder(path);
-        if (thumbJobRef.current) thumbJobRef.current.cancelled = true;
 
-        const name = path.replace(/[\\/]+$/, '').split(/[\\/]/).filter(Boolean).pop() || path;
-        const imported = parseNativeEntriesToAssets(entries, name, path);
 
-        setAssets((prev) => [...imported, ...prev.filter((a) => !a.id.startsWith('native-'))]);
-        setNativeDir(path);
-        setNativeSubdirs(entries.filter((e) => e.is_dir));
-        setActiveFolder(`native:${path}`);
-        setSelectedIds(new Set(imported[0] ? [imported[0].id] : []));
-        setFocusedId(imported[0]?.id ?? null);
-        try {
-          localStorage.setItem('aerobridge_last_native_dir', path);
-        } catch {}
+  // Mouse side buttons: button 3 = Back, button 4 = Forward (capture phase so WebView2 does not swallow them)
+  const currentViewRef = useRef(currentView);
+  currentViewRef.current = currentView;
 
-        // History bookkeeping
-        const h = navHistoryRef.current;
-        let nextHistory = h;
-        if (opts?.historyIndex !== undefined) {
-          nextHistory = { stack: h.stack, index: opts.historyIndex };
-        } else if (h.stack[h.index] !== path) {
-          const stack = [...h.stack.slice(0, h.index + 1), path];
-          nextHistory = { stack, index: stack.length - 1 };
-        }
-        navHistoryRef.current = nextHistory;
-        setNavHistory(nextHistory);
-
-        // Real previews (PDF, INDD, AI, PSD, RAW, video) are generated in the background
-        thumbJobRef.current = hydrateNativeThumbnails(imported, (patches) => {
-          setAssets((prev) =>
-            prev.map((a) => {
-              const p = patches.get(a.id);
-              return p
-                ? { ...a, url: p.url, dimensions: p.dimensions, duration: p.duration ?? a.duration }
-                : a;
-            })
-          );
-        });
-      } catch (err) {
-        addToast('Složku nelze otevřít', String(err), 'warning');
-      } finally {
-        setNativeLoading(false);
-      }
-    },
-    [addToast]
-  );
-
-  const handleNativeBack = useCallback(() => {
-    const h = navHistoryRef.current;
-    if (h.index > 0) void navigateNative(h.stack[h.index - 1], { historyIndex: h.index - 1 });
-  }, [navigateNative]);
-
-  const handleNativeForward = useCallback(() => {
-    const h = navHistoryRef.current;
-    if (h.index < h.stack.length - 1) {
-      void navigateNative(h.stack[h.index + 1], { historyIndex: h.index + 1 });
-    }
-  }, [navigateNative]);
-
-  const handleNativeUp = useCallback(() => {
-    if (!nativeDir) return;
-    const ancestors = pathAncestors(nativeDir);
-    if (ancestors.length > 1) void navigateNative(ancestors[ancestors.length - 2]);
-  }, [nativeDir, navigateNative]);
-
-  const handleNativeRefresh = useCallback(() => {
-    if (nativeDir) {
-      void navigateNative(nativeDir, { historyIndex: navHistoryRef.current.index });
-    }
-  }, [nativeDir, navigateNative]);
-
-  // Keyboard: Alt+Left/Right/Up, F5 (Explorer-like)
   useEffect(() => {
     if (!isDesktopApp()) return;
-    const onKey = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
-      if (e.altKey && e.key === 'ArrowLeft') {
+    const swallow = (e: MouseEvent) => {
+      if (e.button === 3 || e.button === 4) {
         e.preventDefault();
-        handleNativeBack();
-      } else if (e.altKey && e.key === 'ArrowRight') {
-        e.preventDefault();
-        handleNativeForward();
-      } else if (e.altKey && e.key === 'ArrowUp') {
-        e.preventDefault();
-        handleNativeUp();
-      } else if (e.key === 'F5' && activeFolder.startsWith('native:')) {
-        e.preventDefault();
-        handleNativeRefresh();
+        e.stopPropagation();
       }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [handleNativeBack, handleNativeForward, handleNativeUp, handleNativeRefresh, activeFolder]);
+    const onMouseUp = (e: MouseEvent) => {
+      if (e.button === 3) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (currentViewRef.current === 'commander') {
+          window.dispatchEvent(
+            new CustomEvent('aerobridge:commander-back', {
+              detail: { clientX: e.clientX, clientY: e.clientY },
+            })
+          );
+        } else {
+          handleNativeBack();
+        }
+      } else if (e.button === 4) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (currentViewRef.current === 'commander') {
+          window.dispatchEvent(
+            new CustomEvent('aerobridge:commander-forward', {
+              detail: { clientX: e.clientX, clientY: e.clientY },
+            })
+          );
+        } else {
+          handleNativeForward();
+        }
+      }
+    };
+    window.addEventListener('mousedown', swallow, true);
+    window.addEventListener('auxclick', swallow, true);
+    window.addEventListener('mouseup', onMouseUp, true);
+    return () => {
+      window.removeEventListener('mousedown', swallow, true);
+      window.removeEventListener('auxclick', swallow, true);
+      window.removeEventListener('mouseup', onMouseUp, true);
+    };
+  }, [handleNativeBack, handleNativeForward]);
 
-  // Restore the last browsed native folder on desktop start
+  // Priority default working drive: F:\ (Working) instead of C:\ System drive
   useEffect(() => {
     if (!isInitialLoadDone || !isDesktopApp()) return;
     let last: string | null = null;
     try {
       last = localStorage.getItem('aerobridge_last_native_dir');
     } catch {}
-    if (last) void navigateNative(last);
+
+    import('./utils/tauriBridge').then(async ({ listNativeDrives }) => {
+      try {
+        const drives = await listNativeDrives();
+        // Priority for default drive: F:\ (Working) > drive with "working" in name > first non-C drive > F:\ fallback
+        const fDrive = drives.find(
+          (d) => d.path.toUpperCase().startsWith('F:') || d.name.toLowerCase().includes('working')
+        );
+        const nonCDrive = drives.find((d) => !d.path.toUpperCase().startsWith('C:'));
+        const preferredDefault = fDrive?.path || nonCDrive?.path || 'F:\\';
+
+        // Never open C:\ System drive by default on launch
+        if (last && !last.toUpperCase().startsWith('C:')) {
+          void navigateNative(last);
+        } else {
+          void navigateNative(preferredDefault);
+        }
+      } catch (e) {
+        console.warn('Initial desktop drive navigation failed:', e);
+        void navigateNative('F:\\');
+      }
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isInitialLoadDone]);
 
@@ -581,25 +696,12 @@ export default function App() {
         const folderPath = `/${result.folderName}`;
         setActiveFolder(folderPath);
 
-        // Store directory handle in IndexedDB for persistent browsing
-        if (result.handle) {
-          try {
-            const saved = await saveDirectoryHandle(result.folderName, result.handle);
-            setSavedDirectories((prev) => {
-              const filtered = prev.filter((d) => d.id !== saved.id);
-              return [...filtered, saved];
-            });
-          } catch (e) {
-            console.warn('Could not store directory handle:', e);
-          }
-        }
-
         // Save imported assets to IndexedDB
         saveAssetsToIndexedDB(imported);
 
         addToast(
-          'Složka připojena a uložena',
-          `Přidáno ${imported.length} souborů do IndexedDB knihovny`
+          'Složka připojena',
+          `Přidáno ${imported.length} souborů do mezipaměti`
         );
       }
     } else if (folderInputRef.current) {
@@ -610,62 +712,28 @@ export default function App() {
   const handleRevealInExplorer = useCallback(async (asset: AssetItem) => {
     if (!asset.fullPath) return;
     if (isDesktopApp()) {
-      await revealInWindowsExplorer(asset.fullPath);
-      addToast('Zobrazeno v Průzkumníku', asset.name, 'info');
+      try {
+        // If it's a mock asset (doesn't have native disk path like C:\ or D:\)
+        if (!asset.fullPath.match(/^[a-zA-Z]:[\\/]/)) {
+          if (nativeDir) {
+            await revealInWindowsExplorer(nativeDir);
+            addToast('Otevřeno v Průzkumníku', nativeDir, 'info');
+          } else {
+            addToast('Ukázkový projekt', 'Tento soubor je ukázka v paměti. Otevřete skutečnou složku z disku.', 'info');
+          }
+          return;
+        }
+
+        await revealInWindowsExplorer(asset.fullPath);
+        addToast('Zobrazeno v Průzkumníku Windows', asset.name, 'info');
+      } catch (err) {
+        addToast('Nelze otevřít umístění', String(err), 'warning');
+      }
     } else {
       handleCopyPath(asset);
     }
-  }, [addToast, handleCopyPath]);
+  }, [nativeDir, addToast, handleCopyPath]);
 
-
-  // Rescan existing saved directory handle from IndexedDB
-  const handleRescanSavedDirectory = async (dir: SavedDirectoryRecord) => {
-    addToast('Ověřuji oprávnění...', dir.name, 'info');
-    const hasPermission = await verifyDirectoryPermission(dir.handle);
-    if (!hasPermission) {
-      addToast(
-        'Vyžadováno oprávnění',
-        'Povolte prosím v prohlížeči přístup k místnímu disku',
-        'warning'
-      );
-      return;
-    }
-
-    try {
-      addToast('Načítám soubory z disku...', `Složka ${dir.name}`, 'info');
-      const files = await scanDirectoryHandle(dir.handle);
-      const imported = await parseFilesToAssets(files, dir.name);
-      if (imported.length > 0) {
-        setAssets((prev) => {
-          // Replace files from this folder with newly scanned ones
-          const remaining = prev.filter((a) => a.folder !== dir.path);
-          return [...imported, ...remaining];
-        });
-        setActiveFolder(dir.path);
-        if (imported[0]) {
-          setFocusedId(imported[0].id);
-          setSelectedIds(new Set([imported[0].id]));
-        }
-        saveAssetsToIndexedDB(imported);
-        addToast(
-          'Disk synchronizován',
-          `Obnoveno ${imported.length} souborů ze složky "${dir.name}"`
-        );
-      } else {
-        addToast('Složka je prázdná', dir.name, 'info');
-      }
-    } catch (err) {
-      console.error('Failed to rescan local folder:', err);
-      addToast('Chyba při čtení disku', 'Zkuste složku vybrat znovu', 'warning');
-    }
-  };
-
-  // Remove saved directory handle from IndexedDB
-  const handleRemoveSavedDirectory = async (id: string) => {
-    await removeSavedDirectory(id);
-    setSavedDirectories((prev) => prev.filter((d) => d.id !== id));
-    addToast('Složka odebrána', 'Odebráno z rychlého přístupu IndexedDB');
-  };
 
   const handleFolderInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -684,16 +752,19 @@ export default function App() {
 
   // --- Drag & Drop Listener ---
   const handleDragOver = (e: React.DragEvent) => {
+    if (currentView === 'commander') return;
     e.preventDefault();
     setIsDragOver(true);
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
+    if (currentView === 'commander') return;
     e.preventDefault();
     setIsDragOver(false);
   };
 
   const handleDrop = async (e: React.DragEvent) => {
+    if (currentView === 'commander') return;
     e.preventDefault();
     setIsDragOver(false);
 
@@ -710,147 +781,56 @@ export default function App() {
     }
   };
 
-  // --- Delete / Remove Selection from View ---
-  const handleDeleteSelected = useCallback(() => {
-    if (selectedIds.size === 0) return;
-    const count = selectedIds.size;
-    const removedAssets = assets.filter((a) => selectedIds.has(a.id));
 
-    // Safely revoke any blob URLs to prevent memory leaks
-    removedAssets.forEach((a) => {
-      if (a.url && a.url.startsWith('blob:')) {
-        try {
-          URL.revokeObjectURL(a.url);
-        } catch {}
+
+  // --- PDF Multi-page Page Navigation Handler ---
+  const handlePageChange = useCallback(async (assetId: string, pageNum: number, resolvedUrl?: string) => {
+    let newUrl = resolvedUrl;
+    if (!newUrl) {
+      const target = assets.find((a) => a.id === assetId);
+      if (target) {
+        const rendered = await renderPdfPage(target, pageNum, 1200);
+        if (rendered) newUrl = rendered.url;
       }
-    });
-
-    setAssets((prev) => prev.filter((a) => !selectedIds.has(a.id)));
-    setSelectedIds(new Set());
-    setFocusedId(null);
-    addToast(
-      'Položky odebrány ze zobrazení',
-      `Odebráno ${count} ${count === 1 ? 'položka' : count < 5 ? 'položky' : 'položek'}`
+    }
+    setAssets((prev) =>
+      prev.map((a) =>
+        a.id === assetId
+          ? {
+              ...a,
+              currentPage: pageNum,
+              url: newUrl || a.url,
+            }
+          : a
+      )
     );
-  }, [selectedIds, assets, addToast]);
+  }, [assets]);
 
-  // --- Keyboard Shortcuts ---
-  useEffect(() => {
-    const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      if (
-        document.activeElement?.tagName === 'INPUT' ||
-        document.activeElement?.tagName === 'TEXTAREA'
-      ) {
-        return;
-      }
+  // --- Toggle File Info (Adobe Bridge Style: Show Thumbnail Only / Show Details) ---
+  const handleToggleShowAllInfo = useCallback(() => {
+    if (currentView !== 'browser' && currentView !== 'essentials') {
+      setCurrentView('browser');
+    }
+    if (browserViewMode !== 'grid') {
+      setBrowserViewMode('grid');
+    }
+    setShowAllInfo((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('aerobridge_show_file_info', String(next));
+      } catch {}
+      addToast(
+        next ? 'Zobrazeny názvy a přípony souborů' : 'Pouze miniatury (názvy skryty)',
+        next
+          ? 'Pod obrázky je zobrazeno jméno a přípona (Ctrl+T)'
+          : 'Podrobnosti skryty, zobrazeno pouze po najetí (Ctrl+T)'
+      );
+      return next;
+    });
+  }, [currentView, addToast]);
 
-      // Spacebar: Quick Look Fullscreen
-      if (e.key === ' ' && !quickLookOpen && !batchRenameOpen && !batchExportOpen && !batchIptcOpen) {
-        e.preventDefault();
-        if (focusedAsset) setQuickLookOpen(true);
-        return;
-      }
-
-      // F2: Windows Shortcut for Batch Rename
-      if (e.key === 'F2') {
-        e.preventDefault();
-        if (selectedAssets.length > 0) {
-          setBatchRenameOpen(true);
-        } else {
-          addToast('Dávkové přejmenování', 'Nejprve vyberte alespoň jeden soubor (F2)', 'info');
-        }
-        return;
-      }
-
-      // Delete: Remove selected items from view
-      if (e.key === 'Delete' && !quickLookOpen && !batchRenameOpen && !batchExportOpen && !batchIptcOpen) {
-        if (selectedIds.size > 0) {
-          e.preventDefault();
-          handleDeleteSelected();
-        }
-        return;
-      }
-
-      // Escape: Clear selection
-      if (e.key === 'Escape' && !quickLookOpen && !batchRenameOpen && !batchExportOpen && !batchIptcOpen) {
-        if (selectedIds.size > 0) {
-          e.preventDefault();
-          setSelectedIds(new Set());
-        }
-        return;
-      }
-
-      // Cmd/Ctrl + A: Select All
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a') {
-        e.preventDefault();
-        setSelectedIds(new Set(filteredAssets.map((a) => a.id)));
-        return;
-      }
-
-      // Cmd/Ctrl + M: Open Batch IPTC Modal
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'm') {
-        e.preventDefault();
-        if (selectedAssets.length > 0) {
-          setBatchIptcOpen(true);
-        } else {
-          addToast('IPTC úprava', 'Nejprve vyberte alespoň jeden soubor', 'info');
-        }
-        return;
-      }
-
-      // Cmd/Ctrl + I: Toggle file information display
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'i') {
-        e.preventDefault();
-        setShowAllInfo((prev) => {
-          const next = !prev;
-          addToast(
-            next ? 'Informace zobrazeny trvale' : 'Informace skryty (pouze po najetí)',
-            'Přepnuto klávesovou zkratkou Ctrl+I'
-          );
-          return next;
-        });
-        return;
-      }
-
-      // Cmd/Ctrl + F: Search focus
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'f') {
-        e.preventDefault();
-        searchInputRef.current?.focus();
-        return;
-      }
-
-      // Cmd/Ctrl + C: Copy Image
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'c') {
-        if (focusedAsset) {
-          e.preventDefault();
-          handleCopyImage(focusedAsset);
-        }
-        return;
-      }
-
-      // Navigation: Arrow keys
-      if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
-        e.preventDefault();
-        const currentIndex = filteredAssets.findIndex((a) => a.id === focusedId);
-        let nextIndex = currentIndex;
-
-        if (e.key === 'ArrowLeft' && currentIndex > 0) nextIndex = currentIndex - 1;
-        if (e.key === 'ArrowRight' && currentIndex < filteredAssets.length - 1) nextIndex = currentIndex + 1;
-        if (e.key === 'ArrowUp' && currentIndex > 3) nextIndex = currentIndex - 4;
-        if (e.key === 'ArrowDown' && currentIndex < filteredAssets.length - 4) nextIndex = currentIndex + 4;
-
-        if (nextIndex >= 0 && nextIndex < filteredAssets.length && nextIndex !== currentIndex) {
-          const nextAsset = filteredAssets[nextIndex];
-          setFocusedId(nextAsset.id);
-          setSelectedIds(new Set([nextAsset.id]));
-        }
-        return;
-      }
-    };
-
-    window.addEventListener('keydown', handleGlobalKeyDown);
-    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [
+  // --- Global Keyboard Shortcuts Hook ---
+  useKeyboardShortcuts({
     quickLookOpen,
     batchRenameOpen,
     batchExportOpen,
@@ -859,11 +839,38 @@ export default function App() {
     filteredAssets,
     focusedId,
     selectedIds,
-    selectedAssets.length,
+    selectedAssets,
+    nativeDir,
+    clipboard,
+    contextMenuPos,
+    closeContextMenu,
+    setSelectedIds,
+    setFocusedId,
+    setQuickLookOpen,
+    setBatchRenameOpen,
+    setBatchIptcOpen,
+    searchInputRef,
+    handleOpenAsset,
+    handleRenameRequest,
+    handleCreateFolderRequest,
+    handleDeleteRequest,
     handleDeleteSelected,
+    handleCopyFiles,
+    handleCutFiles,
+    handlePasteFiles,
     handleCopyImage,
+    handleToggleShowAllInfo,
+    handleNativeRefresh,
+    handleNativeBack,
+    handleNativeForward,
+    handleNativeUp,
+    handleShowProperties,
+    currentView,
+    browserViewMode,
+    onToggleBrowserViewMode: handleBrowserViewModeChange,
+    onViewChange: setCurrentView,
     addToast,
-  ]);
+  });
 
   // --- Batch Rename Execution ---
   const handleApplyBatchRename = (renamedMap: Record<string, string>) => {
@@ -1009,13 +1016,23 @@ export default function App() {
       {/* Top Bar — Minimalist 2-row Bauhaus Header */}
       <TopBar
         currentView={currentView}
-        onViewChange={setCurrentView}
+        onViewChange={(v) => {
+          if (v === 'essentials' || v === 'table') {
+            setCurrentView('browser');
+          } else {
+            setCurrentView(v);
+          }
+        }}
+        browserViewMode={browserViewMode}
+        onBrowserViewModeChange={handleBrowserViewModeChange}
         onOpenFolder={handleOpenLocalFolder}
         selectedCount={selectedIds.size}
         activeFolder={activeFolder}
         totalFilteredCount={filteredAssets.length}
         searchQuery={filters.searchQuery}
         onSearchChange={(q) => setFilters((f) => ({ ...f, searchQuery: q }))}
+        formatFilter={filters.formatFilter}
+        onFormatFilterChange={(fmt) => setFilters((f) => ({ ...f, formatFilter: fmt }))}
         sortField={sortField}
         onSortFieldChange={setSortField}
         sortOrder={sortOrder}
@@ -1028,61 +1045,62 @@ export default function App() {
         onBatchExport={() => setBatchExportOpen(true)}
         onBatchIptc={() => setBatchIptcOpen(true)}
         showAllInfo={showAllInfo}
-        onToggleShowAllInfo={() => setShowAllInfo((prev) => !prev)}
+        onToggleShowAllInfo={handleToggleShowAllInfo}
         onSelectAll={() => setSelectedIds(new Set(filteredAssets.map((a) => a.id)))}
         onClearSelection={() => setSelectedIds(new Set())}
       />
 
       {/* Main Workspace Frame */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Sidebar */}
-        <Sidebar
-          width={sidebarWidth}
-          folders={computedFolders}
-          activeFolder={activeFolder}
-          onSelectFolder={setActiveFolder}
-          favoriteFolders={favoriteFolders}
-          onToggleFavorite={handleToggleFavoriteFolder}
-          onMoveAssets={handleMoveAssetsToFolder}
-          filters={filters}
-          onUpdateFilter={(k, v) => setFilters({ ...filters, [k]: v })}
-          onResetFilters={() =>
-            setFilters({
-              searchQuery: '',
-              formatFilter: null,
-              orientationFilter: 'all',
-              keywordFilter: null,
-            })
-          }
-          onImportFiles={() => filesInputRef.current?.click()}
-          totalAssetsCount={assets.length}
-          savedDirectories={savedDirectories}
-          onRescanDirectory={handleRescanSavedDirectory}
-          onRemoveSavedDirectory={handleRemoveSavedDirectory}
-          onOpenNativeFolder={handleOpenLocalFolder}
-          nativeActivePath={activeFolder.startsWith('native:') ? nativeDir : null}
-          onNavigateNative={isDesktopApp() ? navigateNative : undefined}
-        />
+        {/* Left Sidebar (Hidden in Commander dual-pane mode) */}
+        {currentView !== 'commander' && (
+          <>
+            <Sidebar
+              width={sidebarWidth}
+              folders={computedFolders}
+              activeFolder={activeFolder}
+              onSelectFolder={setActiveFolder}
+              favoriteFolders={favoriteFolders}
+              onToggleFavorite={handleToggleFavoriteFolder}
+              onMoveAssets={handleMoveAssetsToFolder}
+              filters={filters}
+              onUpdateFilter={(k, v) => setFilters({ ...filters, [k]: v })}
+              onResetFilters={() =>
+                setFilters({
+                  searchQuery: '',
+                  formatFilter: null,
+                  orientationFilter: 'all',
+                  keywordFilter: null,
+                })
+              }
+              onImportFiles={() => filesInputRef.current?.click()}
+              totalAssetsCount={assets.length}
+              onOpenNativeFolder={handleOpenLocalFolder}
+              nativeActivePath={activeFolder.startsWith('native:') ? nativeDir : null}
+              onNavigateNative={isDesktopApp() ? navigateNative : undefined}
+              onContextMenuFolder={handleContextMenuFolder}
+            />
 
-        {/* Dynamic Sidebar Resize Handle (Tahem myši rozšiřovat/zužovat) */}
-        <div
-          onMouseDown={handleSidebarResizeStart}
-          className={`w-1 relative z-20 cursor-col-resize select-none shrink-0 transition-colors group flex items-center justify-center ${
-            isResizingSidebar
-              ? 'bg-[#e2e4e9] opacity-100'
-              : 'bg-transparent hover:bg-[#e2e4e9]/50'
-          }`}
-          title="Tahem myši změnit šířku bočního panelu"
-        >
-          <div className="absolute inset-y-0 -left-1.5 -right-1.5 cursor-col-resize" />
-        </div>
+            {/* Dynamic Sidebar Resize Handle (Tahem myši rozšiřovat/zužovat) */}
+            <div
+              onMouseDown={handleSidebarResizeStart}
+              className={`w-1 relative z-20 cursor-col-resize select-none shrink-0 transition-colors group flex items-center justify-center ${
+                isResizingSidebar
+                  ? 'bg-[#e2e4e9] opacity-100'
+                  : 'bg-transparent hover:bg-[#e2e4e9]/50'
+              }`}
+              title="Tahem myši změnit šířku bočního panelu"
+            >
+              <div className="absolute inset-y-0 -left-1.5 -right-1.5 cursor-col-resize" />
+            </div>
+          </>
+        )}
 
         {/* Center Canvas */}
         <main className="flex-1 flex flex-col min-w-0 bg-[#121316] relative overflow-hidden">
-          {isDesktopApp() && nativeDir && activeFolder.startsWith('native:') && (
+          {isDesktopApp() && nativeDir && activeFolder.startsWith('native:') && currentView !== 'commander' && (
             <NativePathBar
               path={nativeDir}
-              subdirs={nativeSubdirs}
               canBack={navHistory.index > 0}
               canForward={navHistory.index < navHistory.stack.length - 1}
               isLoading={nativeLoading}
@@ -1093,27 +1111,62 @@ export default function App() {
               onNavigate={navigateNative}
             />
           )}
-          {currentView === 'essentials' && (
-            <AssetGrid
-              assets={filteredAssets}
-              selectedIds={selectedIds}
-              focusedId={focusedId}
-              thumbnailSize={thumbnailSize}
-              onThumbnailSizeChange={setThumbnailSize}
-              fitMode={fitMode}
-              onFitModeToggle={() =>
-                setFitMode((m) => (m === 'cover' ? 'contain' : 'cover'))
-              }
-              onSelect={handleSelect}
-              onOpenQuickLook={(id) => {
-                setFocusedId(id);
-                setQuickLookOpen(true);
-              }}
-              onCopyPath={handleCopyPath}
-              onCopyImage={handleCopyImage}
-              isDragOver={isDragOver}
-              showAllInfo={showAllInfo}
-            />
+          {/* Main Browsing Canvas: Grid or List Table within unified Prohlížeč section */}
+          {(currentView === 'browser' || currentView === 'essentials' || currentView === 'table') && (
+            browserViewMode === 'grid' ? (
+              <AssetGrid
+                assets={filteredAssets}
+                selectedIds={selectedIds}
+                focusedId={focusedId}
+                thumbnailSize={thumbnailSize}
+                onThumbnailSizeChange={setThumbnailSize}
+                fitMode={fitMode}
+                onFitModeToggle={() =>
+                  setFitMode((m) => (m === 'cover' ? 'contain' : 'cover'))
+                }
+                onSelect={handleSelect}
+                onOpenQuickLook={(id) => {
+                  setFocusedId(id);
+                  setQuickLookOpen(true);
+                }}
+                onOpenAsset={handleOpenAsset}
+                onCopyPath={handleCopyPath}
+                onCopyImage={handleCopyImage}
+                isDragOver={isDragOver}
+                showAllInfo={showAllInfo}
+                onNavigateFolder={navigateNative}
+                onContextMenu={handleContextMenu}
+                onPageChange={handlePageChange}
+              />
+            ) : (
+              <MetadataTableView
+                assets={filteredAssets}
+                selectedIds={selectedIds}
+                focusedId={focusedId}
+                sortField={sortField}
+                sortOrder={sortOrder}
+                onSort={(field) => {
+                  if (sortField === field) {
+                    setSortOrder((o) => (o === 'asc' ? 'desc' : 'asc'));
+                  } else {
+                    setSortField(field);
+                    setSortOrder('asc');
+                  }
+                }}
+                onSelect={handleSelect}
+                onOpenQuickLook={(id) => {
+                  setFocusedId(id);
+                  setQuickLookOpen(true);
+                }}
+                onOpenAsset={handleOpenAsset}
+                onCopyPath={handleCopyPath}
+                onCopyImage={handleCopyImage}
+                onContextMenu={handleContextMenu}
+                thumbnailSize={thumbnailSize}
+                onThumbnailSizeChange={setThumbnailSize}
+                fitMode={fitMode}
+              />
+            )
           )}
 
           {currentView === 'filmstrip' && (
@@ -1146,45 +1199,53 @@ export default function App() {
             />
           )}
 
-          {currentView === 'table' && (
-            <MetadataTableView
-              assets={filteredAssets}
-              selectedIds={selectedIds}
-              focusedId={focusedId}
-              sortField={sortField}
-              sortOrder={sortOrder}
-              onSort={(field) => {
-                if (sortField === field) {
-                  setSortOrder((o) => (o === 'asc' ? 'desc' : 'asc'));
-                } else {
-                  setSortField(field);
-                  setSortOrder('asc');
-                }
-              }}
-              onSelect={handleSelect}
-              onOpenQuickLook={(id) => {
-                setFocusedId(id);
+          {/* Commander Mode: Full-screen dual-pane file manager a la Total Commander */}
+          {currentView === 'commander' && (
+            <CommanderView
+              initialLeftPath={nativeDir && !nativeDir.toUpperCase().startsWith('C:') ? nativeDir : 'F:\\'}
+              initialRightPath={nativeDir && !nativeDir.toUpperCase().startsWith('C:') ? nativeDir : 'F:\\'}
+              onNotify={addToast}
+              onOpenQuickLook={(asset) => {
+                setFocusedId(asset.id);
                 setQuickLookOpen(true);
               }}
-              onCopyPath={handleCopyPath}
-              onCopyImage={handleCopyImage}
             />
           )}
         </main>
 
-        {/* Right Inspector Drawer */}
-        {(currentView === 'essentials' || currentView === 'table') && (
-          <PreviewInspector
-            asset={focusedAsset}
-            selectedCount={selectedIds.size}
-            onOpenQuickLook={() => setQuickLookOpen(true)}
-            onCopyPath={() => focusedAsset && handleCopyPath(focusedAsset)}
-            onCopyImage={() => focusedAsset && handleCopyImage(focusedAsset)}
-            onDownload={() => focusedAsset && handleDownloadSingle(focusedAsset)}
-            onRevealInExplorer={() => focusedAsset && handleRevealInExplorer(focusedAsset)}
-            onUpdateKeywords={handleUpdateKeywords}
-            onOpenBatchIptc={() => setBatchIptcOpen(true)}
-          />
+        {/* Right Inspector Drawer with Dynamic Resize Handle */}
+        {(currentView === 'browser' || currentView === 'essentials' || currentView === 'table') && (
+          <>
+            {/* Dynamic Inspector Resize Handle (Tahem myši rozšiřovat/zužovat vlevo) */}
+            <div
+              onMouseDown={handleInspectorResizeStart}
+              onDoubleClick={handleInspectorResetWidth}
+              className={`w-1 relative z-20 cursor-col-resize select-none shrink-0 transition-colors group flex items-center justify-center ${
+                isResizingInspector
+                  ? 'bg-[#e2e4e9] opacity-100'
+                  : 'bg-transparent hover:bg-[#e2e4e9]/50'
+              }`}
+              title="Tahem myši změnit šířku panelu náhledu (dvojklik pro výchozí šířku)"
+            >
+              <div className="absolute inset-y-0 -left-1.5 -right-1.5 cursor-col-resize" />
+            </div>
+
+            <PreviewInspector
+              width={inspectorWidth}
+              asset={focusedAsset}
+              selectedCount={selectedIds.size}
+              onOpenQuickLook={() => setQuickLookOpen(true)}
+              onOpenFile={handleOpenAsset}
+              onCopyPath={() => focusedAsset && handleCopyPath(focusedAsset)}
+              onCopyImage={() => focusedAsset && handleCopyImage(focusedAsset)}
+              onDownload={() => focusedAsset && handleDownloadSingle(focusedAsset)}
+              onRevealInExplorer={() => focusedAsset && handleRevealInExplorer(focusedAsset)}
+              onUpdateKeywords={handleUpdateKeywords}
+              onOpenBatchIptc={() => setBatchIptcOpen(true)}
+              onOpenFolder={navigateNative}
+              onPageChange={handlePageChange}
+            />
+          </>
         )}
       </div>
 
@@ -1210,6 +1271,8 @@ export default function App() {
         }}
         onCopyPath={handleCopyPath}
         onCopyImage={handleCopyImage}
+        onOpenFile={handleOpenAsset}
+        onPageChange={handlePageChange}
       />
 
       {/* Batch Rename Modal */}
@@ -1238,6 +1301,48 @@ export default function App() {
 
       {/* Toast Notification Container */}
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+
+      {/* Windows Explorer Style Right-Click File Context Menu */}
+      <FileContextMenu
+        position={contextMenuPos}
+        target={contextMenuTarget}
+        clipboard={clipboard}
+        onClose={closeContextMenu}
+        onOpen={handleOpenContextMenuTarget}
+        onRevealInExplorer={(path) => revealInWindowsExplorer(path)}
+        onOpenTerminal={handleOpenTerminal}
+        onCopy={handleCopyFiles}
+        onCut={handleCutFiles}
+        onPaste={handlePasteFiles}
+        onCopyPath={(p) => {
+          copyTextToClipboard(p);
+          addToast('Cesta zkopírována', p);
+        }}
+        onRename={handleRenameRequest}
+        onDelete={handleDeleteRequest}
+        onCreateFolder={handleCreateFolderRequest}
+        onRefresh={() => {
+          if (nativeDir) {
+            void navigateNative(nativeDir);
+            addToast('Aktualizováno');
+          }
+        }}
+        onSelectAll={() => setSelectedIds(new Set(filteredAssets.map((a) => a.id)))}
+        onShowProperties={handleShowProperties}
+        favoriteFolders={favoriteFolders}
+        onToggleFavorite={handleToggleFavoriteFolder}
+      />
+
+      {/* Input / Confirm Modal for Rename, New Folder, Delete */}
+      <InputDialog
+        isOpen={inputDialog.isOpen}
+        type={inputDialog.type}
+        title={inputDialog.title}
+        initialValue={inputDialog.initialValue}
+        itemCount={inputDialog.itemCount}
+        onClose={() => setInputDialog((prev) => ({ ...prev, isOpen: false }))}
+        onSubmit={handleDialogSubmit}
+      />
     </div>
   );
 }

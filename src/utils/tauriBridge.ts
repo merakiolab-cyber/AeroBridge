@@ -99,7 +99,8 @@ export async function listNativeSubdirs(dirPath: string): Promise<NativeFileEntr
   if (!isDesktopApp()) return [];
   try {
     return await invoke<NativeFileEntry[]>('list_subdirs', { path: dirPath });
-  } catch {
+  } catch (err) {
+    console.debug('[TauriBridge] list_subdirs failed for:', dirPath, err);
     return [];
   }
 }
@@ -116,11 +117,76 @@ export async function extractNativeXmpThumbnail(filePath: string, maxScanMb: num
       maxScanMb,
     });
     return b64 ? `data:image/jpeg;base64,${b64}` : null;
-  } catch {
+  } catch (err) {
+    console.debug('[TauriBridge] extractNativeXmpThumbnail failed for:', filePath, err);
     return null;
   }
 }
 
+
+const iconCache = new Map<string, Promise<string | null>>();
+const iconUrlCache = new Map<string, string>();
+
+/**
+ * Returns a cached blob URL for a file extension immediately if already loaded.
+ */
+export function getCachedNativeFileIcon(ext: string, isDir = false): string | null {
+  const key = isDir ? '<dir>' : ext.toLowerCase().replace(/^\./, '');
+  return iconUrlCache.get(key) || null;
+}
+
+/**
+ * Checks whether a given URL belongs to the shared icon cache (and thus shouldn't be revoked).
+ */
+export function isSharedIconUrl(url: string): boolean {
+  for (const cached of iconUrlCache.values()) {
+    if (cached === url) return true;
+  }
+  return false;
+}
+
+/**
+ * Returns a blob URL with the native Windows shell icon (same as in Explorer)
+ * for a file extension (e.g. "docx") or a folder. Cached per extension.
+ */
+export function getNativeFileIcon(ext: string, isDir = false): Promise<string | null> {
+  if (!isDesktopApp()) return Promise.resolve(null);
+  const key = isDir ? '<dir>' : ext.toLowerCase().replace(/^\./, '');
+  const cached = iconUrlCache.get(key);
+  if (cached) return Promise.resolve(cached);
+
+  let p = iconCache.get(key);
+  if (!p) {
+    p = invoke<ArrayBuffer>('get_file_icon', { ext: isDir ? '' : key, isDir })
+      .then((res) => {
+        const bytes = res instanceof ArrayBuffer ? new Uint8Array(res) : new Uint8Array(res as unknown as number[]);
+        if (!bytes || bytes.length === 0) return null;
+        const url = URL.createObjectURL(new Blob([bytes], { type: 'image/png' }));
+        iconUrlCache.set(key, url);
+        return url;
+      })
+      .catch(() => null);
+    iconCache.set(key, p);
+  }
+  return p;
+}
+
+/**
+ * Extracts Windows shell thumbnail via IShellItemImageFactory.
+ * Used for formats with registered Windows thumbnail handlers (like Corel Painter .rif, CDR, etc.).
+ */
+export async function getNativeShellThumbnail(filePath: string, size = 512): Promise<string | null> {
+  if (!isDesktopApp()) return null;
+  try {
+    const res = await invoke<ArrayBuffer>('get_shell_thumbnail', { path: filePath, size });
+    const bytes = res instanceof ArrayBuffer ? new Uint8Array(res) : new Uint8Array(res as unknown as number[]);
+    if (!bytes || bytes.length === 0) return null;
+    return URL.createObjectURL(new Blob([bytes], { type: 'image/png' }));
+  } catch (err) {
+    console.debug('[TauriBridge] getNativeShellThumbnail failed for:', filePath, err);
+    return null;
+  }
+}
 
 /**
  * Reveals a file or folder in Windows File Explorer (equivalent to Right Click -> Show in Explorer).
@@ -135,6 +201,84 @@ export async function revealInWindowsExplorer(filePath: string): Promise<void> {
 }
 
 /**
+ * Opens a file with its default Windows application (Photoshop, Word, Video Player, etc.)
+ */
+export async function openFileNative(filePath: string): Promise<void> {
+  if (!isDesktopApp()) return;
+  try {
+    await invoke('open_file_native', { path: filePath });
+  } catch (err) {
+    console.error('[TauriBridge] Error opening file:', err);
+    throw err;
+  }
+}
+
+/**
+ * Opens a terminal (Windows Terminal, PowerShell, CMD) in the specified folder or file's parent folder.
+ */
+export async function openTerminalNative(folderOrFilePath: string): Promise<void> {
+  if (!isDesktopApp()) return;
+  try {
+    await invoke('open_terminal_native', { path: folderOrFilePath });
+  } catch (err) {
+    console.error('[TauriBridge] Error opening terminal:', err);
+    throw err;
+  }
+}
+
+/**
+ * Renames a file or folder on the local filesystem. Returns new absolute path.
+ */
+export async function renameFileNative(oldPath: string, newName: string): Promise<string> {
+  if (!isDesktopApp()) throw new Error('Native rename requires desktop app');
+  return await invoke<string>('rename_file_native', { oldPath, newName });
+}
+
+/**
+ * Creates a new directory in parentPath.
+ */
+export async function createFolderNative(parentPath: string, suggestedName?: string): Promise<string> {
+  if (!isDesktopApp()) throw new Error('Native create folder requires desktop app');
+  return await invoke<string>('create_folder_native', { parentPath, suggestedName: suggestedName ?? null });
+}
+
+/**
+ * Moves files or directories to the Windows Recycle Bin (Koš).
+ */
+export async function deleteFilesNative(paths: string[]): Promise<void> {
+  if (!isDesktopApp() || paths.length === 0) return;
+  await invoke('delete_files_native', { paths });
+}
+
+/**
+ * Copies source files/directories into destFolder.
+ */
+export async function copyFilesNative(sources: string[], destFolder: string): Promise<string[]> {
+  if (!isDesktopApp() || sources.length === 0) return [];
+  return await invoke<string[]>('copy_files_native', { sources, destFolder });
+}
+
+/**
+ * Moves (cuts) source files/directories into destFolder.
+ */
+export async function moveFilesNative(sources: string[], destFolder: string): Promise<string[]> {
+  if (!isDesktopApp() || sources.length === 0) return [];
+  return await invoke<string[]>('move_files_native', { sources, destFolder });
+}
+
+/**
+ * Opens the native Windows File Properties dialog.
+ */
+export async function showFilePropertiesNative(filePath: string): Promise<void> {
+  if (!isDesktopApp()) return;
+  try {
+    await invoke('show_file_properties_native', { path: filePath });
+  } catch (err) {
+    console.warn('[TauriBridge] Error showing properties:', err);
+  }
+}
+
+/**
  * Converts a Windows absolute file path into a safe WebView2 asset URL for <img>, <video>, and canvas.
  */
 export function toDesktopAssetUrl(filePath: string): string {
@@ -145,3 +289,30 @@ export function toDesktopAssetUrl(filePath: string): string {
     return filePath;
   }
 }
+
+export interface FolderSizeInfo {
+  total_bytes: number;
+  file_count: number;
+  folder_count: number;
+}
+
+const folderSizeCache = new Map<string, Promise<FolderSizeInfo | null>>();
+
+/**
+ * Calculates real folder size recursively (bytes, files count, subfolders count).
+ * Cached per directory path.
+ */
+export function getNativeFolderSize(dirPath: string): Promise<FolderSizeInfo | null> {
+  if (!isDesktopApp()) return Promise.resolve(null);
+  let p = folderSizeCache.get(dirPath);
+  if (!p) {
+    p = invoke<FolderSizeInfo>('get_folder_size', { path: dirPath }).catch((err) => {
+      console.warn('[TauriBridge] Failed to get folder size for', dirPath, err);
+      return null;
+    });
+    folderSizeCache.set(dirPath, p);
+  }
+  return p;
+}
+
+

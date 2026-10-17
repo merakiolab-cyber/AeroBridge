@@ -1,9 +1,9 @@
 import React from 'react';
-import { Check, Info, AlertTriangle } from 'lucide-react';
+import { Check, Info, AlertTriangle, AlertCircle } from 'lucide-react';
 
 export interface ToastMessage {
   id: string;
-  type: 'success' | 'info' | 'warning';
+  type: 'success' | 'info' | 'warning' | 'error';
   title: string;
   description?: string;
 }
@@ -28,12 +28,15 @@ export const ToastContainer: React.FC<ToastProps> = ({ toasts, onDismiss }) => {
             className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
               toast.type === 'success'
                 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                : toast.type === 'error'
+                ? 'bg-red-500/20 text-red-400 border border-red-500/30'
                 : toast.type === 'warning'
                 ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
                 : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
             }`}
           >
             {toast.type === 'success' && <Check className="w-4 h-4" />}
+            {toast.type === 'error' && <AlertCircle className="w-4 h-4" />}
             {toast.type === 'warning' && <AlertTriangle className="w-4 h-4" />}
             {toast.type === 'info' && <Info className="w-4 h-4" />}
           </div>

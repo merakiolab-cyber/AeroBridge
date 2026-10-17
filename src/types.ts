@@ -1,5 +1,6 @@
-export type WorkspaceView = 'essentials' | 'filmstrip' | 'compare' | 'table';
-export type AssetType = 'image' | 'raw' | 'vector' | 'document' | 'video' | 'adobe-psd' | 'adobe-ai' | 'adobe-indd' | 'adobe-ae' | 'adobe-pr' | 'pdf' | 'other';
+export type WorkspaceView = 'browser' | 'essentials' | 'filmstrip' | 'compare' | 'table' | 'commander';
+export type BrowserViewMode = 'grid' | 'table';
+export type AssetType = 'image' | 'raw' | 'vector' | 'document' | 'video' | 'adobe-psd' | 'adobe-ai' | 'adobe-indd' | 'adobe-ae' | 'adobe-pr' | 'pdf' | 'painter' | 'figma' | 'html' | 'krita' | 'blend' | 'other';
 
 export interface ExifData {
   camera?: string;
@@ -32,7 +33,7 @@ export interface AssetItem {
   fullPath?: string;
   url: string;
   type: AssetType;
-  category: 'image' | 'raw' | 'adobe-psd' | 'adobe-ai' | 'adobe-indd' | 'adobe-ae' | 'adobe-pr' | 'pdf' | 'video' | 'vector' | 'other';
+  category: 'image' | 'raw' | 'adobe-psd' | 'adobe-ai' | 'adobe-indd' | 'adobe-ae' | 'adobe-pr' | 'pdf' | 'video' | 'vector' | 'painter' | 'figma' | 'html' | 'krita' | 'blend' | 'other';
   format: string;
   extension: string;
   colorBadge: string;
@@ -54,6 +55,13 @@ export interface AssetItem {
   blob?: Blob;
   fileRef?: File;
   fileHandle?: any;
+  isFolder?: boolean;
+  /** True while `url` is a system file-type icon (not a real content preview). */
+  isIcon?: boolean;
+  /** Total page count for multi-page documents (PDFs, multi-page TIFFs/AI). */
+  pageCount?: number;
+  /** Currently active page being previewed. */
+  currentPage?: number;
 }
 
 export interface FilterState {

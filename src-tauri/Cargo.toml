@@ -1,6 +1,6 @@
 [package]
 name = "aerobridge-studio"
-version = "2.8.0"
+version = "3.27.15"
 description = "Ultra-Fast Creative Asset Manager for Windows 11"
 authors = ["AeroBridge Contributors"]
 license = "MIT"
@@ -19,7 +19,20 @@ tauri-build = { version = "2.7.3", features = [] }
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
-tauri = { version = "2.12.4", features = ["protocol-asset"] }
+tauri = { version = "2.12.4", features = ["protocol-asset", "devtools"] }
 tauri-plugin-log = "2"
 rfd = "0.15"
+png = "0.17"
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.61", features = [
+  "Win32_Foundation",
+  "Win32_Graphics_Gdi",
+  "Win32_Storage_FileSystem",
+  "Win32_System_Com",
+  "Win32_System_Registry",
+  "Win32_UI_Controls",
+  "Win32_UI_Shell",
+  "Win32_UI_WindowsAndMessaging",
+] }
 

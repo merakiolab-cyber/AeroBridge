@@ -3,6 +3,8 @@ import { AssetItem } from '../types';
 import { formatBytes } from '../utils/localFileSystem';
 import { ZoomableCanvas } from './ZoomableCanvas';
 import { Copy, Maximize2, FileText } from 'lucide-react';
+import { getResolutionInfo } from '../utils/extractors';
+import { toDesktopAssetUrl } from '../utils/tauriBridge';
 
 interface CompareViewProps {
   assets: AssetItem[];
@@ -54,12 +56,12 @@ export const CompareView: React.FC<CompareViewProps> = ({
         {compareAssets.map((asset) => (
           <div
             key={asset.id}
-            className="flex flex-col bg-[#101218] rounded-none border border-white/[0.08] overflow-hidden shadow-xl"
+            className="flex flex-col bg-[#14161c] rounded-2xl overflow-hidden shadow-xl"
           >
             {/* Header info */}
-            <div className="p-3.5 bg-[#14161f] border-b border-white/[0.06] flex items-center justify-between">
+            <div className="p-3.5 bg-[#1a1c24] flex items-center justify-between">
               <div className="truncate flex items-center gap-2">
-                <span className="px-1.5 py-0.5 text-[10px] font-mono font-bold tracking-widest text-white/90 rounded-none bg-black/80 border border-white/10">
+                <span className="px-2 py-0.5 text-[10px] font-mono font-bold tracking-wide text-white/90 rounded-md bg-black/60 shadow-sm">
                   {asset.extension}
                 </span>
                 <span className="text-xs font-medium text-white truncate" title={asset.name}>
@@ -98,9 +100,26 @@ export const CompareView: React.FC<CompareViewProps> = ({
             {/* Canvas with wheel zoom */}
             <div className="flex-1 bg-[#06070a] relative overflow-hidden">
               <ZoomableCanvas
-                src={asset.url}
+                src={
+                  ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg', 'bmp', 'ico', 'avif'].includes(
+                    (asset.extension || '').toLowerCase().replace(/^\./, '')
+                  ) && asset.fullPath
+                    ? toDesktopAssetUrl(asset.fullPath)
+                    : asset.url
+                }
                 alt={asset.name}
                 enableOverlayControls={false}
+                onLoad={(e) => {
+                  const img = e.currentTarget;
+                  if (img.naturalWidth > 0) {
+                    if (asset.dimensions.width !== img.naturalWidth || asset.dimensions.height !== img.naturalHeight) {
+                      asset.dimensions = {
+                        width: img.naturalWidth,
+                        height: img.naturalHeight,
+                      };
+                    }
+                  }
+                }}
               />
             </div>
 
@@ -108,8 +127,14 @@ export const CompareView: React.FC<CompareViewProps> = ({
             <div className="p-3 bg-[#12141c] border-t border-white/[0.06] flex items-center justify-between text-xs">
               <div className="text-[11px] text-slate-400 font-mono tabular-nums">
                 <span>{formatBytes(asset.size)}</span>
-                <span className="mx-1.5">·</span>
-                <span>{asset.dimensions.width} × {asset.dimensions.height}</span>
+                {asset.dimensions.width > 0 && (
+                  <>
+                    <span className="mx-1.5">·</span>
+                    <span>
+                      {asset.dimensions.width} × {asset.dimensions.height} ({getResolutionInfo(asset.dimensions.width, asset.dimensions.height, asset.exif?.resolutionDpi).megapixelsFormatted})
+                    </span>
+                  </>
+                )}
               </div>
               <span className="text-[11px] text-[#e2e4e9] font-mono font-medium">
                 {asset.exif.colorProfile || 'sRGB IEC61966-2.1'}

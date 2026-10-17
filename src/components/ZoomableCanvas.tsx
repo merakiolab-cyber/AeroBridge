@@ -1,68 +1,246 @@
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { RotateCcw, ZoomIn, ZoomOut, Maximize } from 'lucide-react';
+import { RotateCcw, ZoomIn, ZoomOut, Maximize, Columns2 } from 'lucide-react';
 
 interface ZoomableCanvasProps {
   src: string;
   alt: string;
   className?: string;
+  paddingClassName?: string;
   onDoubleClick?: () => void;
   enableOverlayControls?: boolean;
+  onLoad?: (e: React.SyntheticEvent<HTMLImageElement>) => void;
+  preserveZoom?: boolean;
+  scale?: number;
+  onScaleChange?: (scale: number) => void;
 }
 
 export const ZoomableCanvas: React.FC<ZoomableCanvasProps> = ({
   src,
   alt,
   className = '',
+  paddingClassName,
+  onDoubleClick,
   enableOverlayControls = true,
+  onLoad,
+  preserveZoom = false,
+  scale: controlledScale,
+  onScaleChange,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(1);
+  const imgRef = useRef<HTMLImageElement>(null);
+
+  const [internalScale, setInternalScale] = useState(controlledScale ?? 1);
+  const scale = controlledScale !== undefined ? controlledScale : internalScale;
+
+  const setScale = useCallback(
+    (action: number | ((prev: number) => number)) => {
+      const next = typeof action === 'function' ? action(scale) : action;
+      if (controlledScale === undefined) {
+        setInternalScale(next);
+      }
+      onScaleChange?.(next);
+    },
+    [scale, controlledScale, onScaleChange]
+  );
+
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [showBadge, setShowBadge] = useState(false);
+  const [badgeText, setBadgeText] = useState<string>('');
   const badgeTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  const [naturalDims, setNaturalDims] = useState<{ width: number; height: number } | null>(null);
+
   // Trigger transient zoom percentage badge
-  const triggerBadge = useCallback(() => {
+  const triggerBadge = useCallback((customText?: string) => {
+    if (customText) setBadgeText(customText);
     setShowBadge(true);
     if (badgeTimerRef.current) clearTimeout(badgeTimerRef.current);
     badgeTimerRef.current = setTimeout(() => {
       setShowBadge(false);
-    }, 1200);
+    }, 1300);
   }, []);
 
-  // Reset zoom & pan when image source changes
+  // Sync external controlled scale if it changes
   useEffect(() => {
+    if (controlledScale !== undefined) {
+      setInternalScale(controlledScale);
+    }
+  }, [controlledScale]);
+
+  // Reset zoom & pan when image source changes (unless preserveZoom is enabled)
+  useEffect(() => {
+    if (!preserveZoom) {
+      setScale(1);
+    }
+    setPosition({ x: 0, y: 0 });
+    setNaturalDims(null);
+  }, [src, preserveZoom, setScale]);
+
+  // Is this a tall / vertical image (e.g. infographic, webpage screenshot, poster)
+  const isTallImage = useMemo(() => {
+    if (!naturalDims) return false;
+    return naturalDims.height > naturalDims.width * 1.25;
+  }, [naturalDims]);
+
+  // Compute reference scales relative to rendered layout
+  const layoutDims = useMemo(() => {
+    const img = imgRef.current;
+    if (!img) return { w: 1, h: 1 };
+    return {
+      w: Math.max(img.offsetWidth, 1),
+      h: Math.max(img.offsetHeight, 1),
+    };
+  }, [scale, naturalDims]);
+
+  // Scale needed to reach 1:1 true pixel resolution
+  const actualScale = useMemo(() => {
+    if (!naturalDims || !imgRef.current) return 1;
+    const wLayout = Math.max(imgRef.current.offsetWidth, 1);
+    return Math.max(0.1, naturalDims.width / wLayout);
+  }, [naturalDims]);
+
+  // Scale needed to fit container width comfortably
+  const fitWidthScale = useMemo(() => {
+    const container = containerRef.current;
+    const img = imgRef.current;
+    if (!container || !img) return 1;
+    const cRect = container.getBoundingClientRect();
+    const wLayout = Math.max(img.offsetWidth, 1);
+    return Math.max(1, (cRect.width * 0.92) / wLayout);
+  }, [naturalDims]);
+
+  // True percentage of native image resolution
+  const actualPercent = useMemo(() => {
+    if (!actualScale || actualScale <= 0) return Math.round(scale * 100);
+    return Math.round((scale / actualScale) * 100);
+  }, [scale, actualScale]);
+
+  // Reset to full view (fit to window)
+  const resetZoom = useCallback(() => {
     setScale(1);
     setPosition({ x: 0, y: 0 });
-  }, [src]);
+    triggerBadge('Přizpůsobeno oknu');
+  }, [triggerBadge]);
 
-  // Smooth mouse wheel zoom at cursor point (Figma / Photoshop style)
+  // Fit image to viewport width (ideal for tall infographics & landing pages)
+  const fitToWidth = useCallback(() => {
+    const container = containerRef.current;
+    const img = imgRef.current;
+    if (!container || !img) return;
+
+    const cRect = container.getBoundingClientRect();
+    const wLayout = Math.max(img.offsetWidth, 1);
+    const hLayout = Math.max(img.offsetHeight, 1);
+
+    const targetScale = Math.max(1, (cRect.width * 0.92) / wLayout);
+    setScale(targetScale);
+
+    // If image becomes taller than container, align top edge near top of viewport
+    const scaledHeight = hLayout * targetScale;
+    if (scaledHeight > cRect.height) {
+      const topOffset = (scaledHeight - cRect.height) / 2 - 32;
+      setPosition({ x: 0, y: -topOffset });
+    } else {
+      setPosition({ x: 0, y: 0 });
+    }
+    triggerBadge('Přizpůsobeno šířce');
+  }, [triggerBadge]);
+
+  // 1:1 Pixel-Perfect Native Size
+  const fitToActualSize = useCallback(() => {
+    const container = containerRef.current;
+    const img = imgRef.current;
+    if (!container || !img) return;
+
+    const cRect = container.getBoundingClientRect();
+    const wLayout = Math.max(img.offsetWidth, 1);
+    const hLayout = Math.max(img.offsetHeight, 1);
+    const wNat = naturalDims?.width || img.naturalWidth || wLayout;
+    const hNat = naturalDims?.height || img.naturalHeight || hLayout;
+
+    const targetScale = Math.max(0.2, wNat / wLayout);
+    setScale(targetScale);
+
+    const scaledHeight = hLayout * targetScale;
+    if (scaledHeight > cRect.height && hNat > wNat * 1.25) {
+      const topOffset = (scaledHeight - cRect.height) / 2 - 32;
+      setPosition({ x: 0, y: -topOffset });
+    } else {
+      setPosition({ x: 0, y: 0 });
+    }
+    triggerBadge('100% · Skutečná velikost');
+  }, [naturalDims, triggerBadge]);
+
+  const zoomIn = useCallback(() => {
+    setScale((s) => {
+      const next = Math.min(s * 1.35, Math.max(30, fitWidthScale * 3));
+      triggerBadge();
+      return next;
+    });
+  }, [fitWidthScale, triggerBadge]);
+
+  const zoomOut = useCallback(() => {
+    setScale((s) => {
+      const next = Math.max(s / 1.35, 0.2);
+      triggerBadge();
+      return next;
+    });
+  }, [setScale, triggerBadge]);
+
+  // Cycle between view modes on badge click
+  const cycleViewMode = useCallback(() => {
+    if (Math.abs(scale - 1) < 0.05) {
+      if (isTallImage) fitToWidth();
+      else fitToActualSize();
+    } else if (isTallImage && Math.abs(scale - fitWidthScale) < 0.1) {
+      fitToActualSize();
+    } else {
+      resetZoom();
+    }
+  }, [scale, isTallImage, fitWidthScale, fitToWidth, fitToActualSize, resetZoom]);
+
+  // Mouse wheel: scroll vertically when image overflows in height, or zoom at cursor when Ctrl is pressed / fits
   useEffect(() => {
     const container = containerRef.current;
+    const img = imgRef.current;
     if (!container) return;
 
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
 
-      const rect = container.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left - rect.width / 2;
-      const mouseY = e.clientY - rect.top - rect.height / 2;
+      const cRect = container.getBoundingClientRect();
+      const wLayout = img?.offsetWidth || 1;
+      const hLayout = img?.offsetHeight || 1;
+      const scaledHeight = hLayout * scale;
 
-      // Dynamic zoom factor based on wheel delta
-      const zoomIntensity = e.ctrlKey ? 0.02 : 0.0015;
+      // If image is taller than container and Ctrl is NOT held: smooth vertical page scroll
+      if (!e.ctrlKey && scaledHeight > cRect.height * 1.05) {
+        const maxScrollOffset = (scaledHeight - cRect.height) / 2 + 60;
+        setPosition((prev) => {
+          const nextY = prev.y - e.deltaY;
+          const clampedY = Math.max(-maxScrollOffset, Math.min(maxScrollOffset, nextY));
+          return { x: prev.x, y: clampedY };
+        });
+        return;
+      }
+
+      // Otherwise: Zoom centered at mouse cursor
+      const mouseX = e.clientX - cRect.left - cRect.width / 2;
+      const mouseY = e.clientY - cRect.top - cRect.height / 2;
+
+      const zoomIntensity = e.ctrlKey ? 0.02 : 0.0018;
       const delta = -e.deltaY;
       const factor = Math.exp(delta * zoomIntensity);
 
       setScale((prevScale) => {
-        const newScale = Math.min(Math.max(prevScale * factor, 0.6), 12);
+        const maxLimit = Math.max(30, fitWidthScale * 3);
+        const newScale = Math.min(Math.max(prevScale * factor, 0.2), maxLimit);
 
-        // Adjust position so the zoom centers on the mouse cursor
         setPosition((prevPos) => {
           if (newScale <= 1) {
-            // Re-center smoothly when zoomed out
             return { x: prevPos.x * 0.8, y: prevPos.y * 0.8 };
           }
           const scaleDiff = newScale / prevScale;
@@ -81,7 +259,7 @@ export const ZoomableCanvas: React.FC<ZoomableCanvasProps> = ({
     return () => {
       container.removeEventListener('wheel', handleWheel);
     };
-  }, [triggerBadge]);
+  }, [scale, fitWidthScale, triggerBadge]);
 
   // Drag to pan
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -105,40 +283,54 @@ export const ZoomableCanvas: React.FC<ZoomableCanvasProps> = ({
     setIsDragging(false);
   };
 
-  // Double click toggles between 100% (fit) and 2.5x zoom
+  // Smart double-click: for vertical images toggles between fit-window and fit-width
   const handleDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (scale > 1.2) {
-      setScale(1);
-      setPosition({ x: 0, y: 0 });
-    } else {
-      const rect = containerRef.current?.getBoundingClientRect();
-      if (rect) {
-        const mouseX = e.clientX - rect.left - rect.width / 2;
-        const mouseY = e.clientY - rect.top - rect.height / 2;
-        setScale(2.5);
-        setPosition({ x: -mouseX * 1.5, y: -mouseY * 1.5 });
-      } else {
-        setScale(2.5);
-      }
+    if (onDoubleClick) {
+      onDoubleClick();
+      return;
     }
-    triggerBadge();
+
+    if (scale > 1.15 || position.x !== 0 || position.y !== 0) {
+      resetZoom();
+    } else if (isTallImage) {
+      fitToWidth();
+    } else {
+      fitToActualSize();
+    }
   };
 
-  const resetZoom = () => {
-    setScale(1);
-    setPosition({ x: 0, y: 0 });
-    triggerBadge();
-  };
+  // Keyboard shortcuts (W: fit width, 0: 100%, + / -: zoom)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeTag = (document.activeElement?.tagName || '').toLowerCase();
+      if (activeTag === 'input' || activeTag === 'textarea') return;
 
-  const zoomIn = () => {
-    setScale((s) => Math.min(s * 1.35, 12));
-    triggerBadge();
-  };
+      if (e.key === 'w' || e.key === 'W') {
+        e.preventDefault();
+        fitToWidth();
+      } else if (e.key === '0') {
+        e.preventDefault();
+        fitToActualSize();
+      } else if (e.key === '=' || e.key === '+') {
+        e.preventDefault();
+        zoomIn();
+      } else if (e.key === '-') {
+        e.preventDefault();
+        zoomOut();
+      }
+    };
 
-  const zoomOut = () => {
-    setScale((s) => Math.max(s / 1.35, 0.6));
-    triggerBadge();
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [fitToWidth, fitToActualSize, zoomIn, zoomOut]);
+
+  const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    if (img.naturalWidth > 0) {
+      setNaturalDims({ width: img.naturalWidth, height: img.naturalHeight });
+    }
+    onLoad?.(e);
   };
 
   return (
@@ -149,7 +341,9 @@ export const ZoomableCanvas: React.FC<ZoomableCanvasProps> = ({
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
       onDoubleClick={handleDoubleClick}
-      className={`relative w-full h-full overflow-hidden select-none flex items-center justify-center ${
+      className={`relative w-full h-full min-w-0 min-h-0 overflow-hidden select-none flex items-center justify-center ${
+        paddingClassName || 'p-4 md:p-6'
+      } ${
         scale > 1.05 ? 'cursor-grab active:cursor-grabbing' : 'cursor-zoom-in'
       } ${className}`}
     >
@@ -170,13 +364,20 @@ export const ZoomableCanvas: React.FC<ZoomableCanvasProps> = ({
                 mass: 0.45,
               }
         }
-        className="flex items-center justify-center max-w-full max-h-full origin-center pointer-events-none will-change-transform"
+        className={`flex items-center justify-center w-full h-full max-w-full max-h-full min-w-0 min-h-0 origin-center pointer-events-none ${
+          isDragging ? 'will-change-transform' : ''
+        }`}
       >
         <img
+          ref={imgRef}
           src={src}
           alt={alt}
           referrerPolicy="no-referrer"
-          className="max-w-[98vw] max-h-[96vh] object-contain drop-shadow-2xl rounded-none transition-shadow duration-300"
+          onLoad={handleImageLoad}
+          className="max-w-full max-h-full w-auto h-auto object-contain drop-shadow-2xl rounded-none transition-shadow duration-300 pointer-events-auto"
+          style={{
+            imageRendering: 'auto',
+          }}
           draggable={false}
         />
       </motion.div>
@@ -192,10 +393,15 @@ export const ZoomableCanvas: React.FC<ZoomableCanvasProps> = ({
             className="absolute bottom-5 left-6 px-3.5 py-1.5 rounded-full bg-[#12141c]/90 text-white/90 text-xs font-mono font-medium backdrop-blur-md border border-white/10 shadow-xl pointer-events-none flex items-center gap-2"
           >
             <span className="tabular-nums font-semibold text-[#e2e4e9]">
-              {Math.round(scale * 100)}%
+              {actualPercent}%
             </span>
             <span className="text-[11px] text-zinc-400">
-              {scale === 1 ? 'Přizpůsobeno' : 'Kolečkem zvětšete / Dvojklik pro reset'}
+              {badgeText ||
+                (scale === 1
+                  ? 'Přizpůsobeno oknu'
+                  : isTallImage && Math.abs(scale - fitWidthScale) < 0.1
+                  ? 'Přizpůsobeno šířce · Kolečkem posunujte'
+                  : 'Kolečkem zvětšete / Dvojklik pro reset')}
             </span>
           </motion.div>
         )}
@@ -203,7 +409,65 @@ export const ZoomableCanvas: React.FC<ZoomableCanvasProps> = ({
 
       {/* Floating Micro Zoom Bar Controls */}
       {enableOverlayControls && (
-        <div className="absolute bottom-5 right-6 flex items-center gap-1.5 bg-[#12141c]/80 backdrop-blur-md p-1.5 rounded-full border border-white/10 shadow-xl pointer-events-auto">
+        <div className="absolute bottom-5 right-6 flex items-center gap-1.5 bg-[#12141c]/85 backdrop-blur-md p-1.5 rounded-full border border-white/10 shadow-2xl pointer-events-auto">
+          {/* Mode: Fit to Window */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              resetZoom();
+            }}
+            className={`px-2.5 h-7 rounded-full text-[11px] font-medium transition-colors flex items-center gap-1.5 ${
+              scale === 1
+                ? 'bg-sky-500/20 text-sky-300 font-semibold'
+                : 'text-slate-300 hover:text-white hover:bg-white/10'
+            }`}
+            title="Přizpůsobit oknu"
+          >
+            <Maximize className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Okno</span>
+          </button>
+
+          {/* Mode: Fit to Width (for tall images) */}
+          {isTallImage && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                fitToWidth();
+              }}
+              className={`px-2.5 h-7 rounded-full text-[11px] font-medium transition-colors flex items-center gap-1.5 ${
+                Math.abs(scale - fitWidthScale) < 0.1
+                  ? 'bg-sky-500/20 text-sky-300 font-semibold'
+                  : 'text-slate-300 hover:text-white hover:bg-white/10'
+              }`}
+              title="Přizpůsobit šířce (Klávesa W) – ideální pro čtení dlouhých stránek a infografik"
+            >
+              <Columns2 className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Šířka</span>
+            </button>
+          )}
+
+          {/* Mode: 1:1 Actual Resolution */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              fitToActualSize();
+            }}
+            className={`px-2.5 h-7 rounded-full text-[11px] font-medium transition-colors flex items-center gap-1.5 ${
+              Math.abs(scale - actualScale) < 0.1
+                ? 'bg-sky-500/20 text-sky-300 font-semibold'
+                : 'text-slate-300 hover:text-white hover:bg-white/10'
+            }`}
+            title="Skutečná velikost 100% (Klávesa 0) – 1 pixel obrázku = 1 pixel monitoru"
+          >
+            <span className="font-mono">1:1</span>
+          </button>
+
+          <div className="w-[1px] h-4 bg-white/15 mx-0.5" />
+
+          {/* Zoom Out */}
           <button
             type="button"
             onClick={(e) => {
@@ -211,21 +475,25 @@ export const ZoomableCanvas: React.FC<ZoomableCanvasProps> = ({
               zoomOut();
             }}
             className="w-7 h-7 rounded-full flex items-center justify-center text-slate-300 hover:text-white hover:bg-white/10 transition-colors"
-            title="Zmenšit"
+            title="Zmenšit (-)"
           >
             <ZoomOut className="w-3.5 h-3.5" />
           </button>
+
+          {/* Percentage Indicator Button */}
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              resetZoom();
+              cycleViewMode();
             }}
-            className="px-2.5 h-7 rounded-full text-[11px] font-medium font-mono text-slate-300 hover:text-white hover:bg-white/10 transition-colors"
-            title="Resetovat na 100%"
+            className="px-2 h-7 rounded-full text-[11px] font-medium font-mono text-slate-200 hover:text-white hover:bg-white/10 transition-colors tabular-nums"
+            title="Přepnout režim zobrazení (Okno / Šířka / 100%)"
           >
-            {Math.round(scale * 100)}%
+            {actualPercent}%
           </button>
+
+          {/* Zoom In */}
           <button
             type="button"
             onClick={(e) => {
@@ -233,19 +501,21 @@ export const ZoomableCanvas: React.FC<ZoomableCanvasProps> = ({
               zoomIn();
             }}
             className="w-7 h-7 rounded-full flex items-center justify-center text-slate-300 hover:text-white hover:bg-white/10 transition-colors"
-            title="Zvětšit"
+            title="Zvětšit (+)"
           >
             <ZoomIn className="w-3.5 h-3.5" />
           </button>
-          {scale !== 1 && (
+
+          {/* Reset button if scale or position is modified */}
+          {(scale !== 1 || position.x !== 0 || position.y !== 0) && (
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 resetZoom();
               }}
-              className="w-7 h-7 rounded-full flex items-center justify-center text-[#e2e4e9] hover:text-white hover:bg-white/10 transition-colors"
-              title="Přizpůsobit oknu"
+              className="w-7 h-7 rounded-full flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-colors ml-0.5"
+              title="Resetovat pozici a měřítko"
             >
               <RotateCcw className="w-3.5 h-3.5" />
             </button>

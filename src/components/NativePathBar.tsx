@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, ArrowRight, ArrowUp, RefreshCw, ChevronRight, Folder } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ArrowUp, RefreshCw, ChevronRight } from 'lucide-react';
 import type { NativeFileEntry } from '../utils/tauriBridge';
 import { pathAncestors } from './NativeExplorerTree';
 
 interface NativePathBarProps {
   path: string;
-  subdirs: NativeFileEntry[];
+  subdirs?: NativeFileEntry[];
   canBack: boolean;
   canForward: boolean;
   isLoading: boolean;
@@ -23,7 +23,6 @@ const segmentLabel = (full: string) => {
 
 export const NativePathBar: React.FC<NativePathBarProps> = ({
   path,
-  subdirs,
   canBack,
   canForward,
   isLoading,
@@ -106,23 +105,6 @@ export const NativePathBar: React.FC<NativePathBarProps> = ({
           <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
         </button>
       </div>
-
-      {subdirs.length > 0 && (
-        <div className="flex flex-wrap gap-1 px-2 pb-2 max-h-[84px] overflow-y-auto">
-          {subdirs.map((d) => (
-            <button
-              key={d.path}
-              type="button"
-              onClick={() => onNavigate(d.path)}
-              className="flex items-center gap-1.5 max-w-[220px] px-2 py-1 text-xs text-zinc-300 bg-white/[0.04] border border-white/[0.06] hover:bg-white/[0.1] hover:border-white/20 hover:text-white transition-colors"
-              title={d.path}
-            >
-              <Folder className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
-              <span className="truncate">{d.name}</span>
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   );
 };

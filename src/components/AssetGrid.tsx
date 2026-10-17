@@ -13,11 +13,15 @@ interface AssetGridProps {
   onFitModeToggle?: () => void;
   onSelect: (id: string, e: React.MouseEvent) => void;
   onOpenQuickLook: (id: string) => void;
+  onOpenAsset?: (asset: AssetItem) => void;
   onCopyPath: (asset: AssetItem) => void;
   onCopyImage: (asset: AssetItem) => void;
   isDragOver: boolean;
   showAllInfo?: boolean;
   activeFolder?: string;
+  onNavigateFolder?: (path: string) => void;
+  onContextMenu?: (e: React.MouseEvent, asset?: AssetItem) => void;
+  onPageChange?: (assetId: string, pageNum: number) => void;
 }
 
 export const AssetGrid: React.FC<AssetGridProps> = ({
@@ -29,11 +33,15 @@ export const AssetGrid: React.FC<AssetGridProps> = ({
   fitMode,
   onSelect,
   onOpenQuickLook,
+  onOpenAsset,
   onCopyPath,
   onCopyImage,
   isDragOver,
   showAllInfo = false,
   activeFolder,
+  onNavigateFolder,
+  onContextMenu,
+  onPageChange,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -93,7 +101,7 @@ export const AssetGrid: React.FC<AssetGridProps> = ({
   const GAP = 16;
   const PADDING_X = 48; // 24px left + 24px right (p-6)
   const itemWidth = thumbnailSize;
-  const itemHeight = showAllInfo ? Math.round(thumbnailSize * 0.82) + 68 : thumbnailSize;
+  const itemHeight = showAllInfo ? Math.round(thumbnailSize * 0.82) + 76 : thumbnailSize;
   const rowHeight = itemHeight + GAP;
 
   // Compute number of columns that fit horizontally
@@ -155,6 +163,17 @@ export const AssetGrid: React.FC<AssetGridProps> = ({
     }
   }, [focusedId, assets, columns, rowHeight, dimensions.height]);
 
+  const handleDragStart = useCallback(
+    (asset: AssetItem, e: React.DragEvent) => {
+      const isSelected = selectedIds.has(asset.id);
+      const idsToDrag = isSelected && selectedIds.size > 1 ? Array.from(selectedIds) : [asset.id];
+      e.dataTransfer.setData('application/json', JSON.stringify({ assetIds: idsToDrag }));
+      e.dataTransfer.setData('text/plain', idsToDrag.join(','));
+      e.dataTransfer.effectAllowed = 'move';
+    },
+    [selectedIds]
+  );
+
   if (assets.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-12 text-center text-zinc-500 select-none bg-[#121316]">
@@ -181,14 +200,19 @@ export const AssetGrid: React.FC<AssetGridProps> = ({
       <div
         ref={viewportRef}
         onScroll={handleScroll}
+        onContextMenu={(e) => {
+          // If clicked directly on the viewport, the spacer canvas or empty area
+          e.preventDefault();
+          onContextMenu?.(e, undefined);
+        }}
         className="flex-1 overflow-y-auto p-6"
       >
-        {/* Drop zone overlay in Ivory Bauhaus style */}
+        {/* Drop zone overlay in Material surface style */}
         {isDragOver && (
-          <div className="absolute inset-0 z-40 bg-[#e2e4e9]/5 border border-dashed border-[#e2e4e9] m-4 rounded-none flex items-center justify-center backdrop-blur-xs pointer-events-none">
-            <div className="bg-[#1e2024] px-6 py-4 rounded-none border border-[#e2e4e9]/40 text-center shadow-2xl">
-              <Sparkles className="w-8 h-8 text-[#e2e4e9] mx-auto mb-2 animate-bounce" />
-              <span className="text-sm font-semibold text-[#e2e4e9]">
+          <div className="absolute inset-0 z-40 bg-sky-500/10 m-4 rounded-3xl flex items-center justify-center backdrop-blur-sm pointer-events-none transition-all">
+            <div className="bg-[#1e2028] px-8 py-5 rounded-2xl text-center shadow-2xl">
+              <Sparkles className="w-8 h-8 text-sky-400 mx-auto mb-2 animate-bounce" />
+              <span className="text-sm font-semibold text-zinc-200">
                 Pusťte složky nebo soubory pro okamžité offline načtení
               </span>
             </div>
@@ -217,11 +241,25 @@ export const AssetGrid: React.FC<AssetGridProps> = ({
                 thumbnailSize={thumbnailSize}
                 fitMode={fitMode}
                 showAllInfo={showAllInfo}
-                selectedIds={selectedIds}
+                onDragStart={handleDragStart}
                 onClick={(e) => onSelect(asset.id, e)}
-                onDoubleClick={() => onOpenQuickLook(asset.id)}
+                onDoubleClick={() => {
+                  if (asset.isFolder && onNavigateFolder && asset.fullPath) {
+                    onNavigateFolder(asset.fullPath);
+                  } else if (onOpenAsset) {
+                    onOpenAsset(asset);
+                  } else {
+                    onOpenQuickLook(asset.id);
+                  }
+                }}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onContextMenu?.(e, asset);
+                }}
                 onCopyPath={() => onCopyPath(asset)}
                 onCopyImage={() => onCopyImage(asset)}
+                onPageChange={onPageChange}
               />
             ))}
           </div>
