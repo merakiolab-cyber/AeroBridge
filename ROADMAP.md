@@ -104,6 +104,42 @@
 
 ---
 
+## 🖼️ Fáze 6: Zdokonalení zobrazení médií, Filmstrip a výchozí pracovní prostředí (DOKONČENO ✅)
+- [x] **Výchozí pracovní disk `F:\` (Working) namísto systémového `C:\` (System):**
+  - [x] Prioritní automatická detekce a otevírání pracovního disku `F:\` při startu aplikace v desktopovém režimu
+  - [x] Automatické přesměrování a ignorování systémového disku `C:\` (Windows OS)
+  - [x] Oboustranná inicializace panelů Commanderu na disk `F:\` (Working)
+  - [x] Plná podpora kořenů všech diskových jednotek v navigačním stromu a oblíbených položkách
+- [x] **Oprava zobrazení náhledů ve Filmstripu (Fit to Frame Screen):**
+  - [x] Odstranění globálních omezovačů `96vh` / `98vw` způsobujících vertikální ořez na monitorech
+  - [x] Plnohodnotný `max-w-full max-h-full min-w-0 min-h-0 w-auto h-auto object-contain` adaptivní kontejner se zachováním poměru stran bez ořezu a deformací
+  - [x] Bezpečné okraje (`paddingClassName` `pt-16 pb-16`) zamezující kolizi s horním informačním štítkem a spodní lištou zoomu
+- [x] **Persistent Zoom (Paměť měřítka zobrazení):**
+  - [x] Zachování zvoleného zoomu/měřítka (např. 70 %, 50 %, 150 %) při přechodu mezi obrázky (šipkami, kolečkem či kliknutím)
+  - [x] Automatické vycentrování nového obrázku při zachování měřítka
+  - [x] Rozšíření spodního limitu zmenšení až na 20 % (`scale: 0.2`)
+  - [x] Dvojklik nebo tlačítko *Okno* pro okamžitý reset na 100% přizpůsobení oknu
+- [x] **Interaktivní spodní lišta miniatur Filmstripu:**
+  - [x] Uchopení a tažení myší (Mouse Grab & Drag-to-Scroll) pro plynulý posun dlouhých pásů miniatur
+  - [x] Ochrana proti nechtěnému výběru při dokončení tažení
+  - [x] Automatické horizontální rolování při otáčení kolečka myši nad lištou
+  - [x] Automatické sledování aktivní miniatury (`scrollIntoView`) při navigaci z klávesnice či bočních tlačítek myši
+- [x] **Podpora změny velikosti miniatur i pro zobrazení Seznam (Table/List View):**
+  - [x] Sjednocení ovládacích prvků velikosti miniatur (posuvník, presety S/M/L/XL, Oříznout vs Celý) v TopBaru i pro zobrazení Seznam
+- [x] **Odstranění složek z gridu v náhledových režimech:**
+  - [x] Režimy Prohlížeč, Filmstrip a Porovnat zobrazují výhradně mediální soubory (složky jsou přístupné v levém stromu a Commanderu)
+  - [x] Odstraněna položka Videa z levého panelu systémových složek
+
+---
+
+## ⚙️ Fáze 7: Správa mezipaměti & nastavení (V plánu / Next ⏳)
+- [ ] **Správa a promazání mezipaměti (Cache Management a la Adobe Bridge):**
+  - [ ] Rychlá akce pro promazání cache aktivní složky (vynucení čerstvého znovunačtení miniatur z disku)
+  - [ ] Dialog Nastavení / Správa mezipaměti s přehledem položek v RAM (LRU), PDF render cache a IndexedDB tabulkách
+  - [ ] Vyčištění veškeré paměťové i diskové mezipaměti jedním kliknutím
+
+---
+
 ## 🚫 Vyřazené funkce ze záměru (Out of Scope / Záměrně neimplementovat)
 - ❌ **Typografie & OpenType (Font preview / Glyphs / Font management):** Zcela vyřazeno z DAM workflow jako zbytečné. AeroBridge se soustředí výhradně na kreativní média (foto, video, Adobe formáty, vektorovou grafiku).
 - ❌ **Barevné štítky & hodnocení hvězdičkami (Rating 1–5, Labels):** Odmítnuto pro zachování minimalistického, nerušivého prostředí bez vizuálního smogu.
