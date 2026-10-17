@@ -319,6 +319,7 @@ export default function App() {
   // --- File Operations Hook (Clipboard, Context Menu, Dialogs, Deletes, Renames) ---
   const {
     clipboard,
+    setClipboard,
     contextMenuPos,
     contextMenuTarget,
     inputDialog,
@@ -937,6 +938,7 @@ export default function App() {
     selectedAssets,
     nativeDir,
     clipboard,
+    setClipboard,
     contextMenuPos,
     closeContextMenu,
     setSelectedIds,

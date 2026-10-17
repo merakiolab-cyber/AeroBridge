@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { AssetItem } from '../types';
 import {
   isDesktopApp,
@@ -53,6 +53,9 @@ export function useFileOperations({
   addToast,
 }: UseFileOperationsProps) {
   const [clipboard, setClipboard] = useState<{ paths: string[]; op: 'copy' | 'cut' } | null>(null);
+  const clipboardRef = useRef(clipboard);
+  clipboardRef.current = clipboard;
+
   const [contextMenuPos, setContextMenuPos] = useState<ContextMenuPosition | null>(null);
   const [contextMenuTarget, setContextMenuTarget] = useState<ContextMenuTarget | null>(null);
   const [inputDialog, setInputDialog] = useState<InputDialogState>({
@@ -168,7 +171,9 @@ export function useFileOperations({
   const handleCopyFiles = useCallback(
     (paths: string[]) => {
       if (paths.length === 0) return;
-      setClipboard({ paths, op: 'copy' });
+      const nextClip = { paths, op: 'copy' as const };
+      clipboardRef.current = nextClip;
+      setClipboard(nextClip);
       copyTextToClipboard(paths.join('\r\n'));
       addToast('Zkopírováno do schránky', `${paths.length} ${paths.length === 1 ? 'položka' : 'položek'}`);
     },
@@ -178,7 +183,10 @@ export function useFileOperations({
   const handleCutFiles = useCallback(
     (paths: string[]) => {
       if (paths.length === 0) return;
-      setClipboard({ paths, op: 'cut' });
+      const nextClip = { paths, op: 'cut' as const };
+      clipboardRef.current = nextClip;
+      setClipboard(nextClip);
+      copyTextToClipboard(paths.join('\r\n'));
       addToast('Vyjmuté položky', `${paths.length} ${paths.length === 1 ? 'položka' : 'položek'} — připraveno k vložení`, 'info');
     },
     [addToast]
@@ -186,8 +194,9 @@ export function useFileOperations({
 
   const handlePasteFiles = useCallback(
     async (destFolder: string) => {
-      let pathsToPaste = clipboard?.paths || [];
-      let opToUse: 'copy' | 'cut' = clipboard?.op || 'copy';
+      const currentClip = clipboardRef.current || clipboard;
+      let pathsToPaste = currentClip?.paths || [];
+      let opToUse: 'copy' | 'cut' = currentClip?.op || 'copy';
 
       // Fallback: check system clipboard if internal state is empty
       if (pathsToPaste.length === 0) {
@@ -216,7 +225,7 @@ export function useFileOperations({
 
       // Safety check: Don't paste folder into itself or its subfolder
       const normDest = destFolder.toLowerCase().replace(/\\+$/, '');
-      const isSelfOrSub = pathsToPaste.some((p) => {
+      const isSelfOrSub = pathsToPaste.some((p: string) => {
         const normP = p.toLowerCase().replace(/\\+$/, '');
         return normDest === normP || normDest.startsWith(normP + '\\');
       });
@@ -233,6 +242,7 @@ export function useFileOperations({
         } else {
           const moved = await moveFilesNative(pathsToPaste, destFolder);
           const count = moved && moved.length > 0 ? moved.length : pathsToPaste.length;
+          clipboardRef.current = null;
           setClipboard(null);
           addToast('Položky přesunuty', `Přesunuto ${count} položek`);
         }
@@ -396,6 +406,7 @@ export function useFileOperations({
 
   return {
     clipboard,
+    setClipboard,
     contextMenuPos,
     contextMenuTarget,
     inputDialog,

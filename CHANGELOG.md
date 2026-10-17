@@ -2,6 +2,19 @@
 
 ## Changelog
 
+### Version 3.27.25 (Spolehlivé fungování klávesových zkratek Ctrl+C / Ctrl+X / Ctrl+V v Prohlížeči)
+- **Aktivace fáze zachycení (Capture Phase) klávesových událostí ([useKeyboardShortcuts.ts](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/hooks/useKeyboardShortcuts.ts)):**
+  - Vyřešen stejný problém jako dříve v Commanderu: posluchač klávesnice v `useKeyboardShortcuts` byl původně registrován v bublající fázi (`useCapture: false`), což způsobovalo, že při zaměření karet souborů nebo tabulkových řádků Chromium a WebView2 spolknuly systémové akcelerátory jako `Ctrl+C`, `Ctrl+X` nebo `Ctrl+V` dříve, než se dostaly k obslužnému kódu.
+  - Listener je nyní registrován s `useCapture: true` na úrovni `window`, takže AeroBridge zachytí a zpracuje klávesové zkratky prioritně před jakýmikoliv podřízenými elementy nebo výchozím chováním prohlížeče.
+  - Všechny obsluhované zkratky nyní volají `e.preventDefault()` a `e.stopPropagation()`.
+- **Inteligentní a spolehlivá extrakce cest vybraných souborů ([useKeyboardShortcuts.ts](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/hooks/useKeyboardShortcuts.ts)):**
+  - Implementována pomocná funkce `getEffectivePaths(p)` s víceúrovňovým fallbackem: 1) `selectedAssets`, 2) `selectedIds` vyhledané v `filteredAssets`, 3) `focusedAsset`, 4) `focusedId`. Klávesová zkratka `Ctrl+C` nebo `Ctrl+X` tak spolehlivě zkopíruje vybraný soubor i v případě, kdy uživatel kliknul na jedinou položku a stav hromadného výběru nebyl ještě synchronizován.
+  - Doplněna zkratka `Ctrl+Shift+C` pro přímé zkopírování plné diskové cesty do schránky Windows, `Ctrl+D` pro odznačení výběru a zrušení vyjmutí (cut) stiskem `Escape`.
+  - Přejmenování přes `F2` a smazání přes `Delete` nyní fungují jednotně pro hromadný výběr i samostatně zaměřený soubor.
+- **Okamžitá synchronizace schránky bez zpoždění re-renderu ([useFileOperations.ts](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/hooks/useFileOperations.ts), [App.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/App.tsx)):**
+  - V `useFileOperations` přidán `clipboardRef`, který se aktualizuje synchronně při volání `handleCopyFiles` / `handleCutFiles` a umožňuje okamžité vložení (`Ctrl+V`) bez čekání na asynchronní cyklus stavu Reactu.
+  - Zpřístupněn export `setClipboard` do `useKeyboardShortcuts` pro spolehlivé rušení operace vyjmutí klávesou Escape.
+
 ### Version 3.27.24 (Oprava zablokování tažení myší v karuselu Filmstrip)
 - **Odstranění nechtěného zablokování režimu tažení ([FilmstripView.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/FilmstripView.tsx)):**
   - Opravena závažná chyba, kdy při kliknutí myší na miniaturu ve spodním karuselu událost `onPointerUp` na kartě miniatury volala `e.stopPropagation()`. Nadřazený kontejner karuselu tak nikdy neobdržel událost puštění myši (`pointerup`), v důsledku čehož interní příznak `isDraggingStripRef` zůstal trvale nastaven na `true`.
