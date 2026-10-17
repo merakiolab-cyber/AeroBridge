@@ -2,6 +2,13 @@
 
 ## Changelog
 
+### Version 3.27.20 (Oprava výběru fotek myší v režimu Filmstrip napřeskáčku)
+- **Přímé klikání na miniatury ve spodním pásu ([FilmstripView.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/FilmstripView.tsx)):**
+  - Opravena chyba, kdy `setPointerCapture` okamžitě po stisku myši na kontejneru zachytil veškeré události a zabránil spuštění `onClick` / `onPointerUp` na jednotlivých kartách miniatur (bylo možné procházet fotky pouze popořadě šipkami).
+  - Aktivace zachycení ukazatele (`setPointerCapture`) byla odložena až na okamžik, kdy pohyb kurzoru překročí práh posunu (6 px).
+  - Přidán přímý handler `onPointerUp` a přístupné klávesové zkratky (Enter / Mezerník) na každou miniaturu pro okamžitý výběr jakékoliv fotografie napřeskáčku bez zpoždění.
+  - Zajištěno automatické plynulé vystředění aktivní miniatury v karuselu a optimální zobrazení přímých obrazových cest přes `toDesktopAssetUrl`.
+
 ### Version 3.27.19 (Oprava extrakce náhledů Adobe InDesign .indd přes nativní embedded JPEG)
 - **Nativní extrakce vložených JPEG náhledů v Rustu ([lib.rs](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src-tauri/src/lib.rs)):**
   - V InDesign dokumentech (`.indd`) jsou XML XMP pakety často rozděleny přes 4KB sektorové hranice s výplňovými nulami a sektorovými hlavičkami, což způsobovalo neplatné base64 zarovnání a pád vykreslování v prohlížeči (s následným fallbackem na obecnou ikonu souboru).

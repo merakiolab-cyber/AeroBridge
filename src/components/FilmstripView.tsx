@@ -81,11 +81,7 @@ export const FilmstripView: React.FC<FilmstripViewProps> = ({
     hasDraggedRef.current = false;
     dragStartXRef.current = e.clientX;
     scrollStartXRef.current = strip.scrollLeft;
-    setIsStripDragging(true);
-
-    try {
-      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    } catch {}
+    // Do NOT capture pointer or set isStripDragging yet so child click / pointerup events work cleanly
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -94,19 +90,35 @@ export const FilmstripView: React.FC<FilmstripViewProps> = ({
     if (!strip) return;
 
     const deltaX = e.clientX - dragStartXRef.current;
-    if (Math.abs(deltaX) > 4) {
+    if (!hasDraggedRef.current && Math.abs(deltaX) >= 6) {
       hasDraggedRef.current = true;
+      setIsStripDragging(true);
+      try {
+        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      } catch {}
     }
-    strip.scrollLeft = scrollStartXRef.current - deltaX;
+
+    if (hasDraggedRef.current) {
+      strip.scrollLeft = scrollStartXRef.current - deltaX;
+    }
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!isDraggingStripRef.current) return;
     isDraggingStripRef.current = false;
     setIsStripDragging(false);
+
     try {
-      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+      if ((e.currentTarget as HTMLElement).hasPointerCapture?.(e.pointerId)) {
+        (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+      }
     } catch {}
+
+    if (hasDraggedRef.current) {
+      setTimeout(() => {
+        hasDraggedRef.current = false;
+      }, 60);
+    }
   };
 
   const handlePrev = () => {
@@ -244,18 +256,39 @@ export const FilmstripView: React.FC<FilmstripViewProps> = ({
       >
         {assets.map((asset) => {
           const isCurrent = asset.id === currentAsset.id;
+          const directImageExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg', 'bmp', 'ico', 'avif'];
+          const ext = (asset.extension || '').toLowerCase().replace(/^\./, '');
+          const thumbSrc = (directImageExtensions.includes(ext) && asset.fullPath)
+            ? toDesktopAssetUrl(asset.fullPath)
+            : asset.url;
+
           return (
             <motion.div
               key={asset.id}
               ref={isCurrent ? activeThumbRef : undefined}
               whileHover={{ y: -2 }}
-              onClick={() => {
+              onClick={(e) => {
+                e.stopPropagation();
                 if (hasDraggedRef.current) return;
                 onSelect(asset.id);
               }}
+              onPointerUp={(e) => {
+                if (e.button === 0 && !hasDraggedRef.current) {
+                  e.stopPropagation();
+                  onSelect(asset.id);
+                }
+              }}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onSelect(asset.id);
+                }
+              }}
               draggable={false}
               onDragStart={(e) => e.preventDefault()}
-              className={`h-full aspect-4/3 rounded-xl overflow-hidden relative shrink-0 transition-all ${
+              className={`h-full aspect-4/3 rounded-xl overflow-hidden relative shrink-0 transition-all cursor-pointer ${
                 isStripDragging ? 'cursor-grabbing' : 'cursor-pointer'
               } ${
                 isCurrent
@@ -264,7 +297,7 @@ export const FilmstripView: React.FC<FilmstripViewProps> = ({
               }`}
             >
               <img
-                src={asset.url}
+                src={thumbSrc}
                 alt={asset.name}
                 referrerPolicy="no-referrer"
                 draggable={false}
