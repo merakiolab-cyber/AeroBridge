@@ -27,6 +27,7 @@ import {
 import { parseImageHeader } from './extractors/imageHeaderParser';
 import {
   extractNativeXmpThumbnail,
+  extractNativeEmbeddedJpeg,
   getNativeFileIcon,
   getNativeFolderSize,
   getNativeShellThumbnail,
@@ -370,18 +371,24 @@ async function doGenerateNativeThumbnail(asset: AssetItem, path: string, ext: st
           return null;
         }
 
-        // 1. Windows Shell thumbnail provider (instant if InDesign / Bridge / SageThumbs is installed)
-        const shellThumb = await getNativeShellThumbnail(path, 600);
-        if (shellThumb) return await withDims(shellThumb);
+        // 1. Ultra-fast native embedded JPEG extraction directly from binary file (InDesign stores full 512-1024px page renders)
+        const nativeJpeg = await extractNativeEmbeddedJpeg(path, 8192, 128);
+        if (nativeJpeg) return await withDims(nativeJpeg);
 
-        // 2. Stream through file for XMP packet (<xmpGImg:image> Base64 JPEG)
+        // 2. JavaScript embedded JPEG stream scan (fallback for head buffer up to 64MB)
+        const head = await readNativeFileBinary(path, 64 * MB);
+        const jpeg = extractEmbeddedJpeg(head, 8192, 64 * MB);
+        if (jpeg) return await withDims(jpeg);
+
+        // 3. Stream through file for verified XMP packet (<xmpGImg:image> Base64 JPEG)
         const xmp = await extractNativeXmpThumbnail(path, 700);
         if (xmp) return await withDims(xmp);
 
-        // 3. Scan for embedded JPEG stream (large page render)
-        const head = await readNativeFileBinary(path, 32 * MB);
-        const jpeg = extractEmbeddedJpeg(head, 8192, 32 * MB);
-        return jpeg ? await withDims(jpeg) : null;
+        // 4. Windows Shell thumbnail provider (instant if InDesign / Bridge / SageThumbs is installed)
+        const shellThumb = await getNativeShellThumbnail(path, 600);
+        if (shellThumb) return await withDims(shellThumb);
+
+        return null;
       }
 
       case 'adobe-ai': {

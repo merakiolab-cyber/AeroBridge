@@ -146,6 +146,33 @@ mod tests {
         let temp = std::env::temp_dir();
         assert!(temp.exists());
     }
+
+    #[test]
+    fn test_extract_embedded_jpeg() {
+        let path = r#"F:\Airmed - bannery vystavy facelift\LED_stolek_vystavy_100x100cm_v01.indd"#;
+        if std::path::Path::new(path).exists() {
+            let res = extract_embedded_jpeg_blocking(path, 8192, 128 * 1024 * 1024);
+            println!("test_extract_embedded_jpeg 1: is_some={}, len={}", res.is_some(), res.as_ref().map(|v| v.len()).unwrap_or(0));
+            assert!(res.is_some());
+            let b = res.unwrap();
+            assert_eq!(b[0], 0xFF);
+            assert_eq!(b[1], 0xD8);
+            assert_eq!(b[b.len() - 2], 0xFF);
+            assert_eq!(b[b.len() - 1], 0xD9);
+        }
+
+        let path2 = r#"F:\AC_Mining Operations_letak_DL\AC_Mining Operations_DL_skladacka_105x210_v01.indd"#;
+        if std::path::Path::new(path2).exists() {
+            let res2 = extract_embedded_jpeg_blocking(path2, 8192, 128 * 1024 * 1024);
+            println!("test_extract_embedded_jpeg 2: is_some={}, len={}", res2.is_some(), res2.as_ref().map(|v| v.len()).unwrap_or(0));
+            assert!(res2.is_some());
+            let b = res2.unwrap();
+            assert_eq!(b[0], 0xFF);
+            assert_eq!(b[1], 0xD8);
+            assert_eq!(b[b.len() - 2], 0xFF);
+            assert_eq!(b[b.len() - 1], 0xD9);
+        }
+    }
 }
 
 /// Quick-access places (Desktop, Documents, Pictures, ...) using OS known folders.
@@ -370,11 +397,21 @@ fn clean_base64(raw: &[u8]) -> Option<String> {
         .chars()
         .filter(|c| c.is_ascii_alphanumeric() || *c == '+' || *c == '/' || *c == '=')
         .collect();
-    if cleaned.len() > 100 {
-        Some(cleaned)
-    } else {
-        None
+    if cleaned.len() < 100 || cleaned.len() % 4 != 0 {
+        return None;
     }
+    // Verify it actually decodes to a valid image (JPEG SOI FF D8 or PNG 89 50 4E 47)
+    use base64::{engine::general_purpose::STANDARD, Engine as _};
+    if let Ok(bytes) = STANDARD.decode(&cleaned) {
+        if bytes.len() >= 4 {
+            let is_jpeg = bytes[0] == 0xFF && bytes[1] == 0xD8;
+            let is_png = bytes.starts_with(&[0x89, 0x50, 0x4E, 0x47]);
+            if is_jpeg || is_png {
+                return Some(cleaned);
+            }
+        }
+    }
+    None
 }
 
 fn find_xmp_start(data: &[u8]) -> Option<(usize, usize)> {
@@ -501,6 +538,65 @@ async fn extract_xmp_thumbnail(path: String, max_scan_mb: u64) -> Option<String>
     .await
     .ok()
     .flatten()
+}
+
+/// Scans a file on disk for the largest embedded JPEG image (SOI FF D8 FF ... EOI FF D9).
+/// Highly optimized for InDesign (.indd), camera RAW files, EPS, etc.
+fn extract_embedded_jpeg_blocking(path: &str, min_size: usize, max_scan_bytes: u64) -> Option<Vec<u8>> {
+    let mut file = fs::File::open(path).ok()?;
+    let meta = file.metadata().ok()?;
+    let scan_limit = meta.len().min(max_scan_bytes) as usize;
+
+    let mut buf = vec![0u8; scan_limit.min(128 * 1024 * 1024)];
+    let n = file.read(&mut buf).ok()?;
+    if n < 4 {
+        return None;
+    }
+    let data = &buf[..n];
+
+    let mut best_slice: Option<(usize, usize)> = None;
+    let mut best_len = 0usize;
+
+    let limit = data.len().saturating_sub(4);
+    let mut i = 0usize;
+    while i < limit {
+        if data[i] == 0xFF && data[i + 1] == 0xD8 && data[i + 2] == 0xFF {
+            let max_search = data.len().min(i + 16 * 1024 * 1024);
+            let mut j = i + min_size;
+            while j + 1 < max_search {
+                if data[j] == 0xFF && data[j + 1] == 0xD9 {
+                    let length = (j + 2) - i;
+                    if length > best_len {
+                        best_len = length;
+                        best_slice = Some((i, j + 2));
+                    }
+                    i = j + 1;
+                    break;
+                }
+                j += 1;
+            }
+        }
+        i += 1;
+    }
+
+    best_slice.map(|(start, end)| data[start..end].to_vec())
+}
+
+#[tauri::command]
+async fn extract_embedded_jpeg(
+    path: String,
+    min_size: Option<usize>,
+    max_scan_mb: Option<u64>,
+) -> Result<tauri::ipc::Response, String> {
+    let min_sz = min_size.unwrap_or(8192);
+    let max_scan = max_scan_mb.unwrap_or(128).saturating_mul(1024 * 1024);
+    tauri::async_runtime::spawn_blocking(move || {
+        extract_embedded_jpeg_blocking(&path, min_sz, max_scan)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map(tauri::ipc::Response::new)
+    .ok_or_else(|| "Nenalezen žádný vložený náhled JPEG".to_string())
 }
 
 /// Windows shell icon (PNG bytes) for a file extension ("docx") or folder.
@@ -992,6 +1088,7 @@ pub fn run() {
             list_subdirs,
             read_file_binary,
             extract_xmp_thumbnail,
+            extract_embedded_jpeg,
             get_file_icon,
             get_shell_thumbnail,
             reveal_in_explorer,

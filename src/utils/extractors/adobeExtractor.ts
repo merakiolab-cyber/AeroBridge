@@ -85,18 +85,18 @@ export async function extractInddThumbnail(
   buffer: ArrayBuffer,
   _fileName: string
 ): Promise<{ url: string; width: number; height: number; isPlaceholder?: boolean }> {
-  // Method 1: Check XMP base64 preview
+  // Method 1: Scan for embedded page preview JPEG (min 8KB) - InDesign embeds 512-1024px full page renders
+  const embeddedJpeg = extractEmbeddedJpeg(buffer, 8192, 64 * 1024 * 1024);
+  if (embeddedJpeg) {
+    const dims = await getImageDimensions(embeddedJpeg);
+    return { url: embeddedJpeg, width: dims.width, height: dims.height };
+  }
+
+  // Method 2: Check XMP base64 preview
   const xmpThumb = extractXmpThumbnail(buffer);
   if (xmpThumb) {
     const dims = await getImageDimensions(xmpThumb);
     return { url: xmpThumb, width: dims.width, height: dims.height };
-  }
-
-  // Method 2: Scan for embedded page preview JPEG (min 8KB)
-  const embeddedJpeg = extractEmbeddedJpeg(buffer, 8192);
-  if (embeddedJpeg) {
-    const dims = await getImageDimensions(embeddedJpeg);
-    return { url: embeddedJpeg, width: dims.width, height: dims.height };
   }
 
   // Fallback: No embedded preview available

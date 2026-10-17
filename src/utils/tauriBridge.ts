@@ -123,6 +123,31 @@ export async function extractNativeXmpThumbnail(filePath: string, maxScanMb: num
   }
 }
 
+/**
+ * Extracts embedded JPEG from raw binary file (e.g. InDesign .indd, camera RAW, EPS).
+ * Returns a blob URL.
+ */
+export async function extractNativeEmbeddedJpeg(
+  filePath: string,
+  minSize = 8192,
+  maxScanMb = 128
+): Promise<string | null> {
+  if (!isDesktopApp()) return null;
+  try {
+    const res = await invoke<ArrayBuffer>('extract_embedded_jpeg', {
+      path: filePath,
+      minSize,
+      maxScanMb,
+    });
+    const bytes = res instanceof ArrayBuffer ? new Uint8Array(res) : new Uint8Array(res as unknown as number[]);
+    if (!bytes || bytes.length === 0) return null;
+    return URL.createObjectURL(new Blob([bytes], { type: 'image/jpeg' }));
+  } catch (err) {
+    console.debug('[TauriBridge] extractNativeEmbeddedJpeg failed for:', filePath, err);
+    return null;
+  }
+}
+
 
 const iconCache = new Map<string, Promise<string | null>>();
 const iconUrlCache = new Map<string, string>();
