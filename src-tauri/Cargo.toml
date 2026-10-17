@@ -1,6 +1,6 @@
 [package]
 name = "aerobridge-studio"
-version = "3.27.15"
+version = "3.27.16"
 description = "Ultra-Fast Creative Asset Manager for Windows 11"
 authors = ["AeroBridge Contributors"]
 license = "MIT"
