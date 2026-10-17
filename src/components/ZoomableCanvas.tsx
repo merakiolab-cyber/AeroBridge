@@ -32,21 +32,34 @@ export const ZoomableCanvas: React.FC<ZoomableCanvasProps> = ({
 
   const [internalScale, setInternalScale] = useState(controlledScale ?? 1);
   const scale = controlledScale !== undefined ? controlledScale : internalScale;
+  const scaleRef = useRef(scale);
+  scaleRef.current = scale;
+
+  const onScaleChangeRef = useRef(onScaleChange);
+  onScaleChangeRef.current = onScaleChange;
+
+  const controlledScaleRef = useRef(controlledScale);
+  controlledScaleRef.current = controlledScale;
 
   const setScale = useCallback(
     (action: number | ((prev: number) => number)) => {
-      const next = typeof action === 'function' ? action(scale) : action;
-      if (controlledScale === undefined) {
+      const current = scaleRef.current;
+      const next = typeof action === 'function' ? action(current) : action;
+      if (controlledScaleRef.current === undefined) {
         setInternalScale(next);
       }
-      onScaleChange?.(next);
+      scaleRef.current = next;
+      onScaleChangeRef.current?.(next);
     },
-    [scale, controlledScale, onScaleChange]
+    []
   );
 
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const dragDistanceRef = useRef(0);
+  const dragStartPosRef = useRef({ x: 0, y: 0 });
+
   const [showBadge, setShowBadge] = useState(false);
   const [badgeText, setBadgeText] = useState<string>('');
   const badgeTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -67,17 +80,30 @@ export const ZoomableCanvas: React.FC<ZoomableCanvasProps> = ({
   useEffect(() => {
     if (controlledScale !== undefined) {
       setInternalScale(controlledScale);
+      scaleRef.current = controlledScale;
     }
   }, [controlledScale]);
 
-  // Reset zoom & pan when image source changes (unless preserveZoom is enabled)
+  // Reset zoom & pan ONLY when image source actually changes (unless preserveZoom is enabled)
+  const prevSrcRef = useRef(src);
   useEffect(() => {
-    if (!preserveZoom) {
-      setScale(1);
+    if (prevSrcRef.current !== src) {
+      prevSrcRef.current = src;
+      if (!preserveZoom) {
+        setScale(1);
+      }
+      setPosition({ x: 0, y: 0 });
+      setNaturalDims(null);
     }
-    setPosition({ x: 0, y: 0 });
-    setNaturalDims(null);
   }, [src, preserveZoom, setScale]);
+
+  // Read natural dimensions immediately if image is already cached
+  useEffect(() => {
+    const img = imgRef.current;
+    if (img && img.complete && img.naturalWidth > 0) {
+      setNaturalDims({ width: img.naturalWidth, height: img.naturalHeight });
+    }
+  }, [src]);
 
   // Is this a tall / vertical image (e.g. infographic, webpage screenshot, poster)
   const isTallImage = useMemo(() => {
@@ -202,23 +228,23 @@ export const ZoomableCanvas: React.FC<ZoomableCanvasProps> = ({
     }
   }, [scale, isTallImage, fitWidthScale, fitToWidth, fitToActualSize, resetZoom]);
 
-  // Mouse wheel: scroll vertically when image overflows in height, or zoom at cursor when Ctrl is pressed / fits
+  // Mouse wheel: scroll vertically when image overflows in height, or zoom at cursor
   useEffect(() => {
     const container = containerRef.current;
-    const img = imgRef.current;
     if (!container) return;
 
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
+      e.stopPropagation();
 
+      const img = imgRef.current;
       const cRect = container.getBoundingClientRect();
-      const wLayout = img?.offsetWidth || 1;
       const hLayout = img?.offsetHeight || 1;
-      const scaledHeight = hLayout * scale;
+      const currentScale = scaleRef.current;
+      const scaledHeight = hLayout * currentScale;
 
       // Reading mode (tall image fitted to width) or Shift held: smooth vertical scroll.
-      // Otherwise the wheel zooms, so the image can always be zoomed in and out.
-      const inReadingMode = isTallImage && Math.abs(scale - fitWidthScale) < 0.1;
+      const inReadingMode = isTallImage && Math.abs(currentScale - fitWidthScale) < 0.1;
       if (!e.ctrlKey && (inReadingMode || e.shiftKey) && scaledHeight > cRect.height * 1.05) {
         const maxScrollOffset = (scaledHeight - cRect.height) / 2 + 60;
         setPosition((prev) => {
@@ -233,9 +259,15 @@ export const ZoomableCanvas: React.FC<ZoomableCanvasProps> = ({
       const mouseX = e.clientX - cRect.left - cRect.width / 2;
       const mouseY = e.clientY - cRect.top - cRect.height / 2;
 
-      const zoomIntensity = e.ctrlKey ? 0.02 : 0.0018;
       const delta = -e.deltaY;
-      const factor = Math.exp(delta * zoomIntensity);
+      let factor = 1;
+      if (Math.abs(delta) >= 50) {
+        // Discrete mouse wheel notch (standard Windows mouse wheel)
+        factor = delta > 0 ? 1.25 : 0.8;
+      } else {
+        // Smooth touchpad pinch / scroll
+        factor = Math.exp(delta * (e.ctrlKey ? 0.02 : 0.006));
+      }
 
       setScale((prevScale) => {
         const maxLimit = Math.max(30, fitWidthScale * 3);
@@ -243,7 +275,7 @@ export const ZoomableCanvas: React.FC<ZoomableCanvasProps> = ({
 
         setPosition((prevPos) => {
           if (newScale <= 1) {
-            return { x: prevPos.x * 0.8, y: prevPos.y * 0.8 };
+            return { x: 0, y: 0 };
           }
           const scaleDiff = newScale / prevScale;
           return {
@@ -261,12 +293,14 @@ export const ZoomableCanvas: React.FC<ZoomableCanvasProps> = ({
     return () => {
       container.removeEventListener('wheel', handleWheel);
     };
-  }, [scale, setScale, isTallImage, fitWidthScale, triggerBadge]);
+  }, [isTallImage, fitWidthScale, setScale, triggerBadge]);
 
   // Drag to pan
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return; // Left click only
     setIsDragging(true);
+    dragDistanceRef.current = 0;
+    dragStartPosRef.current = { x: e.clientX, y: e.clientY };
     setDragStart({
       x: e.clientX - position.x,
       y: e.clientY - position.y,
@@ -275,6 +309,8 @@ export const ZoomableCanvas: React.FC<ZoomableCanvasProps> = ({
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isDragging) return;
+    const dist = Math.hypot(e.clientX - dragStartPosRef.current.x, e.clientY - dragStartPosRef.current.y);
+    dragDistanceRef.current = dist;
     setPosition({
       x: e.clientX - dragStart.x,
       y: e.clientY - dragStart.y,
@@ -285,7 +321,31 @@ export const ZoomableCanvas: React.FC<ZoomableCanvasProps> = ({
     setIsDragging(false);
   };
 
-  // Smart double-click: for vertical images toggles between fit-window and fit-width
+  // Single click: If at fit-window (scale <= 1.05), clicking zooms into clicked point
+  const handleClick = (e: React.MouseEvent) => {
+    // If user dragged to pan, don't zoom
+    if (dragDistanceRef.current > 6) return;
+
+    if (scaleRef.current <= 1.05) {
+      const container = containerRef.current;
+      if (!container) return;
+      const cRect = container.getBoundingClientRect();
+      const mouseX = e.clientX - cRect.left - cRect.width / 2;
+      const mouseY = e.clientY - cRect.top - cRect.height / 2;
+
+      const targetScale = Math.max(2, actualScale);
+      setScale(targetScale);
+
+      const scaleDiff = targetScale / scaleRef.current;
+      setPosition({
+        x: mouseX - mouseX * scaleDiff,
+        y: mouseY - mouseY * scaleDiff,
+      });
+      triggerBadge('Zvětšeno');
+    }
+  };
+
+  // Smart double-click: for vertical images toggles between fit-window and fit-width, otherwise fit-window / 100%
   const handleDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (onDoubleClick) {
@@ -293,7 +353,7 @@ export const ZoomableCanvas: React.FC<ZoomableCanvasProps> = ({
       return;
     }
 
-    if (scale > 1.15 || position.x !== 0 || position.y !== 0) {
+    if (scaleRef.current > 1.15 || position.x !== 0 || position.y !== 0) {
       resetZoom();
     } else if (isTallImage) {
       fitToWidth();
@@ -342,6 +402,7 @@ export const ZoomableCanvas: React.FC<ZoomableCanvasProps> = ({
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
+      onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       className={`relative w-full h-full min-w-0 min-h-0 overflow-hidden select-none flex items-center justify-center ${
         paddingClassName || 'p-4 md:p-6'

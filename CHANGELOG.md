@@ -2,6 +2,16 @@
 
 ## Changelog
 
+### Version 3.27.21 (Oprava a optimalizace zoomování fotografií na plátně)
+- **Odstranění smyčky rušení zoomu ([ZoomableCanvas.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/ZoomableCanvas.tsx)):**
+  - Opravena kritická chyba, kdy `setScale` v závislostech měnil svou instanci při každém pootočení kolečka nebo stisku tlačítka zoomu, což zpětně spouštělo `useEffect` pro reset měřítka na hodnotu 100% (fit window). Zoom se tak okamžitě resetoval a uživatel nemohl obrázek přiblížit.
+  - `setScale` nyní používá stabilní funkční aktualizaci a `useRef` bez rekompilace závislostí.
+  - Reset na výchozí velikost (`scale = 1`) se nyní spouští výhradně při skutečné změně URL obrázku (`prevSrcRef !== src`).
+- **Nové interaktivní ovládání přiblížení:**
+  - **Click-to-Zoom:** Kliknutím myší na obrázek v základním zobrazení se okamžitě plynule zazoomuje na místo kliknutí (200% / 1:1 skutečná velikost) v souladu s kurzorem lupy `cursor-zoom-in`.
+  - **Plynulé kolečko myši:** Optimalizována citlivost jak pro krokové kolečko myši (25 % na krok), tak pro hladká gesta na touchpadu.
+  - **Pan & Drag:** Po přiblížení se kurzor změní na ruku (`cursor-grab` / `cursor-grabbing`) a umožňuje přirozené posouvání detailu. Dvojklik vrací zobrazení na celé okno.
+
 ### Version 3.27.20 (Oprava výběru fotek myší v režimu Filmstrip napřeskáčku)
 - **Přímé klikání na miniatury ve spodním pásu ([FilmstripView.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/FilmstripView.tsx)):**
   - Opravena chyba, kdy `setPointerCapture` okamžitě po stisku myši na kontejneru zachytil veškeré události a zabránil spuštění `onClick` / `onPointerUp` na jednotlivých kartách miniatur (bylo možné procházet fotky pouze popořadě šipkami).
