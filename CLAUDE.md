@@ -103,8 +103,12 @@ AeroBridge processes user creative files, system paths, and media buffers. Secur
 - ✅ **Respect Bauhaus Aesthetics:** Clean rectilinear panels, high contrast, subtle borders (`border-white/10`), crisp typography (`font-mono` for data, `font-sans` for labels).
 - ✅ **Maintain documentation:** Update `CHANGELOG.md` and `ROADMAP.md` when introducing significant features.
 - ✅ **Validate directory permissions:** Always verify directory handle permission using `verifyDirectoryPermission()` before attempting re-scans in IndexedDB.
+- ✅ **Synchronize versions across ALL 3 configs:** Whenever bumping version, update `package.json`, `src-tauri/tauri.conf.json` AND `src-tauri/Cargo.toml` simultaneously!
+- ✅ **Display version badge visibly:** Keep the version badge visible in `TopBar.tsx` and window title so the active running build is immediately verifiable.
+- ✅ **Kill running app before building:** Terminate any running `aerobridge-studio.exe` before calling `npm run desktop:build` to avoid `os error 32` file locks.
 
 ### DON'T:
+- ❌ **NEVER register Service Workers in Desktop (Tauri/WebView2):** Service workers aggressively cache `index.html` and assets in `%LOCALAPPDATA%\com.aerobridge.studio\EBWebView\Default\Service Worker\CacheStorage`, causing WebView2 to run stale cached frontend code even after recompiling the `.exe`. Always keep service workers disabled/unregistered in desktop mode.
 - ❌ **Don't hardcode absolute local paths:** Use relative virtual paths or user-selected handles.
 - ❌ **Don't use Tailwind utility overload without purpose:** Stick to the established color tokens (`bg-[#14161e]`, `bg-[#1a1d27]`, `border-white/10`).
 - ❌ **Don't block the main thread with heavy image resizing:** Process exports sequentially or with yields (`await new Promise(r => setTimeout(r, 0))`).
