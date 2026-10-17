@@ -47,7 +47,7 @@ export const FilmstripView: React.FC<FilmstripViewProps> = ({
 
   // Keep active thumbnail visible in horizontal carousel
   useEffect(() => {
-    if (activeThumbRef.current) {
+    if (activeThumbRef.current && !isDraggingStripRef.current) {
       activeThumbRef.current.scrollIntoView({
         behavior: 'smooth',
         block: 'nearest',
@@ -55,6 +55,28 @@ export const FilmstripView: React.FC<FilmstripViewProps> = ({
       });
     }
   }, [currentAsset?.id]);
+
+  // Global window pointerup to guarantee drag state is always released
+  useEffect(() => {
+    const handleGlobalPointerUp = () => {
+      if (isDraggingStripRef.current) {
+        isDraggingStripRef.current = false;
+        setIsStripDragging(false);
+        if (hasDraggedRef.current) {
+          setTimeout(() => {
+            hasDraggedRef.current = false;
+          }, 60);
+        }
+      }
+    };
+
+    window.addEventListener('pointerup', handleGlobalPointerUp);
+    window.addEventListener('pointercancel', handleGlobalPointerUp);
+    return () => {
+      window.removeEventListener('pointerup', handleGlobalPointerUp);
+      window.removeEventListener('pointercancel', handleGlobalPointerUp);
+    };
+  }, []);
 
   // Convert vertical mouse wheel to horizontal scroll on the bottom filmstrip
   useEffect(() => {
@@ -81,7 +103,6 @@ export const FilmstripView: React.FC<FilmstripViewProps> = ({
     hasDraggedRef.current = false;
     dragStartXRef.current = e.clientX;
     scrollStartXRef.current = strip.scrollLeft;
-    // Do NOT capture pointer or set isStripDragging yet so child click / pointerup events work cleanly
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -89,13 +110,18 @@ export const FilmstripView: React.FC<FilmstripViewProps> = ({
     const strip = filmstripRef.current;
     if (!strip) return;
 
+    // Safety: if mouse button is not held down, immediately release drag
+    if (e.buttons === 0) {
+      isDraggingStripRef.current = false;
+      setIsStripDragging(false);
+      hasDraggedRef.current = false;
+      return;
+    }
+
     const deltaX = e.clientX - dragStartXRef.current;
     if (!hasDraggedRef.current && Math.abs(deltaX) >= 6) {
       hasDraggedRef.current = true;
       setIsStripDragging(true);
-      try {
-        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-      } catch {}
     }
 
     if (hasDraggedRef.current) {
@@ -103,16 +129,10 @@ export const FilmstripView: React.FC<FilmstripViewProps> = ({
     }
   };
 
-  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+  const handlePointerUp = () => {
     if (!isDraggingStripRef.current) return;
     isDraggingStripRef.current = false;
     setIsStripDragging(false);
-
-    try {
-      if ((e.currentTarget as HTMLElement).hasPointerCapture?.(e.pointerId)) {
-        (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-      }
-    } catch {}
 
     if (hasDraggedRef.current) {
       setTimeout(() => {
@@ -267,16 +287,9 @@ export const FilmstripView: React.FC<FilmstripViewProps> = ({
               key={asset.id}
               ref={isCurrent ? activeThumbRef : undefined}
               whileHover={{ y: -2 }}
-              onClick={(e) => {
-                e.stopPropagation();
+              onClick={() => {
                 if (hasDraggedRef.current) return;
                 onSelect(asset.id);
-              }}
-              onPointerUp={(e) => {
-                if (e.button === 0 && !hasDraggedRef.current) {
-                  e.stopPropagation();
-                  onSelect(asset.id);
-                }
               }}
               role="button"
               tabIndex={0}

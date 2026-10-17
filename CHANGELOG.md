@@ -2,6 +2,14 @@
 
 ## Changelog
 
+### Version 3.27.24 (Oprava zablokování tažení myší v karuselu Filmstrip)
+- **Odstranění nechtěného zablokování režimu tažení ([FilmstripView.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/FilmstripView.tsx)):**
+  - Opravena závažná chyba, kdy při kliknutí myší na miniaturu ve spodním karuselu událost `onPointerUp` na kartě miniatury volala `e.stopPropagation()`. Nadřazený kontejner karuselu tak nikdy neobdržel událost puštění myši (`pointerup`), v důsledku čehož interní příznak `isDraggingStripRef` zůstal trvale nastaven na `true`.
+  - Kurzor se následně choval tak, že při sebemenším pohybu myši neustále posouval pás fotografií doleva a doprava a nešlo vybrat jinou fotku ani režim tažení ukončit.
+  - Přidán globální listener pro `pointerup` a `pointercancel` na objektu `window`, který garantuje spolehlivé uvolnění stavu tažení bez ohledu na to, kde uživatel myš pustí.
+  - Odstraněno `e.stopPropagation()` z karet miniatur, výběr se provádí standardním `onClick` pouze pokud nedošlo k tažení pásu.
+  - V `handlePointerMove` doplněna pojistka `e.buttons === 0`, která okamžitě zruší tažení, pokud uživatel nedrží žádné tlačítko myši.
+
 ### Version 3.27.23 (Plnohodnotný Drag & Drop a nativní kopírování/vkládání v režimu Prohlížeče)
 - **Kompletní Drag & Drop přetahování souborů do složek ([ThumbnailCard.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/ThumbnailCard.tsx), [AssetGrid.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/AssetGrid.tsx), [MetadataTableView.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/MetadataTableView.tsx)):**
   - Karty složek v mřížce i řádky složek v tabulce nyní plně přijímají přetažené soubory (`onDragOver`, `onDragLeave`, `onDrop`).
