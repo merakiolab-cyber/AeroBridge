@@ -41,6 +41,9 @@ interface UseKeyboardShortcutsProps {
   browserViewMode?: 'grid' | 'table';
   onToggleBrowserViewMode?: (mode: 'grid' | 'table') => void;
   onViewChange?: (view: WorkspaceView) => void;
+  settingsOpen?: boolean;
+  setSettingsOpen?: (open: boolean) => void;
+  handlePurgeFolderCache?: () => void;
   addToast: (title: string, desc: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
 }
 
@@ -61,7 +64,7 @@ export function useKeyboardShortcuts(props: UseKeyboardShortcutsProps) {
 
       const p = propsRef.current;
       const isAnyModalOpen =
-        p.quickLookOpen || p.batchRenameOpen || p.batchExportOpen || p.batchIptcOpen;
+        p.quickLookOpen || p.batchRenameOpen || p.batchExportOpen || p.batchIptcOpen || p.settingsOpen;
 
       // When in Commander view, yield all shortcuts to CommanderView except workspace switcher (Ctrl+1..5)
       if (p.currentView === 'commander') {
@@ -258,6 +261,20 @@ export function useKeyboardShortcuts(props: UseKeyboardShortcutsProps) {
       ) {
         e.preventDefault();
         p.handleToggleShowAllInfo();
+        return;
+      }
+
+      // Cmd/Ctrl + ,: Open Settings Modal
+      if ((e.metaKey || e.ctrlKey) && e.key === ',') {
+        e.preventDefault();
+        p.setSettingsOpen?.(true);
+        return;
+      }
+
+      // Ctrl + F5: Purge Folder Cache & Refresh
+      if ((e.metaKey || e.ctrlKey) && e.key === 'F5') {
+        e.preventDefault();
+        p.handlePurgeFolderCache?.();
         return;
       }
 

@@ -257,3 +257,55 @@ export async function loadWorkspaceSession(): Promise<SessionStateRecord | null>
     return null;
   }
 }
+
+/**
+ * Returns statistics about IndexedDB storage (asset records, saved dirs, estimated disk usage)
+ */
+export async function getIndexedDbStats(): Promise<{ assetCount: number; directoryCount: number; estimatedSizeMb: number }> {
+  try {
+    const db = await openDB();
+    const assetCount = await new Promise<number>((resolve) => {
+      const tx = db.transaction('assets', 'readonly');
+      const req = tx.objectStore('assets').count();
+      req.onsuccess = () => resolve(req.result || 0);
+      req.onerror = () => resolve(0);
+    });
+    const directoryCount = await new Promise<number>((resolve) => {
+      const tx = db.transaction('directories', 'readonly');
+      const req = tx.objectStore('directories').count();
+      req.onsuccess = () => resolve(req.result || 0);
+      req.onerror = () => resolve(0);
+    });
+
+    let estimatedBytes = 0;
+    if (typeof navigator !== 'undefined' && navigator.storage && navigator.storage.estimate) {
+      const est = await navigator.storage.estimate();
+      estimatedBytes = est.usage || 0;
+    }
+
+    return {
+      assetCount,
+      directoryCount,
+      estimatedSizeMb: parseFloat((estimatedBytes / (1024 * 1024)).toFixed(2)),
+    };
+  } catch {
+    return { assetCount: 0, directoryCount: 0, estimatedSizeMb: 0 };
+  }
+}
+
+/**
+ * Clears custom asset records from IndexedDB
+ */
+export async function clearIndexedDbAssets(): Promise<void> {
+  try {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('assets', 'readwrite');
+      const req = tx.objectStore('assets').clear();
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    });
+  } catch (err) {
+    console.warn('Failed to clear IndexedDB assets:', err);
+  }
+}

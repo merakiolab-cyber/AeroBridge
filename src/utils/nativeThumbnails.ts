@@ -191,7 +191,49 @@ async function withDims(url: string): Promise<ThumbPatch> {
 // Prevents re-extracting thumbnails when re-opening folders
 // ---------------------------------------------------------------------------
 const thumbCache = new Map<string, ThumbPatch>();
-const MAX_THUMB_CACHE = 2500;
+let maxThumbCacheLimit = 2500;
+try {
+  const savedLimit = localStorage.getItem('aerobridge_max_thumb_cache');
+  if (savedLimit) maxThumbCacheLimit = parseInt(savedLimit, 10) || 2500;
+} catch {}
+
+export function getMaxThumbCacheLimit(): number {
+  return maxThumbCacheLimit;
+}
+
+export function setMaxThumbCacheLimit(limit: number): void {
+  maxThumbCacheLimit = Math.max(500, Math.min(limit, 10000));
+  try {
+    localStorage.setItem('aerobridge_max_thumb_cache', String(maxThumbCacheLimit));
+  } catch {}
+}
+
+export function getThumbnailCacheStats() {
+  return {
+    count: thumbCache.size,
+    maxLimit: maxThumbCacheLimit,
+    placeholderCount: placeholderCache.size,
+  };
+}
+
+export function purgeThumbnailCache(folderPath?: string): number {
+  if (!folderPath) {
+    const count = thumbCache.size;
+    thumbCache.clear();
+    placeholderCache.clear();
+    return count;
+  }
+  const prefix = folderPath.replace(/[\\/]+$/, '').toLowerCase();
+  let deleted = 0;
+  for (const key of Array.from(thumbCache.keys())) {
+    const pathPart = key.split(':')[0].toLowerCase();
+    if (pathPart.startsWith(prefix)) {
+      thumbCache.delete(key);
+      deleted++;
+    }
+  }
+  return deleted;
+}
 
 async function patchToDataUrl(patch: ThumbPatch): Promise<ThumbPatch> {
   if (!patch.url || !patch.url.startsWith('blob:')) {
@@ -618,7 +660,7 @@ export async function generateNativeThumbnail(asset: AssetItem): Promise<ThumbPa
   const patch = await doGenerateNativeThumbnail(asset, path, ext);
   if (patch && !patch.isPlaceholder && patch.url) {
     const durable = await patchToDataUrl(patch);
-    if (thumbCache.size >= MAX_THUMB_CACHE) {
+    if (thumbCache.size >= maxThumbCacheLimit) {
       const iter = thumbCache.keys();
       for (let i = 0; i < 400; i++) {
         const k = iter.next().value;

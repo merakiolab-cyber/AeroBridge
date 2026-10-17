@@ -132,11 +132,14 @@
 
 ---
 
-## ⚙️ Fáze 7: Správa mezipaměti & nastavení (V plánu / Next ⏳)
-- [ ] **Správa a promazání mezipaměti (Cache Management a la Adobe Bridge):**
-  - [ ] Rychlá akce pro promazání cache aktivní složky (vynucení čerstvého znovunačtení miniatur z disku)
-  - [ ] Dialog Nastavení / Správa mezipaměti s přehledem položek v RAM (LRU), PDF render cache a IndexedDB tabulkách
-  - [ ] Vyčištění veškeré paměťové i diskové mezipaměti jedním kliknutím
+## ⚙️ Fáze 7: Správa mezipaměti & nastavení (DOKONČENO ✅)
+- [x] **Správa a promazání mezipaměti (Cache Management a la Adobe Bridge):**
+  - [x] Rychlá akce pro promazání cache aktivní složky (vynucení čerstvého znovunačtení miniatur z disku) přes nabídku `...` i klávesovou zkratku <kbd>Ctrl+F5</kbd>
+  - [x] Plnohodnotný modální dialog Nastavení a správa mezipaměti přístupný tlačítkem ozubeného kola v horní liště, z nabídky `...` nebo přes <kbd>Ctrl+,</kbd>
+  - [x] Živý přehled stavu mezipaměti v reálném čase: počet miniatur v RAM (LRU), renderované stránky a dokumenty PDF, systémové ikony Windows Shell a databáze IndexedDB s odhadem velikosti v MB
+  - [x] Vyčištění veškeré paměťové i diskové mezipaměti jedním kliknutím s bezpečným uvolněním paměti (`URL.revokeObjectURL`, `.destroy()` pro PDF streamy a resetem tabulek)
+  - [x] Nastavitelná kapacita paměťové mezipaměti miniatur (1 000 / 2 500 / 5 000 položek) s perzistencí v `localStorage`
+  - [x] Informační záložka „O aplikaci & Systém“ s přehledem parametrů Windows 11 Fluent UX, 100% offline zabezpečení a podporovaných formátů
 
 ---
 

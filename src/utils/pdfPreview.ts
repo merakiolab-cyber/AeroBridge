@@ -219,3 +219,42 @@ export async function renderPdfPage(
     return null;
   }
 }
+
+export function getPdfCacheStats() {
+  return {
+    docCount: docCache.size,
+    pageCount: pageRenderCache.size,
+  };
+}
+
+export function purgePdfCache(folderPath?: string): number {
+  if (!folderPath) {
+    const count = docCache.size + pageRenderCache.size;
+    for (const entry of Array.from(docCache.values())) {
+      try {
+        if (typeof entry.doc?.destroy === 'function') entry.doc.destroy();
+      } catch {}
+    }
+    docCache.clear();
+    pageRenderCache.clear();
+    return count;
+  }
+  const prefix = folderPath.replace(/[\\/]+$/, '').toLowerCase();
+  let deleted = 0;
+  for (const [key, entry] of Array.from(docCache.entries())) {
+    if (key.toLowerCase().startsWith(prefix)) {
+      try {
+        if (typeof entry.doc?.destroy === 'function') entry.doc.destroy();
+      } catch {}
+      docCache.delete(key);
+      deleted++;
+    }
+  }
+  for (const key of Array.from(pageRenderCache.keys())) {
+    if (key.toLowerCase().startsWith(prefix)) {
+      pageRenderCache.delete(key);
+      deleted++;
+    }
+  }
+  return deleted;
+}

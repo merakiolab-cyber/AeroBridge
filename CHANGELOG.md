@@ -2,6 +2,24 @@
 
 ## Changelog
 
+### Version 3.27.16 (Správa a promazání mezipaměti — Cache Management a la Adobe Bridge & Dialog Nastavení)
+- **Komplexní správce mezipaměti ([cacheManager.ts](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/utils/cacheManager.ts)):**
+  - Sjednocení všech vrstev mezipaměti aplikace do jednoho rozhraní: LRU paměťová cache miniatur, renderované stránky a dokumenty PDF (`pdf.js`), systémové ikony Windows Shell (`IShellItemImageFactory`) a perzistentní IndexedDB úložiště.
+  - Funkce `purgeFolderCache(folderPath)`: cílené vymazání mezipaměti pouze pro konkrétní otevřenou složku bez dopadu na ostatní dříve načtené složky (přesně ve stylu *Tools > Cache > Purge Cache for Folder* v Adobe Bridge).
+  - Funkce `purgeEntireAppCache()`: kompletní vyčištění veškeré paměťové RAM cache (včetně uvolnění objektových URL přes `URL.revokeObjectURL` a uvolnění WebAssembly paměti přes `doc.destroy()`) a smazání záznamů v IndexedDB.
+- **Modální okno Nastavení a správa mezipaměti ([SettingsModal.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/SettingsModal.tsx)):**
+  - Windows 11 Fluent UX design s akrylovým pozadím a záložkovou navigací.
+  - **Živé statistiky v reálném čase:** Miniatury v RAM s aktuálním limitem, počet otevřených PDF dokumentů a vyrenderovaných stran, systémové ikony Windows a počet záznamů v IndexedDB včetně odhadované velikosti v MB.
+  - **Akce na 1 kliknutí:** Tlačítko *Promazat složku* pro aktivní adresář a *Vyčistit vše* s barevným odlišením a bezpečnostními indikátory.
+  - **Volba kapacity LRU mezipaměti miniatur:** Tlačítka rychlé volby (1 000 / 2 500 / 5 000 položek) s ukládáním do `localStorage`.
+  - **Karta O aplikaci & Systém:** Přehled verze 3.27.16, offline architektury Tauri v2 + Rust a výchozího pracovního disku `F:\`.
+- **Integrace do uživatelského rozhraní ([TopBar.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/TopBar.tsx), [App.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/App.tsx)):**
+  - Přímé tlačítko ozubeného kola (Nastavení) v horní liště.
+  - Rychlé položky v menu tří teček `...`: *Vymazat mezipaměť složky* (<kbd>Ctrl+F5</kbd>) a *Nastavení a mezipaměť...* (<kbd>Ctrl+,</kbd>).
+- **Globální klávesové zkratky ([useKeyboardShortcuts.ts](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/hooks/useKeyboardShortcuts.ts)):**
+  - <kbd>Ctrl+,</kbd> — otevření dialogu Nastavení a správa mezipaměti.
+  - <kbd>Ctrl+F5</kbd> — okamžité promazání mezipaměti aktivní složky a vynucení čerstvého znovunačtení miniatur přímo ze souborů na disku.
+
 ### Version 3.27.15 (Posouvání spodního pásu miniatur myší — Drag-to-Scroll & Kolečko myši ve Filmstripu)
 - **Uchopení a tažení myší (Mouse Grab & Drag-to-Scroll) ([FilmstripView.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/FilmstripView.tsx)):**
   - Spodní lištu miniatur lze nyní libovolně uchopit a plynule tažením myši posouvat doleva i doprava (`onPointerDown` s `setPointerCapture`).

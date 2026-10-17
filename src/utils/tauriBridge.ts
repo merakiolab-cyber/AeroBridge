@@ -315,4 +315,24 @@ export function getNativeFolderSize(dirPath: string): Promise<FolderSizeInfo | n
   return p;
 }
 
+export function getNativeIconCacheStats() {
+  return {
+    iconCount: iconUrlCache.size,
+    folderSizeCount: folderSizeCache.size,
+  };
+}
+
+export function purgeNativeIconCache(): number {
+  const count = iconUrlCache.size + folderSizeCache.size;
+  for (const url of Array.from(iconUrlCache.values())) {
+    try {
+      URL.revokeObjectURL(url);
+    } catch {}
+  }
+  iconUrlCache.clear();
+  iconCache.clear();
+  folderSizeCache.clear();
+  return count;
+}
+
 

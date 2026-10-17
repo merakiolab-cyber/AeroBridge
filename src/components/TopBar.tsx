@@ -22,6 +22,9 @@ import {
   LayoutGrid,
   List,
   Columns2,
+  Settings,
+  FolderSync,
+  Trash2,
 } from 'lucide-react';
 
 interface TopBarProps {
@@ -52,6 +55,8 @@ interface TopBarProps {
   onToggleShowAllInfo?: () => void;
   onSelectAll?: () => void;
   onClearSelection?: () => void;
+  onOpenSettings?: () => void;
+  onPurgeFolderCache?: () => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -82,6 +87,8 @@ export const TopBar: React.FC<TopBarProps> = ({
   onToggleShowAllInfo,
   onSelectAll,
   onClearSelection,
+  onOpenSettings,
+  onPurgeFolderCache,
 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -274,6 +281,18 @@ export const TopBar: React.FC<TopBarProps> = ({
             </span>
           )}
 
+          {/* Settings & Cache Management Button */}
+          {onOpenSettings && (
+            <button
+              type="button"
+              onClick={onOpenSettings}
+              className="p-1.5 rounded-full transition-all border bg-white/[0.04] text-zinc-300 hover:text-white hover:bg-white/[0.1] border-white/10 cursor-pointer"
+              title="Nastavení a správa mezipaměti (Ctrl+,)"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+          )}
+
           {/* Three dots button and dropdown menu */}
           <div className="relative" ref={menuRef}>
             <button
@@ -415,6 +434,58 @@ export const TopBar: React.FC<TopBarProps> = ({
                   </div>
                   <span className="text-[10px] font-mono text-zinc-400 bg-white/[0.06] px-1.5 py-0.5 rounded">
                     Ctrl+T
+                  </span>
+                </button>
+              )}
+
+              <div className="my-1 border-t border-white/[0.08]" />
+
+              {/* 5. Purge Folder Cache (Adobe Bridge style) */}
+              {onPurgeFolderCache && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onPurgeFolderCache();
+                  }}
+                  className="flex items-center justify-between w-full px-3 py-2 text-xs text-left text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <FolderSync className="w-3.5 h-3.5 text-sky-400" />
+                    <div className="flex flex-col">
+                      <span className="font-medium">Vymazat mezipaměť složky</span>
+                      <span className="text-[10px] text-zinc-400">
+                        Znovunačíst miniatury z disku
+                      </span>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-mono text-zinc-400 bg-white/[0.06] px-1.5 py-0.5 rounded">
+                    Ctrl+F5
+                  </span>
+                </button>
+              )}
+
+              {/* 6. Settings and Cache Dialog */}
+              {onOpenSettings && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onOpenSettings();
+                  }}
+                  className="flex items-center justify-between w-full px-3 py-2 text-xs text-left text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Settings className="w-3.5 h-3.5 text-amber-300" />
+                    <div className="flex flex-col">
+                      <span className="font-medium">Nastavení a mezipaměť...</span>
+                      <span className="text-[10px] text-zinc-400">
+                        Statistiky RAM, uvolnění cache
+                      </span>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-mono text-zinc-400 bg-white/[0.06] px-1.5 py-0.5 rounded">
+                    Ctrl+,
                   </span>
                 </button>
               )}

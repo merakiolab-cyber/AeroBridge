@@ -50,9 +50,11 @@ import { QuickLookModal } from './components/QuickLookModal';
 import { BatchRenameModal } from './components/BatchRenameModal';
 import { BatchExportModal } from './components/BatchExportModal';
 import { BatchIptcModal } from './components/BatchIptcModal';
+import { SettingsModal } from './components/SettingsModal';
 import { FileContextMenu } from './components/FileContextMenu';
 import { InputDialog } from './components/InputDialog';
 import { renderPdfPage } from './utils/pdfPreview';
+import { purgeFolderCache } from './utils/cacheManager';
 import { ToastContainer, ToastMessage } from './components/Toast';
 
 export default function App() {
@@ -62,6 +64,7 @@ export default function App() {
   const [activeFolder, setActiveFolder] = useState<string>('/');
   const [favoriteFolders, setFavoriteFolders] = useState<string[]>([]);
   const [isInitialLoadDone, setIsInitialLoadDone] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [currentView, setCurrentView] = useState<WorkspaceView>('browser');
   const [browserViewMode, setBrowserViewMode] = useState<BrowserViewMode>(() => {
     try {
@@ -176,6 +179,28 @@ export default function App() {
     setFocusedId,
     addToast,
   });
+
+  // --- Cache Purge Handlers ---
+  const handlePurgeFolderCache = useCallback(() => {
+    if (nativeDir) {
+      const res = purgeFolderCache(nativeDir);
+      void navigateNative(nativeDir);
+      addToast(
+        'Mezipaměť složky vymazána',
+        `Uvolněno ${res.deletedThumbnails} miniatur. Znovu načítám data z disku.`,
+        'success'
+      );
+    } else {
+      addToast('Mezipaměť', 'Není otevřena žádná disková složka k promazání', 'info');
+    }
+  }, [nativeDir, navigateNative, addToast]);
+
+  const handlePurgeAllCache = useCallback(() => {
+    if (nativeDir) {
+      void navigateNative(nativeDir);
+    }
+    addToast('Mezipaměť vyčištěna', 'Paměť RAM byla uvolněna a náhledy resetovány', 'success');
+  }, [nativeDir, navigateNative, addToast]);
 
   // --- Filtered & Sorted Assets Computation ---
   const filteredAssets = useMemo(() => {
@@ -869,6 +894,9 @@ export default function App() {
     browserViewMode,
     onToggleBrowserViewMode: handleBrowserViewModeChange,
     onViewChange: setCurrentView,
+    settingsOpen,
+    setSettingsOpen,
+    handlePurgeFolderCache,
     addToast,
   });
 
@@ -1048,6 +1076,8 @@ export default function App() {
         onToggleShowAllInfo={handleToggleShowAllInfo}
         onSelectAll={() => setSelectedIds(new Set(filteredAssets.map((a) => a.id)))}
         onClearSelection={() => setSelectedIds(new Set())}
+        onOpenSettings={() => setSettingsOpen(true)}
+        onPurgeFolderCache={handlePurgeFolderCache}
       />
 
       {/* Main Workspace Frame */}
@@ -1342,6 +1372,16 @@ export default function App() {
         itemCount={inputDialog.itemCount}
         onClose={() => setInputDialog((prev) => ({ ...prev, isOpen: false }))}
         onSubmit={handleDialogSubmit}
+      />
+
+      {/* Settings and Cache Management Modal */}
+      <SettingsModal
+        isOpen={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        activeFolder={nativeDir}
+        onPurgeActiveFolder={handlePurgeFolderCache}
+        onPurgeAll={handlePurgeAllCache}
+        onNotify={addToast}
       />
     </div>
   );
