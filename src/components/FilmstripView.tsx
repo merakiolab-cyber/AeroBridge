@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { getResolutionInfo } from '../utils/extractors';
 import { toDesktopAssetUrl } from '../utils/tauriBridge';
+import { FileTypeBadge } from './AppIcons';
 
 interface FilmstripViewProps {
   assets: AssetItem[];
@@ -167,9 +168,11 @@ export const FilmstripView: React.FC<FilmstripViewProps> = ({
             key={currentAsset.id}
             className="pointer-events-auto flex items-center gap-2.5 bg-[#12141c]/85 backdrop-blur-md px-3.5 py-1.5 rounded-full text-xs text-white shadow-xl"
           >
-            <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold tracking-wide bg-black/70 text-white/90 shadow-sm">
-              {currentAsset.extension}
-            </span>
+            <FileTypeBadge
+              extension={currentAsset.extension}
+              size={18}
+              badgeClassName="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold tracking-wide bg-black/70 text-white/90 shadow-sm"
+            />
             <span className="font-medium truncate max-w-sm">{currentAsset.name}</span>
             <span className="text-slate-400 font-mono text-[11px] tabular-nums">
               {currentAsset.dimensions.width > 0 && (
@@ -268,8 +271,12 @@ export const FilmstripView: React.FC<FilmstripViewProps> = ({
                 className="w-full h-full object-cover rounded-xl pointer-events-none"
                 loading="lazy"
               />
-              <div className="absolute top-1.5 left-1.5 px-2 py-0.5 text-[9px] font-mono font-bold tracking-wide text-white/90 bg-black/70 backdrop-blur-md rounded-md shadow-sm pointer-events-none">
-                {asset.extension}
+              <div className="absolute top-1.5 left-1.5 pointer-events-none">
+                <FileTypeBadge
+                  extension={asset.extension}
+                  size={15}
+                  badgeClassName="px-2 py-0.5 text-[9px] font-mono font-bold tracking-wide text-white/90 bg-black/70 backdrop-blur-md rounded-md shadow-sm pointer-events-none"
+                />
               </div>
             </motion.div>
           );

@@ -5,6 +5,7 @@ import { Copy, FileText, ArrowUp, ArrowDown } from 'lucide-react';
 import { getNativeFileIcon, toDesktopAssetUrl } from '../utils/tauriBridge';
 import { getResolutionInfo } from '../utils/extractors';
 import { Win11Folder } from './Win11Icons';
+import { FileTypeBadge } from './AppIcons';
 
 interface MetadataTableViewProps {
   assets: AssetItem[];
@@ -168,9 +169,13 @@ export const MetadataTableView: React.FC<MetadataTableViewProps> = ({
                         SLOŽKA
                       </span>
                     ) : (
-                      <span className="px-2 py-0.5 text-[10px] font-mono font-bold tracking-wide text-white/90 bg-black/60 rounded-md shadow-sm">
-                        {asset.extension}
-                      </span>
+                      <div className="flex items-center justify-center">
+                        <FileTypeBadge
+                          extension={asset.extension}
+                          size={18}
+                          badgeClassName="px-2 py-0.5 text-[10px] font-mono font-bold tracking-wide text-white/90 bg-black/60 rounded-md shadow-sm"
+                        />
+                      </div>
                     )}
                   </td>
 

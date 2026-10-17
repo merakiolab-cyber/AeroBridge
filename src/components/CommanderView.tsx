@@ -56,6 +56,7 @@ import {
   Win11Documents,
   Win11Pictures,
 } from './Win11Icons';
+import { getAppIcon } from './AppIcons';
 import { AssetItem } from '../types';
 
 export interface CommanderViewProps {
@@ -1897,13 +1898,19 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
                 <div className="flex items-center gap-2 truncate pr-2 pointer-events-none">
                   {it.is_dir ? (
                     <Win11Folder className="w-4 h-4 shrink-0" />
-                  ) : (
-                    <span
-                      className={`text-[9px] font-mono px-1 py-0.2 rounded-xs font-bold shrink-0 ${badge.bg} ${badge.text}`}
-                    >
-                      {it.extension.toUpperCase().slice(0, 4) || 'FILE'}
-                    </span>
-                  )}
+                  ) : (() => {
+                    const AppIconComp = getAppIcon(it.extension);
+                    if (AppIconComp) {
+                      return <AppIconComp size={15} className="shrink-0" />;
+                    }
+                    return (
+                      <span
+                        className={`text-[9px] font-mono px-1 py-0.2 rounded-xs font-bold shrink-0 ${badge.bg} ${badge.text}`}
+                      >
+                        {it.extension.toUpperCase().slice(0, 4) || 'FILE'}
+                      </span>
+                    );
+                  })()}
                   <span className={`truncate ${it.is_dir ? 'font-medium text-white' : ''}`}>
                     {it.name}
                   </span>

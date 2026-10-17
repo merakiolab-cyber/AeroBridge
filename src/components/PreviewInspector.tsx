@@ -20,6 +20,7 @@ import { getPdfDocInfo, renderPdfPage } from '../utils/pdfPreview';
 import { getNativeFolderSize, getNativeFileIcon, toDesktopAssetUrl, type FolderSizeInfo } from '../utils/tauriBridge';
 import { getResolutionInfo } from '../utils/extractors';
 import { Win11Folder } from './Win11Icons';
+import { FileTypeBadge } from './AppIcons';
 
 interface PreviewInspectorProps {
   asset: AssetItem | null;
@@ -321,8 +322,12 @@ export const PreviewInspector: React.FC<PreviewInspectorProps> = ({
                     )}
                   </button>
 
-                  <div className="absolute top-2 left-2 px-1.5 py-0.5 text-[10px] font-mono font-bold tracking-widest text-white/90 rounded-none bg-black/80 backdrop-blur-md border border-white/15">
-                    {asset.extension}
+                  <div className="absolute top-2 left-2 pointer-events-none">
+                    <FileTypeBadge
+                      extension={asset.extension}
+                      size={20}
+                      badgeClassName="px-1.5 py-0.5 text-[10px] font-mono font-bold tracking-widest text-white/90 rounded-none bg-black/80 backdrop-blur-md border border-white/15"
+                    />
                   </div>
                 </div>
 

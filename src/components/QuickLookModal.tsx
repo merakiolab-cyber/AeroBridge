@@ -16,6 +16,7 @@ import { isVisualAsset } from '../utils/adobeThumbnailExtractor';
 import { getPdfDocInfo, renderPdfPage } from '../utils/pdfPreview';
 import { getResolutionInfo } from '../utils/extractors';
 import { toDesktopAssetUrl } from '../utils/tauriBridge';
+import { FileTypeBadge } from './AppIcons';
 
 const directImageExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg', 'bmp', 'ico', 'avif'];
 
@@ -250,9 +251,11 @@ export const QuickLookModal: React.FC<QuickLookModalProps> = ({
           className="absolute top-6 left-6 z-20 flex items-center gap-3 bg-[#11131a]/85 backdrop-blur-md px-3.5 py-1.5 rounded-full shadow-2xl pointer-events-auto"
           onClick={(e) => e.stopPropagation()}
         >
-          <span className="px-2 py-0.5 text-[10px] font-mono font-bold tracking-wide text-white/95 bg-black/70 rounded-md shadow-sm">
-            {asset.extension}
-          </span>
+          <FileTypeBadge
+            extension={asset.extension}
+            size={18}
+            badgeClassName="px-2 py-0.5 text-[10px] font-mono font-bold tracking-wide text-white/95 bg-black/70 rounded-md shadow-sm"
+          />
           <span className="text-xs font-medium text-white truncate max-w-xs sm:max-w-md">
             {asset.name}
           </span>

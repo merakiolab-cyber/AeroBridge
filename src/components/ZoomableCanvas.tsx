@@ -123,7 +123,7 @@ export const ZoomableCanvas: React.FC<ZoomableCanvasProps> = ({
     setScale(1);
     setPosition({ x: 0, y: 0 });
     triggerBadge('Přizpůsobeno oknu');
-  }, [triggerBadge]);
+  }, [setScale, triggerBadge]);
 
   // Fit image to viewport width (ideal for tall infographics & landing pages)
   const fitToWidth = useCallback(() => {
@@ -147,7 +147,7 @@ export const ZoomableCanvas: React.FC<ZoomableCanvasProps> = ({
       setPosition({ x: 0, y: 0 });
     }
     triggerBadge('Přizpůsobeno šířce');
-  }, [triggerBadge]);
+  }, [setScale, triggerBadge]);
 
   // 1:1 Pixel-Perfect Native Size
   const fitToActualSize = useCallback(() => {
@@ -172,7 +172,7 @@ export const ZoomableCanvas: React.FC<ZoomableCanvasProps> = ({
       setPosition({ x: 0, y: 0 });
     }
     triggerBadge('100% · Skutečná velikost');
-  }, [naturalDims, triggerBadge]);
+  }, [naturalDims, setScale, triggerBadge]);
 
   const zoomIn = useCallback(() => {
     setScale((s) => {
@@ -180,7 +180,7 @@ export const ZoomableCanvas: React.FC<ZoomableCanvasProps> = ({
       triggerBadge();
       return next;
     });
-  }, [fitWidthScale, triggerBadge]);
+  }, [setScale, fitWidthScale, triggerBadge]);
 
   const zoomOut = useCallback(() => {
     setScale((s) => {
@@ -216,8 +216,10 @@ export const ZoomableCanvas: React.FC<ZoomableCanvasProps> = ({
       const hLayout = img?.offsetHeight || 1;
       const scaledHeight = hLayout * scale;
 
-      // If image is taller than container and Ctrl is NOT held: smooth vertical page scroll
-      if (!e.ctrlKey && scaledHeight > cRect.height * 1.05) {
+      // Reading mode (tall image fitted to width) or Shift held: smooth vertical scroll.
+      // Otherwise the wheel zooms, so the image can always be zoomed in and out.
+      const inReadingMode = isTallImage && Math.abs(scale - fitWidthScale) < 0.1;
+      if (!e.ctrlKey && (inReadingMode || e.shiftKey) && scaledHeight > cRect.height * 1.05) {
         const maxScrollOffset = (scaledHeight - cRect.height) / 2 + 60;
         setPosition((prev) => {
           const nextY = prev.y - e.deltaY;
@@ -259,7 +261,7 @@ export const ZoomableCanvas: React.FC<ZoomableCanvasProps> = ({
     return () => {
       container.removeEventListener('wheel', handleWheel);
     };
-  }, [scale, fitWidthScale, triggerBadge]);
+  }, [scale, setScale, isTallImage, fitWidthScale, triggerBadge]);
 
   // Drag to pan
   const handleMouseDown = (e: React.MouseEvent) => {

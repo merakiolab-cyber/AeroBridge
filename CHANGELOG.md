@@ -2,6 +2,24 @@
 
 ## Changelog
 
+### Version 3.27.17 (Oficiální ikony grafických, 3D a DAW formátů namísto textových badge)
+- **Komponenta dedikovaných aplikačních ikon ([AppIcons.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/AppIcons.tsx)):**
+  - Implementovány oficiální miniaturní ikony pro klíčové kreativní formáty:
+    - **Adobe Creative Cloud:** Photoshop (`.psd`, `.psb`), Illustrator (`.ai`), InDesign (`.indd`, `.idml`), After Effects (`.aep`), Premiere Pro (`.prproj`), Acrobat PDF (`.pdf`), Lightroom (`.lrcat`), Adobe XD (`.xd`).
+    - **UI/UX & Vektory:** Figma (`.fig` - oficiální 5barevné logo), Sketch (`.sketch`), CorelDRAW (`.cdr`), Corel Painter (`.rif`), Krita (`.kra`).
+    - **3D & Animace:** Blender (`.blend`), ZBrush (`.zpr`, `.ztl`), Cinema 4D (`.c4d`), Maya (`.mb`, `.ma`), 3ds Max (`.max`).
+    - **DAW & Audio:** Ableton Live (`.als`), FL Studio (`.flp`), Cubase (`.cpr`).
+- **Inteligentní fallback na textový badge:**
+  - Běžné systémové, textové a konfigurační soubory (`.txt`, `.md`, `.json`, `.csv`, `.log`) bez typické softwarové identity si přirozeně zachovávají čistý Bauhaus textový štítek.
+- **Sjednocené nasazení napříč celým prostředím:**
+  - Miniatury v mřížce ([ThumbnailCard.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/ThumbnailCard.tsx))
+  - Režim Filmstrip: horní informační lišta i spodní pás miniatur ([FilmstripView.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/FilmstripView.tsx))
+  - Režim Porovnání médií ([CompareView.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/CompareView.tsx))
+  - Rychlý náhled QuickLook ([QuickLookModal.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/QuickLookModal.tsx))
+  - Inspekční panel náhledu ([PreviewInspector.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/PreviewInspector.tsx))
+  - Tabulkové zobrazení Metadat ([MetadataTableView.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/MetadataTableView.tsx))
+  - Řádky souborů v Commanderu ([CommanderView.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/CommanderView.tsx))
+
 ### Version 3.27.16 (Správa a promazání mezipaměti — Cache Management a la Adobe Bridge & Dialog Nastavení)
 - **Komplexní správce mezipaměti ([cacheManager.ts](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/utils/cacheManager.ts)):**
   - Sjednocení všech vrstev mezipaměti aplikace do jednoho rozhraní: LRU paměťová cache miniatur, renderované stránky a dokumenty PDF (`pdf.js`), systémové ikony Windows Shell (`IShellItemImageFactory`) a perzistentní IndexedDB úložiště.

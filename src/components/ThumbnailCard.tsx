@@ -3,6 +3,7 @@ import { AssetItem } from '../types';
 import { formatBytes } from '../utils/localFileSystem';
 import { Copy, Eye, FileText, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Win11Folder } from './Win11Icons';
+import { FileTypeBadge } from './AppIcons';
 import { getNativeFileIcon } from '../utils/tauriBridge';
 
 interface ThumbnailCardProps {
@@ -161,9 +162,10 @@ const ThumbnailCardComponent: React.FC<ThumbnailCardProps> = ({
 
         {/* Material Format Pill + Multi-page indicator */}
         <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 z-20">
-          <span className="px-2 py-0.5 text-[10px] font-mono font-bold tracking-wide text-white/90 rounded-md bg-black/70 backdrop-blur-md shadow-sm">
-            {asset.extension}
-          </span>
+          <FileTypeBadge
+            extension={asset.extension}
+            size={thumbnailSize >= 200 ? 20 : 16}
+          />
           {asset.pageCount && asset.pageCount > 1 && (
             <span className="px-2 py-0.5 text-[10px] font-mono font-semibold text-zinc-300 rounded-md bg-black/70 backdrop-blur-md shadow-sm">
               {asset.currentPage || 1}/{asset.pageCount}

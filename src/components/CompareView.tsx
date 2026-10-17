@@ -5,6 +5,7 @@ import { ZoomableCanvas } from './ZoomableCanvas';
 import { Copy, Maximize2, FileText } from 'lucide-react';
 import { getResolutionInfo } from '../utils/extractors';
 import { toDesktopAssetUrl } from '../utils/tauriBridge';
+import { FileTypeBadge } from './AppIcons';
 
 interface CompareViewProps {
   assets: AssetItem[];
@@ -61,9 +62,11 @@ export const CompareView: React.FC<CompareViewProps> = ({
             {/* Header info */}
             <div className="p-3.5 bg-[#1a1c24] flex items-center justify-between">
               <div className="truncate flex items-center gap-2">
-                <span className="px-2 py-0.5 text-[10px] font-mono font-bold tracking-wide text-white/90 rounded-md bg-black/60 shadow-sm">
-                  {asset.extension}
-                </span>
+                <FileTypeBadge
+                  extension={asset.extension}
+                  size={18}
+                  badgeClassName="px-2 py-0.5 text-[10px] font-mono font-bold tracking-wide text-white/90 rounded-md bg-black/60 shadow-sm"
+                />
                 <span className="text-xs font-medium text-white truncate" title={asset.name}>
                   {asset.name}
                 </span>
