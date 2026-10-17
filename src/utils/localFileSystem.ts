@@ -8,6 +8,7 @@ import {
   extractPainterThumbnail,
   extractFigmaThumbnail,
   extractKritaThumbnail,
+  extractXdThumbnail,
   extractSvgThumbnail,
   extractHtmlThumbnail,
   extractTiffThumbnail,
@@ -132,6 +133,11 @@ export async function parseFilesToAssets(
         const figmaRes = await extractFigmaThumbnail(buffer, file.name);
         previewUrl = figmaRes.url;
         dimensions = { width: figmaRes.width, height: figmaRes.height };
+      } else if (category === 'adobe-xd') {
+        const buffer = await file.slice(0, 1024 * 1024 * 64).arrayBuffer();
+        const xdRes = await extractXdThumbnail(buffer, file.name);
+        previewUrl = xdRes.url;
+        dimensions = { width: xdRes.width, height: xdRes.height };
       } else if (category === 'krita') {
         const buffer = await file.slice(0, 1024 * 1024 * 64).arrayBuffer();
         const kraRes = await extractKritaThumbnail(buffer, file.name);

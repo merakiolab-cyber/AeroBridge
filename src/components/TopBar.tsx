@@ -132,6 +132,7 @@ export const TopBar: React.FC<TopBarProps> = ({
     { id: 'adobe-ai', label: 'Illustrator (.ai)', color: '#ff9a00' },
     { id: 'adobe-indd', label: 'InDesign (.indd)', color: '#ff3366' },
     { id: 'adobe-ae', label: 'After Effects (.aep)', color: '#9999ff' },
+    { id: 'adobe-xd', label: 'Adobe XD (.xd)', color: '#ff61f6' },
     { id: 'figma', label: 'Figma Design (.fig)', color: '#a259ff' },
     { id: 'krita', label: 'Krita malba (.kra)', color: '#3daee9' },
     { id: 'vector', label: 'SVG a vektory (.svg)', color: '#f59e0b' },
@@ -172,7 +173,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           >
             <span className="w-1.5 h-1.5 bg-[#e2e4e9] shadow-[0_0_8px_rgba(237,232,223,0.8)]" />
             <span className="tracking-widest">AeroBridge</span>
-            <span className="text-[10px] text-zinc-400 font-mono tracking-normal normal-case px-1.5 py-0.5 rounded bg-white/[0.06] border border-white/10">v3.27.17</span>
+            <span className="text-[10px] text-zinc-400 font-mono tracking-normal normal-case px-1.5 py-0.5 rounded bg-white/[0.06] border border-white/10">v3.27.18</span>
           </a>
 
           <span className="text-white/20">/</span>

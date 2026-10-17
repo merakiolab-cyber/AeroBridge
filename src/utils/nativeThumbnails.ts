@@ -12,6 +12,7 @@ import {
   extractPainterThumbnail,
   extractFigmaThumbnail,
   extractKritaThumbnail,
+  extractXdThumbnail,
   extractSvgThumbnail,
   extractHtmlThumbnail,
   extractBlendThumbnail,
@@ -490,6 +491,19 @@ async function doGenerateNativeThumbnail(asset: AssetItem, path: string, ext: st
         return null;
       }
 
+      case 'adobe-xd': {
+        const shellThumb = await getNativeShellThumbnail(path, 800);
+        if (shellThumb) {
+          return await withDims(shellThumb);
+        }
+        const head = await readNativeFileBinary(path, 64 * MB);
+        const res = await extractXdThumbnail(head, asset.name);
+        if (res && !res.isPlaceholder && res.url) {
+          return { url: res.url, dimensions: { width: res.width, height: res.height } };
+        }
+        return null;
+      }
+
       case 'html': {
         const buf = await readNativeFileBinary(path, 16 * MB);
         const res = await extractHtmlThumbnail(buf, asset.name);
@@ -582,6 +596,16 @@ async function doGenerateNativeThumbnail(asset: AssetItem, path: string, ext: st
           if (shellThumb) return await withDims(shellThumb);
           const head = await readNativeFileBinary(path, 64 * MB);
           const res = await extractFigmaThumbnail(head, asset.name);
+          if (res && !res.isPlaceholder && res.url) {
+            return { url: res.url, dimensions: { width: res.width, height: res.height } };
+          }
+          return null;
+        }
+        if (ext === 'xd') {
+          const shellThumb = await getNativeShellThumbnail(path, 800);
+          if (shellThumb) return await withDims(shellThumb);
+          const head = await readNativeFileBinary(path, 64 * MB);
+          const res = await extractXdThumbnail(head, asset.name);
           if (res && !res.isPlaceholder && res.url) {
             return { url: res.url, dimensions: { width: res.width, height: res.height } };
           }

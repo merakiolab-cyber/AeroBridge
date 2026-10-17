@@ -2,6 +2,13 @@
 
 ## Changelog
 
+### Version 3.27.18 (Nativní náhledy souborů Adobe XD — .xd)
+- **Extrakce náhledů Adobe XD ([vectorHtmlExtractor.ts](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/utils/extractors/vectorHtmlExtractor.ts)):**
+  - Implementována funkce `extractXdThumbnail()` pro čtení vložených vysokorozlišovacích náhledů (`preview.png` o rozlišení až 2048 px, `thumbnail.png` a artboard rendicí `renditions/image-*.png`) přímo z kontejneru Adobe XD.
+  - V nativním režimu Windows 11 se jako první krok využívá Windows Shell thumbnail provider (`IShellItemImageFactory`) s okamžitým 0ms načtením, s fallbackem na interní ZIP dekompresor (`JSZip`).
+  - Podpora Adobe XD ve všech pohledech aplikace: Mřížka, Seznam, Filmstrip, Porovnání, Rychlý náhled (QuickLook) a Inspekční panel.
+  - Přidán filtr formátu `Adobe XD (.xd)` do horní lišty s fuchsiovou identitou (`#ff61f6`).
+
 ### Version 3.27.17 (Oficiální ikony grafických, 3D a DAW formátů namísto textových badge)
 - **Komponenta dedikovaných aplikačních ikon ([AppIcons.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/AppIcons.tsx)):**
   - Implementovány oficiální miniaturní ikony pro klíčové kreativní formáty:

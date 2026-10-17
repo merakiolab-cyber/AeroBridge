@@ -65,6 +65,7 @@
 - [x] Náhledy souborů Corel Painter (`.rif`, `.riff`) — Windows Shell `IShellItemImageFactory` + offline RIFF/DIB/JPEG dekodér
 - [x] Náhledy souborů TIFF (`.tif`, `.tiff`) — Windows Shell WIC + offline Photopea UTIF engine (i pro vícestránkové TIFFy)
 - [x] Náhledy souborů Figma (`.fig`) — extrakce vloženého `thumbnail.png` z ZIP kontejneru + kiwi stream / Windows Shell + fialový odznak (`#a259ff`)
+- [x] Náhledy souborů Adobe XD (`.xd`) — extrakce vloženého `preview.png` / `thumbnail.png` z ZIP kontejneru + Windows Shell + fuchsiový odznak (`#ff61f6`)
 - [x] Náhledy souborů SVG (`.svg`) — XML validace, viewBox/width/height extrakce, xmlns normalizace a šachovnice průhlednosti
 - [x] Plnohodnotné kontextové menu Průzkumníka Windows (Otevřít, Přejmenovat, Kopírovat, Vyjmout, Smazat, Nová složka, Vlastnosti)
 - [x] Dvojklik na soubor = otevření v systémové aplikaci; podsložky přímo v mřížce

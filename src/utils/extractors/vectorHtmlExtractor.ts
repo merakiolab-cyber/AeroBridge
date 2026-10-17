@@ -468,6 +468,63 @@ export async function extractKritaThumbnail(
 }
 
 /**
+ * Extracts embedded preview or thumbnail from an Adobe XD (.xd) file.
+ * Adobe XD packages are ZIP archives containing high-res preview.png, thumbnail.png,
+ * or renditions/image-*-*.png artboard exports.
+ */
+export async function extractXdThumbnail(
+  buffer: ArrayBuffer,
+  _fileName: string
+): Promise<{ url: string; width: number; height: number; isPlaceholder?: boolean }> {
+  try {
+    const bytes = new Uint8Array(buffer);
+    // XD files are standard ZIP containers starting with PK (0x50, 0x4B, 0x03, 0x04)
+    if (bytes.length >= 4 && bytes[0] === 0x50 && bytes[1] === 0x4b && bytes[2] === 0x03 && bytes[3] === 0x04) {
+      const { default: JSZipModule } = await import('jszip');
+      const JSZip = (JSZipModule as any)?.default || JSZipModule;
+      const zip = await JSZip.loadAsync(buffer);
+
+      // Preferred order of XD preview candidates:
+      // 1. preview.png (full artboard canvas composite, e.g. 2048px)
+      // 2. thumbnail.png (smaller icon preview)
+      // 3. renditions/image-*-2048.png / renditions/image-*.png
+      const candidateFiles = [
+        zip.file('preview.png'),
+        zip.file('thumbnail.png'),
+        ...zip.file(/^renditions\/image-.*-2048\.png$/i),
+        ...zip.file(/^renditions\/image-.*\.png$/i),
+        ...zip.file(/preview\.png$/i),
+        ...zip.file(/thumbnail\.png$/i),
+      ].filter(Boolean);
+
+      const target = candidateFiles[0];
+      if (target) {
+        const blob = await target.async('blob');
+        const url = URL.createObjectURL(blob);
+        const dims = await getImageDimensions(url);
+        return {
+          url,
+          width: dims.width,
+          height: dims.height,
+          isPlaceholder: false,
+        };
+      }
+    }
+
+    // Fallback: search for embedded PNG signature
+    const embeddedPng = extractEmbeddedPng(buffer, 30, 1024 * 1024 * 32);
+    if (embeddedPng) {
+      const dims = await getImageDimensions(embeddedPng);
+      return { url: embeddedPng, width: dims.width, height: dims.height, isPlaceholder: false };
+    }
+  } catch (err) {
+    console.warn('Adobe XD thumbnail extraction failed:', err);
+  }
+
+  return { url: '', width: 0, height: 0, isPlaceholder: true };
+}
+
+/**
  * Ultra-fast offline SVG vector thumbnail and dimensions extractor.
  */
 export async function extractSvgThumbnail(

@@ -15,6 +15,7 @@ export interface ExtractedMedia {
     | 'adobe-indd'
     | 'adobe-ae'
     | 'adobe-pr'
+    | 'adobe-xd'
     | 'pdf'
     | 'video'
     | 'vector'
@@ -147,6 +148,8 @@ export function getAdobeFileType(fileName: string): {
       return { format: 'After Effects Project', category: 'adobe-ae', colorBadge: '#9999ff', extension: ext.toUpperCase() };
     case 'prproj':
       return { format: 'Premiere Pro Project', category: 'adobe-pr', colorBadge: '#ea77ff', extension: ext.toUpperCase() };
+    case 'xd':
+      return { format: 'Adobe XD Design', category: 'adobe-xd', colorBadge: '#ff61f6', extension: 'XD' };
     case 'fig':
       return { format: 'Figma Design', category: 'figma', colorBadge: '#a259ff', extension: 'FIG' };
     case 'rif':
@@ -269,7 +272,7 @@ export function isVisualAsset(asset: { name: string; extension?: string; categor
     return false;
   }
 
-  return ['image', 'raw', 'adobe-psd', 'adobe-ai', 'adobe-indd', 'vector', 'painter', 'figma', 'pdf', 'html', 'krita', 'blend'].includes(asset.category || '');
+  return ['image', 'raw', 'adobe-psd', 'adobe-ai', 'adobe-indd', 'adobe-xd', 'vector', 'painter', 'figma', 'pdf', 'html', 'krita', 'blend'].includes(asset.category || '');
 }
 
 /**
