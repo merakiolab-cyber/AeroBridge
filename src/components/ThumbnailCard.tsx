@@ -20,6 +20,7 @@ interface ThumbnailCardProps {
   onContextMenu?: (e: React.MouseEvent) => void;
   onPageChange?: (assetId: string, pageNum: number) => void;
   onDragStart?: (asset: AssetItem, e: React.DragEvent) => void;
+  onDropOnFolder?: (e: React.DragEvent, targetFolderPath: string) => void;
 }
 
 const ThumbnailCardComponent: React.FC<ThumbnailCardProps> = ({
@@ -36,6 +37,7 @@ const ThumbnailCardComponent: React.FC<ThumbnailCardProps> = ({
   onContextMenu,
   onPageChange,
   onDragStart,
+  onDropOnFolder,
 }) => {
   const fullFileName = React.useMemo(() => {
     if (asset.isFolder) return asset.name;
@@ -49,6 +51,7 @@ const ThumbnailCardComponent: React.FC<ThumbnailCardProps> = ({
 
   const [hasImgError, setHasImgError] = React.useState(false);
   const [fallbackIcon, setFallbackIcon] = React.useState<string | null>(null);
+  const [isDragTarget, setIsDragTarget] = React.useState(false);
 
   React.useEffect(() => {
     setHasImgError(false);
@@ -72,9 +75,35 @@ const ThumbnailCardComponent: React.FC<ThumbnailCardProps> = ({
     if (onDragStart) {
       onDragStart(asset, e);
     } else {
-      e.dataTransfer.setData('application/json', JSON.stringify({ assetIds: [asset.id] }));
-      e.dataTransfer.setData('text/plain', asset.id);
-      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('application/json', JSON.stringify({ assetIds: [asset.id], paths: asset.fullPath ? [asset.fullPath] : [] }));
+      e.dataTransfer.setData('text/plain', asset.fullPath || asset.id);
+      e.dataTransfer.effectAllowed = 'copyMove';
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    if (!asset.isFolder) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = e.ctrlKey ? 'copy' : 'move';
+    if (!isDragTarget) setIsDragTarget(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    if (!asset.isFolder) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragTarget(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    if (!asset.isFolder) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragTarget(false);
+    const folderPath = asset.fullPath || asset.folder;
+    if (folderPath && onDropOnFolder) {
+      onDropOnFolder(e, folderPath);
     }
   };
 
@@ -82,11 +111,16 @@ const ThumbnailCardComponent: React.FC<ThumbnailCardProps> = ({
     <div
       draggable
       onDragStart={handleDrag}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu}
       className={`group relative flex flex-col rounded-xl transition-all duration-150 ease-out hover:-translate-y-0.5 active:scale-[0.99] cursor-pointer select-none text-left overflow-hidden will-change-transform ${
-        isSelected
+        isDragTarget
+          ? 'ring-2 ring-[#60cdff] bg-[#60cdff]/20 shadow-2xl scale-[1.02]'
+          : isSelected
           ? 'bg-[#2b303d] shadow-xl shadow-black/50'
           : isFocused
           ? 'bg-[#23252d] shadow-md shadow-black/30'
@@ -96,6 +130,14 @@ const ThumbnailCardComponent: React.FC<ThumbnailCardProps> = ({
         width: `${thumbnailSize}px`,
       }}
     >
+      {/* Drag Over Overlay on Folder */}
+      {isDragTarget && (
+        <div className="absolute inset-0 bg-[#60cdff]/25 backdrop-blur-xs z-30 flex items-center justify-center rounded-xl pointer-events-none">
+          <span className="text-[11px] font-bold text-white bg-black/80 px-2.5 py-1 rounded-full shadow-lg border border-[#60cdff]/40">
+            + Přesunout sem
+          </span>
+        </div>
+      )}
       {/* Thumbnail Image Container */}
       <div
         className={`relative overflow-hidden bg-[#101115] flex items-center justify-center ${

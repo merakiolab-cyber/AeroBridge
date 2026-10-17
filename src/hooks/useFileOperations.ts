@@ -82,6 +82,7 @@ export function useFileOperations({
           type: 'asset',
           asset,
           selectedAssets: currentSelected,
+          folderPath: nativeDir || (asset.fullPath ? asset.fullPath.substring(0, asset.fullPath.lastIndexOf('\\')) : undefined),
         });
       } else {
         setContextMenuTarget({
@@ -185,15 +186,55 @@ export function useFileOperations({
 
   const handlePasteFiles = useCallback(
     async (destFolder: string) => {
-      if (!clipboard || clipboard.paths.length === 0) return;
+      let pathsToPaste = clipboard?.paths || [];
+      let opToUse: 'copy' | 'cut' = clipboard?.op || 'copy';
+
+      // Fallback: check system clipboard if internal state is empty
+      if (pathsToPaste.length === 0) {
+        try {
+          const clipText = await navigator.clipboard.readText();
+          if (clipText && clipText.trim()) {
+            const lines = clipText
+              .split(/\r?\n/)
+              .map((l) => l.trim().replace(/^"|"$/g, ''))
+              .filter(Boolean);
+            const valid = lines.filter((l) => /^[a-zA-Z]:[\\/]|^\\[\\/]/.test(l));
+            if (valid.length > 0) {
+              pathsToPaste = valid;
+              opToUse = 'copy';
+            }
+          }
+        } catch {
+          // ignore clipboard read error
+        }
+      }
+
+      if (pathsToPaste.length === 0) {
+        addToast('Schránka je prázdná', 'Nejprve zkopírujte (Ctrl+C) nebo vyjměte (Ctrl+X) soubory', 'warning');
+        return;
+      }
+
+      // Safety check: Don't paste folder into itself or its subfolder
+      const normDest = destFolder.toLowerCase().replace(/\\+$/, '');
+      const isSelfOrSub = pathsToPaste.some((p) => {
+        const normP = p.toLowerCase().replace(/\\+$/, '');
+        return normDest === normP || normDest.startsWith(normP + '\\');
+      });
+      if (isSelfOrSub) {
+        addToast('Neplatný cíl', 'Nelze vložit složku do sebe samé nebo její podsložky', 'warning');
+        return;
+      }
+
       try {
-        if (clipboard.op === 'copy') {
-          const created = await copyFilesNative(clipboard.paths, destFolder);
-          addToast('Položky zkopírovány', `Vloženo ${created.length} položek`);
+        if (opToUse === 'copy') {
+          const created = await copyFilesNative(pathsToPaste, destFolder);
+          const count = created && created.length > 0 ? created.length : pathsToPaste.length;
+          addToast('Položky zkopírovány', `Vloženo ${count} položek`);
         } else {
-          const moved = await moveFilesNative(clipboard.paths, destFolder);
+          const moved = await moveFilesNative(pathsToPaste, destFolder);
+          const count = moved && moved.length > 0 ? moved.length : pathsToPaste.length;
           setClipboard(null);
-          addToast('Položky přesunuty', `Přesunuto ${moved.length} položek`);
+          addToast('Položky přesunuty', `Přesunuto ${count} položek`);
         }
         if (nativeDir) {
           await navigateNative(nativeDir);

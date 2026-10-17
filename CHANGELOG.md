@@ -2,6 +2,21 @@
 
 ## Changelog
 
+### Version 3.27.23 (Plnohodnotný Drag & Drop a nativní kopírování/vkládání v režimu Prohlížeče)
+- **Kompletní Drag & Drop přetahování souborů do složek ([ThumbnailCard.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/ThumbnailCard.tsx), [AssetGrid.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/AssetGrid.tsx), [MetadataTableView.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/MetadataTableView.tsx)):**
+  - Karty složek v mřížce i řádky složek v tabulce nyní plně přijímají přetažené soubory (`onDragOver`, `onDragLeave`, `onDrop`).
+  - Při najetí s přetahovaným souborem se karta složky zvýrazní modrým rámečkem s visačkou „+ Přesunout sem“ (nebo s klávesou Ctrl „+ Kopírovat sem“).
+  - Přetažení na složku v mřížce nebo tabulce spouští reálný diskový přesun/kopírování přes `moveFilesNative` / `copyFilesNative` a okamžitě aktualizuje zobrazení složky.
+- **Přetahování na jakoukoli složku ve stromu disků ([NativeExplorerTree.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/NativeExplorerTree.tsx)):**
+  - Dosud fungovalo přetažení pouze do Oblíbených. Nyní lze soubory přetáhnout na jakoukoli jednotku (`C:`, `D:`), systémové složky (Plocha, Stažené, Obrázky) i libovolnou podsložku v navigačním stromu Tento počítač.
+- **Přetahování souborů z Průzkumníka Windows do AeroBridge ([App.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/App.tsx)):**
+  - Přetažením externích souborů z Průzkumníka Windows do okna aplikace se soubory fyzicky zkopírují do aktuálně otevřené diskové složky a ihned se vygenerují jejich náhledy.
+- **Spolehlivé systémové kopírování a vkládání Ctrl+C / Ctrl+X / Ctrl+V ([useKeyboardShortcuts.ts](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/hooks/useKeyboardShortcuts.ts), [useFileOperations.ts](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/hooks/useFileOperations.ts), [FileContextMenu.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/FileContextMenu.tsx)):**
+  - Klávesové zkratky nyní akceptují i fyzické kódy kláves (`KeyC`, `KeyX`, `KeyV`), takže spolehlivě fungují i na české QWERTY/QWERTZ klávesnici.
+  - Při stisku `Ctrl+C` na zaměřený soubor bez hromadného výběru se již nespouští kopírování canvasu, ale korektně se uloží cesta souboru do schránky.
+  - Vkládání (`Ctrl+V`) v Prohlížeči má nyní inteligentní fallback na systémovou schránku Windows (`navigator.clipboard.readText()`), takže lze vkládat soubory zkopírované jak v AeroBridge, tak v Průzkumníku Windows.
+  - V kontextovém menu souborů je nyní položka „Vložit“ (Ctrl+V) vždy k dispozici a automaticky detekuje cílovou složku.
+
 ### Version 3.27.22 (Oprava kolize posuvníku prostředního sloupce s úchytem pro změnu šířky panelu)
 - **Oddělení zóny posuvníku a úchytu změny šířky ([App.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/App.tsx)):**
   - Opravena kritická chyba rozvržení, kdy neviditelná interaktivní zóna (`-left-1.5`) úchytu pro rozšiřování pravého panelu (`PreviewInspector`) zasahovala 6 px do prostředního sloupce a kompletně překrývala vertikální posuvník (scrollbar) mřížky a tabulky.

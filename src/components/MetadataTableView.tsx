@@ -23,6 +23,7 @@ interface MetadataTableViewProps {
   thumbnailSize?: number;
   onThumbnailSizeChange?: (size: number) => void;
   fitMode?: 'cover' | 'contain';
+  onMoveAssets?: (idsOrPaths: string[], targetFolder: string, isCopy?: boolean) => void;
 }
 
 const directImageExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg', 'bmp', 'ico', 'avif'];
@@ -43,6 +44,7 @@ export const MetadataTableView: React.FC<MetadataTableViewProps> = ({
   thumbnailSize = 190,
   onThumbnailSizeChange,
   fitMode = 'cover',
+  onMoveAssets,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -72,6 +74,44 @@ export const MetadataTableView: React.FC<MetadataTableViewProps> = ({
     el.addEventListener('wheel', handleWheel, { passive: false });
     return () => el.removeEventListener('wheel', handleWheel);
   }, [thumbnailSize, onThumbnailSizeChange]);
+
+  const handleDragStart = (asset: AssetItem, e: React.DragEvent) => {
+    const isSelected = selectedIds.has(asset.id);
+    const itemsToDrag = isSelected && selectedIds.size > 1
+      ? assets.filter((a) => selectedIds.has(a.id))
+      : [asset];
+    const paths = itemsToDrag.map((a) => a.fullPath).filter(Boolean) as string[];
+    const ids = itemsToDrag.map((a) => a.id);
+
+    e.dataTransfer.setData('application/json', JSON.stringify({ assetIds: ids, paths }));
+    e.dataTransfer.setData('text/plain', paths.length > 0 ? paths.join('\r\n') : ids.join(','));
+    e.dataTransfer.effectAllowed = 'copyMove';
+  };
+
+  const handleDropOnFolder = (e: React.DragEvent, targetFolderPath: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const isCopy = e.ctrlKey;
+    try {
+      const raw = e.dataTransfer.getData('application/json');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const items = (parsed.paths && parsed.paths.length > 0) ? parsed.paths : parsed.assetIds;
+        if (items && Array.isArray(items) && items.length > 0) {
+          onMoveAssets?.(items, targetFolderPath, isCopy);
+          return;
+        }
+      }
+    } catch {}
+
+    const plain = e.dataTransfer.getData('text/plain');
+    if (plain) {
+      const items = plain.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+      if (items.length > 0) {
+        onMoveAssets?.(items, targetFolderPath, isCopy);
+      }
+    }
+  };
 
   const renderSortIndicator = (field: SortField) => {
     if (sortField !== field) return null;
@@ -154,7 +194,19 @@ export const MetadataTableView: React.FC<MetadataTableViewProps> = ({
                     e.stopPropagation();
                     onContextMenu?.(e, asset);
                   }}
-                  className={`transition-colors cursor-pointer ${
+                  draggable
+                  onDragStart={(e) => handleDragStart(asset, e)}
+                  onDragOver={(e) => {
+                    if (!asset.isFolder) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.dataTransfer.dropEffect = e.ctrlKey ? 'copy' : 'move';
+                  }}
+                  onDrop={(e) => {
+                    if (!asset.isFolder || !asset.fullPath) return;
+                    handleDropOnFolder(e, asset.fullPath);
+                  }}
+                  className={`transition-colors cursor-pointer select-none ${
                     isSelected
                       ? 'bg-[#282d38] text-white shadow-sm font-medium'
                       : isFocused

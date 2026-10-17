@@ -23,7 +23,7 @@ interface NativeExplorerTreeProps {
   onContextMenu?: (e: React.MouseEvent, folder: NativePlace, allSelectedPaths?: string[]) => void;
   favoriteFolders?: string[];
   onToggleFavorite?: (path: string) => void;
-  onMoveAssets?: (assetIds: string[], targetFolder: string) => void;
+  onMoveAssets?: (assetIds: string[], targetFolder: string, isCopy?: boolean) => void;
 }
 
 const norm = (p: string) => p.replace(/\//g, '\\').replace(/\\+$/, '').toLowerCase();
@@ -82,11 +82,53 @@ export const NativeExplorerTree: React.FC<NativeExplorerTreeProps> = ({
   // Favorites section collapsible state & drag/drop
   const [favoritesExpanded, setFavoritesExpanded] = useState<boolean>(true);
   const [dragOverFav, setDragOverFav] = useState<string | null>(null);
+  const [dragOverNode, setDragOverNode] = useState<string | null>(null);
+
+  const handleNodeDragOver = (e: React.DragEvent, path: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = e.ctrlKey ? 'copy' : 'move';
+    if (dragOverNode !== path) setDragOverNode(path);
+  };
+
+  const handleNodeDragLeave = (e: React.DragEvent, path: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (dragOverNode === path) setDragOverNode(null);
+  };
+
+  const handleNodeDrop = (e: React.DragEvent, path: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverNode(null);
+    if (!onMoveAssets) return;
+    const isCopy = e.ctrlKey;
+
+    try {
+      const raw = e.dataTransfer.getData('application/json');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const items = (parsed.paths && parsed.paths.length > 0) ? parsed.paths : parsed.assetIds;
+        if (items && Array.isArray(items) && items.length > 0) {
+          onMoveAssets(items, path, isCopy);
+          return;
+        }
+      }
+    } catch {}
+
+    const plain = e.dataTransfer.getData('text/plain');
+    if (plain) {
+      const ids = plain.split(/\r?\n|,/).map((s) => s.trim()).filter(Boolean);
+      if (ids.length > 0) {
+        onMoveAssets(ids, path, isCopy);
+      }
+    }
+  };
 
   const handleFavDragOver = (e: React.DragEvent, path: string) => {
     e.preventDefault();
     e.stopPropagation();
-    e.dataTransfer.dropEffect = 'move';
+    e.dataTransfer.dropEffect = e.ctrlKey ? 'copy' : 'move';
     if (dragOverFav !== path) setDragOverFav(path);
   };
 
@@ -101,20 +143,22 @@ export const NativeExplorerTree: React.FC<NativeExplorerTreeProps> = ({
     e.stopPropagation();
     setDragOverFav(null);
     if (!onMoveAssets) return;
+    const isCopy = e.ctrlKey;
     try {
       const raw = e.dataTransfer.getData('application/json');
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (parsed.assetIds && Array.isArray(parsed.assetIds)) {
-          onMoveAssets(parsed.assetIds, path);
+        const items = (parsed.paths && parsed.paths.length > 0) ? parsed.paths : parsed.assetIds;
+        if (items && Array.isArray(items) && items.length > 0) {
+          onMoveAssets(items, path, isCopy);
           return;
         }
       }
     } catch {}
     const plain = e.dataTransfer.getData('text/plain');
     if (plain) {
-      const ids = plain.split(',').map((s) => s.trim()).filter(Boolean);
-      if (ids.length > 0) onMoveAssets(ids, path);
+      const ids = plain.split(/\r?\n|,/).map((s) => s.trim()).filter(Boolean);
+      if (ids.length > 0) onMoveAssets(ids, path, isCopy);
     }
   };
 
@@ -470,6 +514,7 @@ export const NativeExplorerTree: React.FC<NativeExplorerTreeProps> = ({
     const isOpen = expanded.has(key);
     const isActive = !!activePath && norm(activePath) === key;
     const isSelected = selectedPaths.has(key);
+    const isDragTarget = dragOverNode === node.path;
     const kids = children[key];
     const isLeaf = kids && kids.length === 0;
 
@@ -484,8 +529,13 @@ export const NativeExplorerTree: React.FC<NativeExplorerTreeProps> = ({
         <div
           onClick={(e) => handleNodeClick(e, node)}
           onContextMenu={(e) => handleContextMenu(e, node)}
+          onDragOver={(e) => handleNodeDragOver(e, node.path)}
+          onDragLeave={(e) => handleNodeDragLeave(e, node.path)}
+          onDrop={(e) => handleNodeDrop(e, node.path)}
           className={`group relative flex items-center mx-1.5 my-[1.5px] py-1.5 pr-2.5 text-[12px] font-normal rounded-[5px] transition-all duration-120 cursor-pointer select-none ${
-            isActive
+            isDragTarget
+              ? 'bg-[#60cdff]/20 text-white font-semibold ring-1 ring-[#60cdff]/50'
+              : isActive
               ? 'bg-white/[0.09] text-white font-medium shadow-xs'
               : isSelected
               ? 'bg-white/[0.07] text-white font-normal ring-1 ring-white/10 shadow-xs'

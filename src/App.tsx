@@ -24,6 +24,8 @@ import {
   isDesktopApp,
   pickNativeFolder,
   revealInWindowsExplorer,
+  copyFilesNative,
+  moveFilesNative,
 } from './utils/tauriBridge';
 import { NativePathBar } from './components/NativePathBar';
 import { writeMetadataBackToAsset } from './utils/metadataWriter';
@@ -452,10 +454,48 @@ export default function App() {
   );
 
   const handleMoveAssetsToFolder = useCallback(
-    (assetIds: string[], targetFolder: string) => {
+    async (assetIdsOrPaths: string[], targetFolder: string, isCopy?: boolean) => {
+      if (isDesktopApp() && targetFolder) {
+        // Resolve real disk paths
+        const paths: string[] = [];
+        for (const item of assetIdsOrPaths) {
+          if (/^[a-zA-Z]:[\\/]/.test(item)) {
+            paths.push(item);
+          } else {
+            const found = assets.find((a) => a.id === item);
+            if (found?.fullPath) paths.push(found.fullPath);
+          }
+        }
+
+        if (paths.length > 0) {
+          try {
+            if (isCopy) {
+              const copied = await copyFilesNative(paths, targetFolder);
+              addToast(
+                'Soubory zkopírovány',
+                `Zkopírováno ${copied.length} položek do "${targetFolder.split('\\').pop() || targetFolder}"`
+              );
+            } else {
+              const moved = await moveFilesNative(paths, targetFolder);
+              addToast(
+                'Soubory přesunuty',
+                `Přesunuto ${moved.length} položek do "${targetFolder.split('\\').pop() || targetFolder}"`
+              );
+            }
+            if (nativeDir) {
+              await navigateNative(nativeDir);
+            }
+            return;
+          } catch (err) {
+            addToast('Chyba při operaci', String(err), 'warning');
+            return;
+          }
+        }
+      }
+
       setAssets((prev) =>
         prev.map((a) =>
-          assetIds.includes(a.id) ? { ...a, folder: targetFolder } : a
+          assetIdsOrPaths.includes(a.id) ? { ...a, folder: targetFolder } : a
         )
       );
       const displayFolderName =
@@ -464,12 +504,10 @@ export default function App() {
           : targetFolder.replace(/^\//, '').replace(/\//g, ' / ');
       addToast(
         'Soubory přesunuty',
-        `${assetIds.length} ${
-          assetIds.length === 1 ? 'soubor byl přesunut' : 'souborů přesunuto'
-        } do "${displayFolderName}"`
+        `${assetIdsOrPaths.length} položek přesunuto do "${displayFolderName}"`
       );
     },
-    [addToast]
+    [assets, nativeDir, navigateNative, addToast]
   );
 
   // --- Dynamic Sidebar Resizing Handler ---
@@ -799,6 +837,31 @@ export default function App() {
     if (currentView === 'commander') return;
     e.preventDefault();
     setIsDragOver(false);
+
+    // If native files from Windows Explorer are dropped into the active folder in desktop mode
+    if (isDesktopApp() && nativeDir && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const paths: string[] = [];
+      for (let i = 0; i < e.dataTransfer.files.length; i++) {
+        const file = e.dataTransfer.files[i];
+        // @ts-ignore
+        if (file.path) {
+          // @ts-ignore
+          paths.push(file.path);
+        }
+      }
+      if (paths.length > 0) {
+        try {
+          addToast('Kopíruji do složky...', `${paths.length} ${paths.length === 1 ? 'položku' : 'položek'}`, 'info');
+          const created = await copyFilesNative(paths, nativeDir);
+          await navigateNative(nativeDir);
+          addToast('Soubory vloženy', `Zkopírováno ${created.length} položek do ${nativeDir.split('\\').pop() || nativeDir}`);
+          return;
+        } catch (err) {
+          addToast('Chyba při kopírování', String(err), 'warning');
+          return;
+        }
+      }
+    }
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       addToast('Zpracovávám přetažené položky...', `${e.dataTransfer.files.length} položek`, 'info');
@@ -1175,6 +1238,7 @@ export default function App() {
                 onNavigateFolder={navigateNative}
                 onContextMenu={handleContextMenu}
                 onPageChange={handlePageChange}
+                onMoveAssets={handleMoveAssetsToFolder}
               />
             ) : (
               <MetadataTableView
@@ -1203,6 +1267,7 @@ export default function App() {
                 thumbnailSize={thumbnailSize}
                 onThumbnailSizeChange={setThumbnailSize}
                 fitMode={fitMode}
+                onMoveAssets={handleMoveAssetsToFolder}
               />
             )
           )}

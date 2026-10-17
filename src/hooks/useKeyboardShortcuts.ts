@@ -286,11 +286,14 @@ export function useKeyboardShortcuts(props: UseKeyboardShortcutsProps) {
       }
 
       // Cmd/Ctrl + C: Copy Files (or Copy Image if mock)
-      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'c') {
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && (e.key.toLowerCase() === 'c' || e.code === 'KeyC')) {
         const nativePaths = p.selectedAssets.map((a) => a.fullPath).filter(Boolean) as string[];
         if (nativePaths.length > 0) {
           e.preventDefault();
           p.handleCopyFiles(nativePaths);
+        } else if (p.focusedAsset?.fullPath) {
+          e.preventDefault();
+          p.handleCopyFiles([p.focusedAsset.fullPath]);
         } else if (p.focusedAsset) {
           e.preventDefault();
           p.handleCopyImage(p.focusedAsset);
@@ -299,18 +302,21 @@ export function useKeyboardShortcuts(props: UseKeyboardShortcutsProps) {
       }
 
       // Cmd/Ctrl + X: Cut Files
-      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'x') {
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && (e.key.toLowerCase() === 'x' || e.code === 'KeyX')) {
         const nativePaths = p.selectedAssets.map((a) => a.fullPath).filter(Boolean) as string[];
         if (nativePaths.length > 0) {
           e.preventDefault();
           p.handleCutFiles(nativePaths);
+        } else if (p.focusedAsset?.fullPath) {
+          e.preventDefault();
+          p.handleCutFiles([p.focusedAsset.fullPath]);
         }
         return;
       }
 
       // Cmd/Ctrl + V: Paste Files
-      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'v') {
-        if (p.clipboard && p.nativeDir) {
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && (e.key.toLowerCase() === 'v' || e.code === 'KeyV')) {
+        if (p.nativeDir) {
           e.preventDefault();
           void p.handlePasteFiles(p.nativeDir);
         }

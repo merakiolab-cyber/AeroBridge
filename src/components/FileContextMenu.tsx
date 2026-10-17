@@ -130,7 +130,7 @@ export const FileContextMenu: React.FC<FileContextMenuProps> = ({
     ? (singleAsset?.fullPath || target.folderPath)
     : target.folderPath;
 
-  const canPaste = !!clipboard && clipboard.paths.length > 0 && !!destFolder;
+  const canPaste = !!destFolder;
 
   // Calculate adjusted position to keep menu inside viewport
   const menuWidth = 240;
@@ -248,13 +248,14 @@ export const FileContextMenu: React.FC<FileContextMenuProps> = ({
             <span className="text-[10px] text-zinc-500 font-mono">Ctrl+C</span>
           </button>
 
-          {/* Paste into selected folder if it's a directory */}
-          {isFolderAsset && destFolder && (
+          {/* Paste into selected folder if it's a directory, or into current directory */}
+          {destFolder && (
             <button
               disabled={!canPaste}
               onClick={() => {
                 onClose();
-                if (destFolder) onPaste(destFolder);
+                const targetDir = isFolderAsset && singleAsset?.fullPath ? singleAsset.fullPath : destFolder;
+                if (targetDir) onPaste(targetDir);
               }}
               className={`w-full flex items-center justify-between px-3 py-1.5 text-left rounded-none transition-colors ${
                 canPaste
@@ -264,7 +265,7 @@ export const FileContextMenu: React.FC<FileContextMenuProps> = ({
             >
               <div className="flex items-center gap-2.5">
                 <ClipboardPaste className="w-4 h-4 text-zinc-400" />
-                <span>Vložit do této složky</span>
+                <span>{isFolderAsset ? 'Vložit do této složky' : 'Vložit'}</span>
               </div>
               <span className="text-[10px] text-zinc-500 font-mono">Ctrl+V</span>
             </button>

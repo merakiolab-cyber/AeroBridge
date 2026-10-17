@@ -17,7 +17,7 @@ interface SidebarProps {
   onSelectFolder: (path: string) => void;
   favoriteFolders: string[];
   onToggleFavorite: (path: string) => void;
-  onMoveAssets: (assetIds: string[], targetFolder: string) => void;
+  onMoveAssets: (assetIds: string[], targetFolder: string, isCopy?: boolean) => void;
   filters?: FilterState;
   onUpdateFilter?: <K extends keyof FilterState>(key: K, value: FilterState[K]) => void;
   onResetFilters?: () => void;
@@ -92,13 +92,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
     e.stopPropagation();
     setDragOverPath(null);
 
-    // Try reading JSON array of asset IDs
+    const isCopy = e.ctrlKey;
+    // Try reading JSON array of paths or asset IDs
     try {
       const raw = e.dataTransfer.getData('application/json');
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (parsed.assetIds && Array.isArray(parsed.assetIds)) {
-          onMoveAssets(parsed.assetIds, path);
+        const items = (parsed.paths && parsed.paths.length > 0) ? parsed.paths : parsed.assetIds;
+        if (items && Array.isArray(items) && items.length > 0) {
+          onMoveAssets(items, path, isCopy);
           return;
         }
       }
@@ -108,9 +110,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
     const plain = e.dataTransfer.getData('text/plain');
     if (plain) {
-      const ids = plain.split(',').map((s) => s.trim()).filter(Boolean);
+      const ids = plain.split(/\r?\n|,/).map((s) => s.trim()).filter(Boolean);
       if (ids.length > 0) {
-        onMoveAssets(ids, path);
+        onMoveAssets(ids, path, isCopy);
       }
     }
   };

@@ -173,7 +173,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           >
             <span className="w-1.5 h-1.5 bg-[#e2e4e9] shadow-[0_0_8px_rgba(237,232,223,0.8)]" />
             <span className="tracking-widest">AeroBridge</span>
-            <span className="text-[10px] text-zinc-400 font-mono tracking-normal normal-case px-1.5 py-0.5 rounded bg-white/[0.06] border border-white/10">v3.27.22</span>
+            <span className="text-[10px] text-zinc-400 font-mono tracking-normal normal-case px-1.5 py-0.5 rounded bg-white/[0.06] border border-white/10">v3.27.23</span>
           </a>
 
           <span className="text-white/20">/</span>

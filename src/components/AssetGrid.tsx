@@ -22,6 +22,7 @@ interface AssetGridProps {
   onNavigateFolder?: (path: string) => void;
   onContextMenu?: (e: React.MouseEvent, asset?: AssetItem) => void;
   onPageChange?: (assetId: string, pageNum: number) => void;
+  onMoveAssets?: (idsOrPaths: string[], targetFolder: string, isCopy?: boolean) => void;
 }
 
 export const AssetGrid: React.FC<AssetGridProps> = ({
@@ -42,6 +43,7 @@ export const AssetGrid: React.FC<AssetGridProps> = ({
   onNavigateFolder,
   onContextMenu,
   onPageChange,
+  onMoveAssets,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -166,12 +168,43 @@ export const AssetGrid: React.FC<AssetGridProps> = ({
   const handleDragStart = useCallback(
     (asset: AssetItem, e: React.DragEvent) => {
       const isSelected = selectedIds.has(asset.id);
-      const idsToDrag = isSelected && selectedIds.size > 1 ? Array.from(selectedIds) : [asset.id];
-      e.dataTransfer.setData('application/json', JSON.stringify({ assetIds: idsToDrag }));
-      e.dataTransfer.setData('text/plain', idsToDrag.join(','));
-      e.dataTransfer.effectAllowed = 'move';
+      const itemsToDrag = isSelected && selectedIds.size > 1
+        ? assets.filter((a) => selectedIds.has(a.id))
+        : [asset];
+      const paths = itemsToDrag.map((a) => a.fullPath).filter(Boolean) as string[];
+      const ids = itemsToDrag.map((a) => a.id);
+
+      e.dataTransfer.setData('application/json', JSON.stringify({ assetIds: ids, paths }));
+      e.dataTransfer.setData('text/plain', paths.length > 0 ? paths.join('\r\n') : ids.join(','));
+      e.dataTransfer.effectAllowed = 'copyMove';
     },
-    [selectedIds]
+    [selectedIds, assets]
+  );
+
+  const handleDropOnFolder = useCallback(
+    (e: React.DragEvent, targetFolderPath: string) => {
+      const isCopy = e.ctrlKey;
+      try {
+        const raw = e.dataTransfer.getData('application/json');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          const items = (parsed.paths && parsed.paths.length > 0) ? parsed.paths : parsed.assetIds;
+          if (items && Array.isArray(items) && items.length > 0) {
+            onMoveAssets?.(items, targetFolderPath, isCopy);
+            return;
+          }
+        }
+      } catch {}
+
+      const plain = e.dataTransfer.getData('text/plain');
+      if (plain) {
+        const items = plain.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+        if (items.length > 0) {
+          onMoveAssets?.(items, targetFolderPath, isCopy);
+        }
+      }
+    },
+    [onMoveAssets]
   );
 
   if (assets.length === 0) {
@@ -260,6 +293,7 @@ export const AssetGrid: React.FC<AssetGridProps> = ({
                 onCopyPath={() => onCopyPath(asset)}
                 onCopyImage={() => onCopyImage(asset)}
                 onPageChange={onPageChange}
+                onDropOnFolder={handleDropOnFolder}
               />
             ))}
           </div>
