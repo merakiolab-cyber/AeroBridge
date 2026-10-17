@@ -545,6 +545,13 @@ export default function App() {
     [inspectorWidth]
   );
 
+  const handleSidebarResetWidth = useCallback(() => {
+    setSidebarWidth(280);
+    try {
+      localStorage.setItem('aerobridge_sidebar_width', '280');
+    } catch {}
+  }, []);
+
   const handleInspectorResetWidth = useCallback(() => {
     setInspectorWidth(440);
     try {
@@ -1114,14 +1121,15 @@ export default function App() {
             {/* Dynamic Sidebar Resize Handle (Tahem myši rozšiřovat/zužovat) */}
             <div
               onMouseDown={handleSidebarResizeStart}
-              className={`w-1 relative z-20 cursor-col-resize select-none shrink-0 transition-colors group flex items-center justify-center ${
+              onDoubleClick={handleSidebarResetWidth}
+              className={`w-1 relative z-10 cursor-col-resize select-none shrink-0 transition-colors group flex items-center justify-center ${
                 isResizingSidebar
                   ? 'bg-[#e2e4e9] opacity-100'
                   : 'bg-transparent hover:bg-[#e2e4e9]/50'
               }`}
-              title="Tahem myši změnit šířku bočního panelu"
+              title="Tahem myši změnit šířku bočního panelu (dvojklik pro výchozí šířku)"
             >
-              <div className="absolute inset-y-0 -left-1.5 -right-1.5 cursor-col-resize" />
+              <div className="absolute inset-y-0 left-0 -right-2.5 cursor-col-resize" />
             </div>
           </>
         )}
@@ -1250,14 +1258,14 @@ export default function App() {
             <div
               onMouseDown={handleInspectorResizeStart}
               onDoubleClick={handleInspectorResetWidth}
-              className={`w-1 relative z-20 cursor-col-resize select-none shrink-0 transition-colors group flex items-center justify-center ${
+              className={`w-1 relative z-10 cursor-col-resize select-none shrink-0 transition-colors group flex items-center justify-center ${
                 isResizingInspector
                   ? 'bg-[#e2e4e9] opacity-100'
                   : 'bg-transparent hover:bg-[#e2e4e9]/50'
               }`}
               title="Tahem myši změnit šířku panelu náhledu (dvojklik pro výchozí šířku)"
             >
-              <div className="absolute inset-y-0 -left-1.5 -right-1.5 cursor-col-resize" />
+              <div className="absolute inset-y-0 left-0 -right-2.5 cursor-col-resize" />
             </div>
 
             <PreviewInspector

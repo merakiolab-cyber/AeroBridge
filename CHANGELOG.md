@@ -2,6 +2,16 @@
 
 ## Changelog
 
+### Version 3.27.22 (Oprava kolize posuvníku prostředního sloupce s úchytem pro změnu šířky panelu)
+- **Oddělení zóny posuvníku a úchytu změny šířky ([App.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/App.tsx)):**
+  - Opravena kritická chyba rozvržení, kdy neviditelná interaktivní zóna (`-left-1.5`) úchytu pro rozšiřování pravého panelu (`PreviewInspector`) zasahovala 6 px do prostředního sloupce a kompletně překrývala vertikální posuvník (scrollbar) mřížky a tabulky.
+  - V důsledku překrytí prohlížeč při najetí myší na posuvník nabízel ikonu pro rozšíření pravého panelu (`cursor-col-resize`) a kliknutí/tažení zahájilo změnu šířky panelu namísto posouvání obsahu.
+  - Interaktivní zóna úchytu byla upravena na `left-0 -right-2.5`, takže vůbec nezasahuje vlevo do prostředního sloupce a rozšiřuje se pouze doprava do prázdného okraje panelu detailů. Posuvník prostředního sloupce je nyní 100% volný a přímo ovladatelný.
+  - Stejné oddělení aplikováno i na úchyt levého bočního panelu (`Sidebar`), včetně nového dvojkliku pro návrat na výchozí šířku.
+- **Vylepšení vzhledu a ergonomie posuvníků ([index.css](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/index.css)):**
+  - Šířka posuvníků byla zvýšena ze 6 px na 8 px pro pohodlnější uchopení myší v souladu s Fluent Designem Windows 11.
+  - Vylepšen kontrast a vizuální odezva táhla posuvníku: základní stav `#3f3f46`, zvýraznění při najetí myší `#71717a`, aktivní táhnutí `#e2e4e9`.
+
 ### Version 3.27.21 (Oprava a optimalizace zoomování fotografií na plátně)
 - **Odstranění smyčky rušení zoomu ([ZoomableCanvas.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/ZoomableCanvas.tsx)):**
   - Opravena kritická chyba, kdy `setScale` v závislostech měnil svou instanci při každém pootočení kolečka nebo stisku tlačítka zoomu, což zpětně spouštělo `useEffect` pro reset měřítka na hodnotu 100% (fit window). Zoom se tak okamžitě resetoval a uživatel nemohl obrázek přiblížit.
