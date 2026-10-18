@@ -84,6 +84,9 @@ export const FileContextMenu: React.FC<FileContextMenuProps> = ({
   onToggleFavorite,
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
+  const [associatedApps, setAssociatedApps] = useState<AssociatedApp[]>([]);
+  const [isOpenWithOpen, setIsOpenWithOpen] = useState(false);
+  const openWithTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Close when clicking outside or pressing Escape
   useEffect(() => {
@@ -106,6 +109,44 @@ export const FileContextMenu: React.FC<FileContextMenuProps> = ({
       window.removeEventListener('pointerdown', handlePointerDown);
     };
   }, [position, onClose]);
+
+  // Target extraction for hooks
+  const singleAsset = target?.type === 'asset' ? target.asset : undefined;
+  const isFolderAsset = singleAsset?.isFolder || target?.type === 'folder';
+  const targetFilePath =
+    singleAsset?.fullPath ||
+    (target?.type === 'asset' && target.selectedAssets?.[0]?.fullPath);
+
+  // Fetch associated applications
+  useEffect(() => {
+    if (!targetFilePath || isFolderAsset || !isDesktopApp()) {
+      setAssociatedApps([]);
+      return;
+    }
+    let isCurrent = true;
+    getAssociatedApps(targetFilePath).then((apps) => {
+      if (isCurrent) setAssociatedApps(apps);
+    });
+    return () => {
+      isCurrent = false;
+    };
+  }, [targetFilePath, isFolderAsset]);
+
+  // Reset submenu state on target/position change
+  useEffect(() => {
+    setIsOpenWithOpen(false);
+  }, [target, position]);
+
+  const handleOpenWithMouseEnter = () => {
+    if (openWithTimeoutRef.current) clearTimeout(openWithTimeoutRef.current);
+    setIsOpenWithOpen(true);
+  };
+
+  const handleOpenWithMouseLeave = () => {
+    openWithTimeoutRef.current = setTimeout(() => {
+      setIsOpenWithOpen(false);
+    }, 200);
+  };
 
   if (!position || !target) return null;
 
@@ -130,47 +171,12 @@ export const FileContextMenu: React.FC<FileContextMenuProps> = ({
     ? target.selectedFolderPaths.map((p) => p.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || p)
     : target.folderName ? [target.folderName] : [];
 
-  const singleAsset = isAssetTarget ? target.asset : undefined;
-  const isFolderAsset = singleAsset?.isFolder || isFolderTreeTarget;
-
   // Destination folder for Paste / New Folder
   const destFolder = isFolderAsset
     ? (singleAsset?.fullPath || target.folderPath)
     : target.folderPath;
 
   const canPaste = !!destFolder;
-
-  // Single or primary file path for Open With
-  const targetFilePath = singleAsset?.fullPath || (isAssetTarget && selectedList[0]?.fullPath);
-
-  const [associatedApps, setAssociatedApps] = useState<AssociatedApp[]>([]);
-  const [isOpenWithOpen, setIsOpenWithOpen] = useState(false);
-  const openWithTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    if (!targetFilePath || isFolderAsset || !isDesktopApp()) {
-      setAssociatedApps([]);
-      return;
-    }
-    let isCurrent = true;
-    getAssociatedApps(targetFilePath).then((apps) => {
-      if (isCurrent) setAssociatedApps(apps);
-    });
-    return () => {
-      isCurrent = false;
-    };
-  }, [targetFilePath, isFolderAsset]);
-
-  const handleOpenWithMouseEnter = () => {
-    if (openWithTimeoutRef.current) clearTimeout(openWithTimeoutRef.current);
-    setIsOpenWithOpen(true);
-  };
-
-  const handleOpenWithMouseLeave = () => {
-    openWithTimeoutRef.current = setTimeout(() => {
-      setIsOpenWithOpen(false);
-    }, 200);
-  };
 
   // Calculate adjusted position to keep menu inside viewport
   const menuWidth = 240;
