@@ -108,17 +108,85 @@ export async function extractInddThumbnail(
  */
 export function extractPsdThumbnail(buffer: ArrayBuffer): string | null {
   try {
-    if (!buffer || buffer.byteLength < 4) return null;
+    if (!buffer || buffer.byteLength < 26) return null;
     const view = new DataView(buffer);
-    // Check '8BPS' signature
-    if (view.getUint32(0) !== 0x38425053) return null;
+    const bytes = new Uint8Array(buffer);
 
-    // First try XMP metadata
-    const xmpThumb = extractXmpThumbnail(buffer, 1024 * 1024 * 4);
+    // 1. Verify PSD ('8BPS') signature
+    if (view.getUint32(0, false) !== 0x38425053) return null;
+
+    // 2. Parse Image Resources Section (where Photoshop stores embedded thumbnails 1036 and 1033)
+    try {
+      const colorModeLength = view.getUint32(26, false);
+      let offset = 26 + 4 + colorModeLength;
+
+      if (offset + 4 <= buffer.byteLength) {
+        const imgResLength = view.getUint32(offset, false);
+        offset += 4;
+        const imgResEnd = Math.min(buffer.byteLength, offset + imgResLength);
+
+        while (offset + 12 <= imgResEnd) {
+          // Signature '8BIM' or 'MeSa'
+          const sig = view.getUint32(offset, false);
+          if (sig !== 0x3842494D && sig !== 0x4D655361) {
+            break;
+          }
+          offset += 4;
+
+          const resId = view.getUint16(offset, false);
+          offset += 2;
+
+          // Pascal string name (length byte + chars + padded to even)
+          const nameLen = bytes[offset];
+          offset += 1 + nameLen;
+          if (offset % 2 !== 0) offset++; // Pad to even
+
+          if (offset + 4 > imgResEnd) break;
+          const resDataSize = view.getUint32(offset, false);
+          offset += 4;
+
+          if (offset + resDataSize > buffer.byteLength) break;
+
+          // Resource ID 0x040C (1036): Photoshop 5.0+ Thumbnail Resource
+          // Resource ID 0x0409 (1033): Photoshop 4.0 Thumbnail Resource
+          if (resId === 0x040C || resId === 0x0409) {
+            if (resDataSize > 28) {
+              const format = view.getUint32(offset, false);
+              if (format === 1) { // 1 = kJpegRGB
+                const jpegStart = offset + 28;
+                if (bytes[jpegStart] === 0xFF && bytes[jpegStart + 1] === 0xD8) {
+                  const jpegBytes = bytes.subarray(jpegStart, offset + resDataSize);
+                  let binary = '';
+                  const chunkLen = 8192;
+                  for (let c = 0; c < jpegBytes.length; c += chunkLen) {
+                    binary += String.fromCharCode.apply(null, Array.from(jpegBytes.subarray(c, c + chunkLen)));
+                  }
+                  return `data:image/jpeg;base64,${btoa(binary)}`;
+                }
+              }
+            }
+          }
+
+          // Resource ID 0x0424 (1060): XMP Metadata
+          if (resId === 0x0424 && resDataSize > 100) {
+            const xmpThumb = extractXmpThumbnail(buffer.slice(offset, offset + resDataSize), resDataSize);
+            if (xmpThumb) return xmpThumb;
+          }
+
+          offset += resDataSize;
+          if (offset % 2 !== 0) offset++; // Pad to even
+        }
+      }
+    } catch (e) {
+      console.debug('PSD structured resource parsing exception:', e);
+    }
+
+    // 3. Fallback: Search for XMP metadata packet anywhere in the buffer
+    const xmpThumb = extractXmpThumbnail(buffer, Math.min(buffer.byteLength, 16 * 1024 * 1024));
     if (xmpThumb) return xmpThumb;
 
-    // Scan for JPEG SOI marker (0xFF, 0xD8) within resource block or file
-    return extractEmbeddedJpeg(buffer, 4096, 1024 * 1024 * 4);
+    // 4. Fallback: Scan for embedded JPEG marker (with minSize=2048 to catch small thumbnails too)
+    return extractEmbeddedJpeg(buffer, 2048, Math.min(buffer.byteLength, 16 * 1024 * 1024));
   } catch (err) {
     console.warn('PSD thumbnail parsing skipped:', err);
   }

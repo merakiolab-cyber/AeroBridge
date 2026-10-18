@@ -5,6 +5,7 @@
  */
 
 import { isTauri, invoke, convertFileSrc } from '@tauri-apps/api/core';
+import { startDrag } from '@crabnebula/tauri-plugin-drag';
 
 export interface NativeFileEntry {
   name: string;
@@ -360,4 +361,69 @@ export function purgeNativeIconCache(): number {
   return count;
 }
 
+const TRANSPARENT_1X1_PNG =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
 
+/**
+ * Initiates an OS-level native drag-and-drop operation (OLE CF_HDROP on Windows).
+ * Allows dragging files seamlessly from AeroBridge into external desktop apps
+ * (e.g. Adobe Photoshop, Illustrator, Premiere, Windows Explorer, Blender).
+ */
+export async function startNativeFileDrag(paths: string[], icon?: string): Promise<void> {
+  if (!isDesktopApp() || !paths || paths.length === 0) return;
+
+  const validPaths = paths
+    .filter((p) => typeof p === 'string' && p.trim().length > 0)
+    .map((p) => p.replace(/\//g, '\\'));
+
+  if (validPaths.length === 0) return;
+
+  (window as any).__isInternalDragging = true;
+  try {
+    const dragIcon =
+      icon && icon.startsWith('data:image/png;base64,') ? icon : TRANSPARENT_1X1_PNG;
+
+    await startDrag({
+      item: validPaths,
+      icon: dragIcon,
+    });
+  } catch (err) {
+    console.warn('[TauriBridge] Native drag failed:', err);
+  } finally {
+    setTimeout(() => {
+      (window as any).__isInternalDragging = false;
+    }, 100);
+  }
+}
+
+export interface AssociatedApp {
+  name: string;
+  exe_name: string;
+  path: string | null;
+  is_default: boolean;
+}
+
+/**
+ * Returns registered/associated applications in Windows for this file.
+ */
+export async function getAssociatedApps(filePath: string): Promise<AssociatedApp[]> {
+  if (!isDesktopApp() || !filePath) return [];
+  try {
+    return await invoke<AssociatedApp[]>('get_associated_apps_native', { filePath });
+  } catch (err) {
+    console.warn('[TauriBridge] Failed to get associated apps:', err);
+    return [];
+  }
+}
+
+/**
+ * Opens a file with a specific application or triggers the native Windows "Open With" dialog.
+ */
+export async function openFileWithApp(filePath: string, appPath?: string): Promise<void> {
+  if (!isDesktopApp() || !filePath) return;
+  try {
+    await invoke('open_file_with_app_native', { filePath, appPath: appPath || null });
+  } catch (err) {
+    console.warn('[TauriBridge] Failed to open file with app:', err);
+  }
+}

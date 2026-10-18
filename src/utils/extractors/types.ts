@@ -24,6 +24,7 @@ export interface ExtractedMedia {
     | 'html'
     | 'krita'
     | 'blend'
+    | '3d'
     | 'other';
   colorBadge: string;
   hasEmbeddedThumbnail: boolean;
@@ -199,6 +200,16 @@ export function getAdobeFileType(fileName: string): {
     case 'blend1':
     case 'blend2':
       return { format: 'Blender 3D Scene', category: 'blend', colorBadge: '#ea7600', extension: 'BLEND' };
+    case 'obj':
+      return { format: 'Wavefront 3D Object', category: '3d', colorBadge: '#06b6d4', extension: 'OBJ' };
+    case 'stl':
+      return { format: 'Stereolithography 3D', category: '3d', colorBadge: '#38bdf8', extension: 'STL' };
+    case '3mf':
+      return { format: '3D Manufacturing Format', category: '3d', colorBadge: '#0ea5e9', extension: '3MF' };
+    case 'zpr':
+      return { format: 'ZBrush Project', category: '3d', colorBadge: '#e11d48', extension: 'ZPR' };
+    case 'ztl':
+      return { format: 'ZBrush Tool', category: '3d', colorBadge: '#f43f5e', extension: 'ZTL' };
     case 'ppt':
     case 'pptx':
     case 'pps':
@@ -261,7 +272,7 @@ export function isVisualAsset(asset: { name: string; extension?: string; categor
     'psd', 'psb', 'ai', 'eps', 'indd', 'idml', 'fig', 'kra', 'rif', 'riff',
     'tif', 'tiff', 'pdf', 'avif', 'heic', 'html', 'htm',
     'cr2', 'cr3', 'nef', 'arw', 'dng', 'raf', 'rw2', 'orf', 'pef',
-    'blend', 'blend1', 'blend2',
+    'blend', 'blend1', 'blend2', 'obj', 'stl', '3mf', 'zpr', 'ztl',
   ]);
 
   if (visualExtensions.has(ext)) {
@@ -272,7 +283,7 @@ export function isVisualAsset(asset: { name: string; extension?: string; categor
     return false;
   }
 
-  return ['image', 'raw', 'adobe-psd', 'adobe-ai', 'adobe-indd', 'adobe-xd', 'vector', 'painter', 'figma', 'pdf', 'html', 'krita', 'blend'].includes(asset.category || '');
+  return ['image', 'raw', 'adobe-psd', 'adobe-ai', 'adobe-indd', 'adobe-xd', 'vector', 'painter', 'figma', 'pdf', 'html', 'krita', 'blend', '3d'].includes(asset.category || '');
 }
 
 /**

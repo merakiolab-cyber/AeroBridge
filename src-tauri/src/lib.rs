@@ -715,6 +715,433 @@ fn open_file_native(path: String) -> Result<(), String> {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct AssociatedApp {
+    pub name: String,
+    pub exe_name: String,
+    pub path: Option<String>,
+    pub is_default: bool,
+}
+
+#[cfg(target_os = "windows")]
+fn reg_get_string(
+    root: windows::Win32::System::Registry::HKEY,
+    subkey: &str,
+    value_name: Option<&str>,
+) -> Option<String> {
+    use windows::core::PCWSTR;
+    use windows::Win32::System::Registry::{RegCloseKey, RegOpenKeyExW, RegQueryValueExW, KEY_READ};
+    let wide_subkey = icons::to_wide(subkey);
+    let mut hkey = windows::Win32::System::Registry::HKEY::default();
+    unsafe {
+        if RegOpenKeyExW(root, PCWSTR(wide_subkey.as_ptr()), Some(0), KEY_READ, &mut hkey).is_err() {
+            return None;
+        }
+        let wide_val = value_name.map(|v| icons::to_wide(v));
+        let val_ptr = wide_val
+            .as_ref()
+            .map(|v| PCWSTR(v.as_ptr()))
+            .unwrap_or(PCWSTR::null());
+
+        let mut buf_size: u32 = 0;
+        if RegQueryValueExW(hkey, val_ptr, None, None, None, Some(&mut buf_size)).is_err()
+            || buf_size == 0
+        {
+            let _ = RegCloseKey(hkey);
+            return None;
+        }
+
+        let mut buf: Vec<u8> = vec![0u8; buf_size as usize];
+        if RegQueryValueExW(
+            hkey,
+            val_ptr,
+            None,
+            None,
+            Some(buf.as_mut_ptr()),
+            Some(&mut buf_size),
+        )
+        .is_ok()
+        {
+            let _ = RegCloseKey(hkey);
+            let u16_slice: &[u16] = std::slice::from_raw_parts(
+                buf.as_ptr() as *const u16,
+                (buf_size as usize) / 2,
+            );
+            let s = String::from_utf16_lossy(u16_slice);
+            let trimmed = s.trim_matches('\0').trim().to_string();
+            if !trimmed.is_empty() {
+                return Some(trimmed);
+            }
+        } else {
+            let _ = RegCloseKey(hkey);
+        }
+    }
+    None
+}
+
+#[cfg(target_os = "windows")]
+fn reg_enum_values(
+    root: windows::Win32::System::Registry::HKEY,
+    subkey: &str,
+) -> Vec<(String, String)> {
+    use windows::core::{PCWSTR, PWSTR};
+    use windows::Win32::System::Registry::{RegCloseKey, RegEnumValueW, RegOpenKeyExW, KEY_READ};
+    let wide_subkey = icons::to_wide(subkey);
+    let mut hkey = windows::Win32::System::Registry::HKEY::default();
+    let mut results = Vec::new();
+    unsafe {
+        if RegOpenKeyExW(root, PCWSTR(wide_subkey.as_ptr()), Some(0), KEY_READ, &mut hkey).is_err() {
+            return results;
+        }
+        let mut index = 0u32;
+        loop {
+            let mut name_buf = vec![0u16; 256];
+            let mut name_len = name_buf.len() as u32;
+            let mut data_buf = vec![0u8; 1024];
+            let mut data_len = data_buf.len() as u32;
+            let mut val_type = 0u32;
+
+            let status = RegEnumValueW(
+                hkey,
+                index,
+                Some(PWSTR(name_buf.as_mut_ptr())),
+                &mut name_len,
+                None,
+                Some(&mut val_type),
+                Some(data_buf.as_mut_ptr()),
+                Some(&mut data_len),
+            );
+            if status.0 != 0 {
+                break;
+            }
+            let name = String::from_utf16_lossy(&name_buf[..name_len as usize]);
+            let u16_data = std::slice::from_raw_parts(
+                data_buf.as_ptr() as *const u16,
+                (data_len as usize) / 2,
+            );
+            let data = String::from_utf16_lossy(u16_data)
+                .trim_matches('\0')
+                .trim()
+                .to_string();
+            results.push((name, data));
+            index += 1;
+        }
+        let _ = RegCloseKey(hkey);
+    }
+    results
+}
+
+fn extract_exe_from_command(cmd: &str) -> Option<String> {
+    let trimmed = cmd.trim();
+    if trimmed.starts_with('"') {
+        if let Some(end) = trimmed[1..].find('"') {
+            let path = &trimmed[1..=end];
+            if Path::new(path).is_file() {
+                return Some(path.to_string());
+            }
+        }
+    }
+    if let Some(token) = trimmed.split_whitespace().next() {
+        let clean = token.trim_matches('"');
+        if Path::new(clean).is_file() {
+            return Some(clean.to_string());
+        }
+    }
+    None
+}
+
+#[cfg(target_os = "windows")]
+fn resolve_app_path(exe: &str) -> Option<String> {
+    use windows::Win32::System::Registry::{HKEY_CLASSES_ROOT, HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE};
+    let hklm_key = format!("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\{}", exe);
+    if let Some(p) = reg_get_string(HKEY_LOCAL_MACHINE, &hklm_key, None) {
+        let clean = p.trim_matches('"');
+        if Path::new(clean).is_file() {
+            return Some(clean.to_string());
+        }
+    }
+    if let Some(p) = reg_get_string(HKEY_CURRENT_USER, &hklm_key, None) {
+        let clean = p.trim_matches('"');
+        if Path::new(clean).is_file() {
+            return Some(clean.to_string());
+        }
+    }
+    let hkcr_cmd_key = format!("Applications\\{}\\shell\\open\\command", exe);
+    if let Some(cmd) = reg_get_string(HKEY_CLASSES_ROOT, &hkcr_cmd_key, None) {
+        if let Some(p) = extract_exe_from_command(&cmd) {
+            return Some(p);
+        }
+    }
+    let sys32 = format!("C:\\Windows\\System32\\{}", exe);
+    if Path::new(&sys32).is_file() {
+        return Some(sys32);
+    }
+    let win_root = format!("C:\\Windows\\{}", exe);
+    if Path::new(&win_root).is_file() {
+        return Some(win_root);
+    }
+    if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
+        let uwp_path = format!("{}\\Microsoft\\WindowsApps\\{}", local_app_data, exe);
+        if Path::new(&uwp_path).is_file() {
+            return Some(uwp_path);
+        }
+    }
+    None
+}
+
+fn get_app_friendly_name(exe: &str, full_path: Option<&str>) -> String {
+    #[cfg(target_os = "windows")]
+    {
+        use windows::Win32::System::Registry::HKEY_CLASSES_ROOT;
+        let hkcr_key = format!("Applications\\{}", exe);
+        if let Some(name) = reg_get_string(HKEY_CLASSES_ROOT, &hkcr_key, Some("FriendlyAppName")) {
+            if !name.starts_with('@') && !name.is_empty() {
+                return name;
+            }
+        }
+    }
+    let lower_exe = exe.to_lowercase();
+    match lower_exe.as_str() {
+        "photoshop.exe" => "Adobe Photoshop".to_string(),
+        "illustrator.exe" => "Adobe Illustrator".to_string(),
+        "indesign.exe" => "Adobe InDesign".to_string(),
+        "afterfx.exe" => "Adobe After Effects".to_string(),
+        "premiere.exe" => "Adobe Premiere Pro".to_string(),
+        "blender.exe" | "blender-launcher.exe" => "Blender".to_string(),
+        "mspaint.exe" => "Malování".to_string(),
+        "notepad.exe" => "Poznámkový blok".to_string(),
+        "brave.exe" => "Brave Browser".to_string(),
+        "chrome.exe" => "Google Chrome".to_string(),
+        "msedge.exe" => "Microsoft Edge".to_string(),
+        "vlc.exe" => "VLC Media Player".to_string(),
+        "acrobat.exe" => "Adobe Acrobat".to_string(),
+        "lightroom.exe" => "Adobe Lightroom".to_string(),
+        "code.exe" => "Visual Studio Code".to_string(),
+        "cursor.exe" => "Cursor".to_string(),
+        "figma.exe" => "Figma".to_string(),
+        "sublime_text.exe" => "Sublime Text".to_string(),
+        _ => {
+            if let Some(fp) = full_path {
+                let p = Path::new(fp);
+                if let Some(stem) = p.file_stem().and_then(|s| s.to_str()) {
+                    return stem.to_string();
+                }
+            }
+            exe.trim_end_matches(".exe")
+                .trim_end_matches(".EXE")
+                .to_string()
+        }
+    }
+}
+
+/// Lists corresponding applications registered in Windows for the given file's extension.
+#[tauri::command]
+fn get_associated_apps_native(file_path: String) -> Vec<AssociatedApp> {
+    #[cfg(target_os = "windows")]
+    {
+        use windows::Win32::System::Registry::{HKEY_CLASSES_ROOT, HKEY_CURRENT_USER};
+        let p = Path::new(&file_path);
+        let ext = match p.extension().and_then(|s| s.to_str()) {
+            Some(e) => format!(".{}", e.to_lowercase()),
+            None => return Vec::new(),
+        };
+
+        let mut apps: Vec<AssociatedApp> = Vec::new();
+        let mut seen_exes = std::collections::HashSet::new();
+
+        // 1. Determine default app
+        let mut default_exe = String::new();
+        let user_choice_key = format!(
+            "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\FileExts\\{}\\UserChoice",
+            ext
+        );
+        if let Some(prog_id) = reg_get_string(HKEY_CURRENT_USER, &user_choice_key, Some("ProgId")) {
+            let prog_cmd_key = format!("{}\\shell\\open\\command", prog_id);
+            if let Some(cmd) = reg_get_string(HKEY_CLASSES_ROOT, &prog_cmd_key, None) {
+                if let Some(fp) = extract_exe_from_command(&cmd) {
+                    if let Some(file_name) = Path::new(&fp).file_name().and_then(|s| s.to_str()) {
+                        default_exe = file_name.to_lowercase();
+                    }
+                }
+            }
+        }
+        if default_exe.is_empty() {
+            if let Some(prog_id) = reg_get_string(HKEY_CLASSES_ROOT, &ext, None) {
+                let prog_cmd_key = format!("{}\\shell\\open\\command", prog_id);
+                if let Some(cmd) = reg_get_string(HKEY_CLASSES_ROOT, &prog_cmd_key, None) {
+                    if let Some(fp) = extract_exe_from_command(&cmd) {
+                        if let Some(file_name) = Path::new(&fp).file_name().and_then(|s| s.to_str()) {
+                            default_exe = file_name.to_lowercase();
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. Query OpenWithList from HKCU
+        let owl_key = format!(
+            "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\FileExts\\{}\\OpenWithList",
+            ext
+        );
+        let values = reg_enum_values(HKEY_CURRENT_USER, &owl_key);
+        let mru = values
+            .iter()
+            .find(|(k, _)| k == "MRUList")
+            .map(|(_, v)| v.clone())
+            .unwrap_or_default();
+
+        let mut ordered_exes = Vec::new();
+        if !mru.is_empty() {
+            for ch in mru.chars() {
+                let key_str = ch.to_string();
+                if let Some((_, val)) = values.iter().find(|(k, _)| k == &key_str) {
+                    if !val.is_empty() && !val.contains('!') {
+                        ordered_exes.push(val.clone());
+                    }
+                }
+            }
+        }
+        for (k, v) in &values {
+            if k != "MRUList" && !v.is_empty() && !v.contains('!') && !ordered_exes.contains(v) {
+                ordered_exes.push(v.clone());
+            }
+        }
+
+        for exe in ordered_exes {
+            let lower = exe.to_lowercase();
+            if seen_exes.contains(&lower) {
+                continue;
+            }
+            seen_exes.insert(lower.clone());
+            let full_path = resolve_app_path(&exe);
+            let name = get_app_friendly_name(&exe, full_path.as_deref());
+            let is_default = !default_exe.is_empty() && lower == default_exe;
+            apps.push(AssociatedApp {
+                name,
+                exe_name: exe,
+                path: full_path,
+                is_default,
+            });
+        }
+
+        // 3. Known default suites if registered or installed on the system
+        let known_suite: &[(&[&str], &str, &str)] = &[
+            (&[".psd", ".psb", ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".webp"], "Photoshop.exe", "Adobe Photoshop"),
+            (&[".ai", ".eps", ".svg", ".pdf"], "Illustrator.exe", "Adobe Illustrator"),
+            (&[".indd", ".idml"], "InDesign.exe", "Adobe InDesign"),
+            (&[".blend", ".obj", ".stl", ".fbx"], "blender.exe", "Blender"),
+            (&[".mp4", ".avi", ".mov", ".mkv", ".webm", ".wmv"], "vlc.exe", "VLC Media Player"),
+            (&[".png", ".jpg", ".jpeg", ".bmp"], "mspaint.exe", "Malování"),
+            (&[".txt", ".json", ".md", ".xml", ".log", ".yaml", ".yml"], "notepad.exe", "Poznámkový blok"),
+        ];
+
+        for (exts, exe, label) in known_suite {
+            if exts.contains(&ext.as_str()) {
+                let lower = exe.to_lowercase();
+                if !seen_exes.contains(&lower) {
+                    if let Some(fp) = resolve_app_path(exe) {
+                        seen_exes.insert(lower.clone());
+                        apps.push(AssociatedApp {
+                            name: label.to_string(),
+                            exe_name: exe.to_string(),
+                            path: Some(fp),
+                            is_default: !default_exe.is_empty() && lower == default_exe,
+                        });
+                    }
+                }
+            }
+        }
+
+        // Sort so that is_default is first, followed by apps with valid path, then others
+        apps.sort_by(|a, b| {
+            b.is_default
+                .cmp(&a.is_default)
+                .then_with(|| b.path.is_some().cmp(&a.path.is_some()))
+        });
+
+        apps
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = file_path;
+        Vec::new()
+    }
+}
+
+/// Opens a file with a specified application executable, or opens the native Windows "Open With" dialog.
+#[tauri::command]
+fn open_file_with_app_native(file_path: String, app_path: Option<String>) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        use windows::core::PCWSTR;
+        use windows::Win32::System::Com::{CoInitializeEx, CoUninitialize, COINIT_APARTMENTTHREADED};
+        use windows::Win32::UI::Shell::{ShellExecuteExW, SHELLEXECUTEINFOW};
+
+        let formatted = file_path.replace('/', "\\");
+        let p = Path::new(&formatted);
+        if !p.exists() {
+            return Err(format!("Soubor neexistuje: {}", formatted));
+        }
+
+        // If specific app path is provided and is not "openas"
+        if let Some(ref ap) = app_path {
+            if !ap.is_empty() && ap != "openas" {
+                let status = Command::new(ap).arg(&formatted).spawn();
+                if status.is_ok() {
+                    return Ok(());
+                }
+            }
+        }
+
+        // If app_path is None or "openas", invoke Windows Open With dialog!
+        let co_init = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED).is_ok() };
+        let wide_path = icons::to_wide(&formatted);
+        let wide_verb = icons::to_wide("openas");
+
+        let mut info = SHELLEXECUTEINFOW {
+            cbSize: std::mem::size_of::<SHELLEXECUTEINFOW>() as u32,
+            fMask: 0,
+            hwnd: Default::default(),
+            lpVerb: PCWSTR(wide_verb.as_ptr()),
+            lpFile: PCWSTR(wide_path.as_ptr()),
+            nShow: 1, // SW_SHOWNORMAL
+            ..Default::default()
+        };
+
+        let res = unsafe { ShellExecuteExW(&mut info) };
+        if co_init {
+            unsafe { CoUninitialize() };
+        }
+
+        if res.is_ok() {
+            return Ok(());
+        }
+
+        // Fallback: rundll32 shell32.dll,OpenAs_RunDLL
+        let _ = Command::new("rundll32.exe")
+            .args(["shell32.dll,OpenAs_RunDLL", &formatted])
+            .spawn();
+
+        Ok(())
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        if let Some(ap) = app_path {
+            Command::new(ap)
+                .arg(file_path)
+                .spawn()
+                .map_err(|e| e.to_string())?;
+        } else {
+            Command::new("xdg-open")
+                .arg(file_path)
+                .spawn()
+                .map_err(|e| e.to_string())?;
+        }
+        Ok(())
+    }
+}
+
+
 /// Opens a terminal (Windows Terminal / PowerShell / CMD) in the specified folder or file's parent folder.
 #[tauri::command]
 fn open_terminal_native(path: String) -> Result<(), String> {
@@ -1075,6 +1502,7 @@ fn show_file_properties_native(path: String) -> Result<(), String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_drag::init())
         .plugin(
             tauri_plugin_log::Builder::default()
                 .level(log::LevelFilter::Info)
@@ -1100,7 +1528,9 @@ pub fn run() {
             move_files_native,
             show_file_properties_native,
             get_folder_size,
-            open_terminal_native
+            open_terminal_native,
+            get_associated_apps_native,
+            open_file_with_app_native
         ])
         .run(tauri::generate_context!())
         .expect("error while building tauri application");

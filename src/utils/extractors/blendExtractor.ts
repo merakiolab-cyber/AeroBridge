@@ -20,11 +20,12 @@ export function extractBlendThumbnail(
     }
 
     const is64Bit = bytes[7] === 0x2D; // '-' = 64-bit, '_' = 32-bit
+    const isLittleEndian = bytes[8] === 0x76; // 'v' = little-endian, 'V' = big-endian
     const headerSize = is64Bit ? 24 : 20;
 
-    // Search for 'TEST' block code within the first 256KB
-    const searchLimit = Math.min(bytes.length - 24, 262144);
-    let testIdx = -1;
+    // Search for 'TEST' block code within the buffer (up to 4MB)
+    const searchLimit = Math.min(bytes.length - 24, 4 * 1024 * 1024);
+    
     for (let i = 12; i < searchLimit; i++) {
       if (
         bytes[i] === 0x54 &&     // 'T'
@@ -32,46 +33,49 @@ export function extractBlendThumbnail(
         bytes[i + 2] === 0x53 && // 'S'
         bytes[i + 3] === 0x54    // 'T'
       ) {
-        testIdx = i;
-        break;
+        try {
+          const testIdx = i;
+          const view = new DataView(buffer, testIdx, 8);
+          const blockSize = view.getUint32(4, isLittleEndian);
+          if (blockSize < 8 || testIdx + headerSize + blockSize > bytes.length) continue;
+
+          const dataView = new DataView(buffer, testIdx + headerSize, 8);
+          const width = dataView.getUint32(0, isLittleEndian);
+          const height = dataView.getUint32(4, isLittleEndian);
+          if (width === 0 || height === 0 || width > 2048 || height > 2048) continue;
+
+          const pixelBytes = width * height * 4;
+          if (blockSize < 8 + pixelBytes) continue;
+
+          const rawRgba = new Uint8ClampedArray(buffer, testIdx + headerSize + 8, pixelBytes);
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return null;
+
+          const imgData = ctx.createImageData(width, height);
+          // Blender stores pixels bottom-to-top (row 0 is bottom)
+          for (let y = 0; y < height; y++) {
+            const srcRow = (height - 1 - y) * width * 4;
+            const dstRow = y * width * 4;
+            imgData.data.set(rawRgba.subarray(srcRow, srcRow + width * 4), dstRow);
+          }
+          ctx.putImageData(imgData, 0, 0);
+
+          return {
+            url: canvas.toDataURL('image/png'),
+            width,
+            height,
+          };
+        } catch {
+          // If this particular occurrence wasn't valid, continue searching
+          continue;
+        }
       }
     }
-    if (testIdx === -1) return null;
-
-    const view = new DataView(buffer, testIdx, 8);
-    const blockSize = view.getUint32(4, true);
-    if (blockSize < 8 || testIdx + headerSize + blockSize > bytes.length) return null;
-
-    const dataView = new DataView(buffer, testIdx + headerSize, 8);
-    const width = dataView.getUint32(0, true);
-    const height = dataView.getUint32(4, true);
-    if (width === 0 || height === 0 || width > 2048 || height > 2048) return null;
-
-    const pixelBytes = width * height * 4;
-    if (blockSize < 8 + pixelBytes) return null;
-
-    const rawRgba = new Uint8ClampedArray(buffer, testIdx + headerSize + 8, pixelBytes);
-
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
-
-    const imgData = ctx.createImageData(width, height);
-    // Blender stores pixels bottom-to-top (row 0 is bottom)
-    for (let y = 0; y < height; y++) {
-      const srcRow = (height - 1 - y) * width * 4;
-      const dstRow = y * width * 4;
-      imgData.data.set(rawRgba.subarray(srcRow, srcRow + width * 4), dstRow);
-    }
-    ctx.putImageData(imgData, 0, 0);
-
-    return {
-      url: canvas.toDataURL('image/png'),
-      width,
-      height,
-    };
+    return null;
   } catch (err) {
     console.warn('[Blend] Failed to extract thumbnail:', err);
     return null;

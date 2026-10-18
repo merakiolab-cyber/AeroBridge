@@ -121,6 +121,20 @@ export const NativeExplorerTree: React.FC<NativeExplorerTreeProps> = ({
       const ids = plain.split(/\r?\n|,/).map((s) => s.trim()).filter(Boolean);
       if (ids.length > 0) {
         onMoveAssets(ids, path, isCopy);
+        return;
+      }
+    }
+
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const filePaths: string[] = [];
+      for (let i = 0; i < e.dataTransfer.files.length; i++) {
+        const file = e.dataTransfer.files[i];
+        const p = (file as unknown as { path?: string }).path;
+        if (p) filePaths.push(p);
+      }
+      if (filePaths.length > 0) {
+        onMoveAssets(filePaths, path, isCopy);
+        return;
       }
     }
   };
@@ -158,7 +172,22 @@ export const NativeExplorerTree: React.FC<NativeExplorerTreeProps> = ({
     const plain = e.dataTransfer.getData('text/plain');
     if (plain) {
       const ids = plain.split(/\r?\n|,/).map((s) => s.trim()).filter(Boolean);
-      if (ids.length > 0) onMoveAssets(ids, path, isCopy);
+      if (ids.length > 0) {
+        onMoveAssets(ids, path, isCopy);
+        return;
+      }
+    }
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const filePaths: string[] = [];
+      for (let i = 0; i < e.dataTransfer.files.length; i++) {
+        const file = e.dataTransfer.files[i];
+        const p = (file as unknown as { path?: string }).path;
+        if (p) filePaths.push(p);
+      }
+      if (filePaths.length > 0) {
+        onMoveAssets(filePaths, path, isCopy);
+        return;
+      }
     }
   };
 

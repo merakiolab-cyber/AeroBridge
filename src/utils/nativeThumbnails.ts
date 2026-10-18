@@ -21,6 +21,8 @@ import {
   extractTiffThumbnail,
   extractPostScriptThumbnail,
   extractOfficeThumbnail,
+  extractStlThumbnail,
+  extractObjThumbnail,
   findPdfOffset,
   getImageDimensions,
 } from './adobeThumbnailExtractor';
@@ -345,8 +347,14 @@ async function doGenerateNativeThumbnail(asset: AssetItem, path: string, ext: st
         return null;
       }
 
-      case 'video':
+      case 'video': {
+        // Step 1: Windows Shell thumbnail provider (instant hardware-accelerated preview for MP4, AVI, MOV, WMV, MKV)
+        const shellThumb = await getNativeShellThumbnail(path, 600);
+        if (shellThumb) return await withDims(shellThumb);
+
+        // Step 2: Fallback to HTML5 video snapshot via Chromium for web-compatible video
         return await videoSnapshot(toDesktopAssetUrl(path));
+      }
 
       case 'pdf': {
         // 1. Windows native Shell thumbnail provider (instant if Acrobat / PowerToys / Sumatra is installed)
@@ -432,11 +440,20 @@ async function doGenerateNativeThumbnail(asset: AssetItem, path: string, ext: st
       }
 
       case 'adobe-psd': {
-        const xmp = await extractNativeXmpThumbnail(path, 48);
-        if (xmp) return await withDims(xmp);
+        // Step 1: Parse embedded Photoshop resource 1036/1033 / XMP thumbnail from file header
         const head = await readNativeFileBinary(path, 16 * MB);
         const thumb = extractPsdThumbnail(head);
-        return thumb ? await withDims(thumb) : null;
+        if (thumb) return await withDims(thumb);
+
+        // Step 2: Native XMP metadata scan through Rust
+        const xmp = await extractNativeXmpThumbnail(path, 48);
+        if (xmp) return await withDims(xmp);
+
+        // Step 3: Windows Shell thumbnail provider (Photoshop / Adobe Bridge / SageThumbs / MysticThumbs)
+        const shellThumb = await getNativeShellThumbnail(path, 800);
+        if (shellThumb) return await withDims(shellThumb);
+
+        return null;
       }
 
       case 'raw': {
@@ -536,13 +553,13 @@ async function doGenerateNativeThumbnail(asset: AssetItem, path: string, ext: st
       }
 
       case 'blend': {
-        // Step 1: Extract embedded 3D scene preview from TEST block in .blend header
-        const head = await readNativeFileBinary(path, 1 * MB);
+        // Step 1: Extract embedded 3D scene preview from TEST block in .blend header (up to 4MB)
+        const head = await readNativeFileBinary(path, 4 * MB);
         const res = extractBlendThumbnail(head, asset.name);
         if (res && res.url) {
           return { url: res.url, dimensions: { width: res.width, height: res.height }, isIcon: false };
         }
-        // Step 2: Try Windows Shell thumbnail provider if registered
+        // Step 2: Try Windows Shell thumbnail provider (Blender shell thumbnailer)
         const shellThumb = await getNativeShellThumbnail(path, 600);
         if (shellThumb) {
           return await withDims(shellThumb);
@@ -550,15 +567,61 @@ async function doGenerateNativeThumbnail(asset: AssetItem, path: string, ext: st
         return null;
       }
 
+      case '3d': {
+        // Step 1: Windows 10/11 native Shell thumbnail provider (3D Viewer / Print 3D / Paint 3D / CAD shell extensions)
+        const shellThumb = await getNativeShellThumbnail(path, 600);
+        if (shellThumb) return await withDims(shellThumb);
+
+        // Step 2: Format-specific specialized extractors
+        if (ext === 'stl') {
+          const buf = await readNativeFileBinary(path, 16 * MB);
+          const stlRes = extractStlThumbnail(buf);
+          if (stlRes) return { url: stlRes.url, dimensions: { width: stlRes.width, height: stlRes.height }, isIcon: false };
+        } else if (ext === 'obj') {
+          const buf = await readNativeFileBinary(path, 16 * MB);
+          const objRes = extractObjThumbnail(buf);
+          if (objRes) return { url: objRes.url, dimensions: { width: objRes.width, height: objRes.height }, isIcon: false };
+        } else if (ext === 'zpr' || ext === 'ztl') {
+          const head = await readNativeFileBinary(path, 16 * MB);
+          const jpeg = extractEmbeddedJpeg(head, 2048, 16 * MB);
+          if (jpeg) return await withDims(jpeg);
+        }
+        return null;
+      }
+
       default: {
         if (ext === 'blend' || ext === 'blend1' || ext === 'blend2') {
-          const head = await readNativeFileBinary(path, 1 * MB);
+          const head = await readNativeFileBinary(path, 4 * MB);
           const res = extractBlendThumbnail(head, asset.name);
           if (res && res.url) {
             return { url: res.url, dimensions: { width: res.width, height: res.height }, isIcon: false };
           }
           const shellThumb = await getNativeShellThumbnail(path, 600);
           if (shellThumb) return await withDims(shellThumb);
+          return null;
+        }
+        if (ext === 'stl') {
+          const shellThumb = await getNativeShellThumbnail(path, 600);
+          if (shellThumb) return await withDims(shellThumb);
+          const buf = await readNativeFileBinary(path, 16 * MB);
+          const stlRes = extractStlThumbnail(buf);
+          if (stlRes) return { url: stlRes.url, dimensions: { width: stlRes.width, height: stlRes.height }, isIcon: false };
+          return null;
+        }
+        if (ext === 'obj') {
+          const shellThumb = await getNativeShellThumbnail(path, 600);
+          if (shellThumb) return await withDims(shellThumb);
+          const buf = await readNativeFileBinary(path, 16 * MB);
+          const objRes = extractObjThumbnail(buf);
+          if (objRes) return { url: objRes.url, dimensions: { width: objRes.width, height: objRes.height }, isIcon: false };
+          return null;
+        }
+        if (ext === 'zpr' || ext === 'ztl') {
+          const shellThumb = await getNativeShellThumbnail(path, 600);
+          if (shellThumb) return await withDims(shellThumb);
+          const head = await readNativeFileBinary(path, 16 * MB);
+          const jpeg = extractEmbeddedJpeg(head, 2048, 16 * MB);
+          if (jpeg) return await withDims(jpeg);
           return null;
         }
         // Fallback check for .rif, .riff, .tif, .tiff in case asset was classified differently

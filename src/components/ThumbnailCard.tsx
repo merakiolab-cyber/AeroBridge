@@ -4,7 +4,7 @@ import { formatBytes } from '../utils/localFileSystem';
 import { Copy, Eye, FileText, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Win11Folder } from './Win11Icons';
 import { FileTypeBadge } from './AppIcons';
-import { getNativeFileIcon } from '../utils/tauriBridge';
+import { getNativeFileIcon, isDesktopApp, startNativeFileDrag } from '../utils/tauriBridge';
 
 interface ThumbnailCardProps {
   asset: AssetItem;
@@ -72,13 +72,25 @@ const ThumbnailCardComponent: React.FC<ThumbnailCardProps> = ({
   };
 
   const handleDrag = (e: React.DragEvent) => {
+    (window as any).__isInternalDragging = true;
     if (onDragStart) {
       onDragStart(asset, e);
-    } else {
-      e.dataTransfer.setData('application/json', JSON.stringify({ assetIds: [asset.id], paths: asset.fullPath ? [asset.fullPath] : [] }));
-      e.dataTransfer.setData('text/plain', asset.fullPath || asset.id);
-      e.dataTransfer.effectAllowed = 'copyMove';
+      return;
     }
+    if (isDesktopApp() && asset.fullPath) {
+      e.preventDefault();
+      const icon = asset.url?.startsWith('data:image/png;base64,') ? asset.url : undefined;
+      void startNativeFileDrag([asset.fullPath], icon);
+      return;
+    }
+    e.dataTransfer.setData('application/x-aerobridge-asset', asset.id);
+    e.dataTransfer.setData('application/json', JSON.stringify({ assetIds: [asset.id], paths: asset.fullPath ? [asset.fullPath] : [] }));
+    e.dataTransfer.setData('text/plain', asset.fullPath || asset.id);
+    e.dataTransfer.effectAllowed = 'copyMove';
+  };
+
+  const handleDragEnd = () => {
+    (window as any).__isInternalDragging = false;
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -91,6 +103,7 @@ const ThumbnailCardComponent: React.FC<ThumbnailCardProps> = ({
 
   const handleDragLeave = (e: React.DragEvent) => {
     if (!asset.isFolder) return;
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
     e.preventDefault();
     e.stopPropagation();
     setIsDragTarget(false);
@@ -111,6 +124,7 @@ const ThumbnailCardComponent: React.FC<ThumbnailCardProps> = ({
     <div
       draggable
       onDragStart={handleDrag}
+      onDragEnd={handleDragEnd}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}

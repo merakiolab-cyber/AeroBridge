@@ -13,6 +13,8 @@ import {
   extractHtmlThumbnail,
   extractTiffThumbnail,
   extractVideoThumbnail,
+  extractStlThumbnail,
+  extractObjThumbnail,
   getAdobeFileType,
   getImageDimensions,
 } from './adobeThumbnailExtractor';
@@ -190,6 +192,23 @@ export async function parseFilesToAssets(
         } else {
           previewUrl = URL.createObjectURL(file);
           dimensions = await getImageDimensions(previewUrl);
+        }
+      } else if (category === '3d') {
+        const ext = extension.toLowerCase();
+        if (ext === 'stl') {
+          const buffer = await file.slice(0, 1024 * 1024 * 16).arrayBuffer();
+          const stlRes = extractStlThumbnail(buffer);
+          if (stlRes) {
+            previewUrl = stlRes.url;
+            dimensions = { width: stlRes.width, height: stlRes.height };
+          }
+        } else if (ext === 'obj') {
+          const buffer = await file.slice(0, 1024 * 1024 * 16).arrayBuffer();
+          const objRes = extractObjThumbnail(buffer);
+          if (objRes) {
+            previewUrl = objRes.url;
+            dimensions = { width: objRes.width, height: objRes.height };
+          }
         }
       } else {
         // PDF, After Effects, Premiere, and other formats

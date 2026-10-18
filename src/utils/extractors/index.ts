@@ -9,3 +9,4 @@ export * from './blendExtractor';
 export * from './vectorHtmlExtractor';
 export * from './officeExtractor';
 export * from './imageHeaderParser';
+export * from './threeDeeExtractor';

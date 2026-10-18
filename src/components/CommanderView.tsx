@@ -39,6 +39,7 @@ import {
   showFilePropertiesNative,
   getNativeFileIcon,
   isDesktopApp,
+  startNativeFileDrag,
   type NativeFileEntry,
   type NativePlace,
 } from '../utils/tauriBridge';
@@ -1641,16 +1642,6 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
           }}
           className="flex-1 overflow-y-auto divide-y divide-white/[0.02] font-mono text-xs select-none focus:outline-none relative"
         >
-          {/* Drag over pane indicator banner */}
-          {dragTargetPane === paneKey && !dragTargetFolder && (
-            <div className="sticky top-0 z-10 bg-[#60cdff]/20 border-b border-[#60cdff]/40 text-[#60cdff] px-3 py-1.5 flex items-center justify-between text-xs backdrop-blur-xs select-none animate-pulse">
-              <span className="font-semibold flex items-center gap-1.5">
-                <Move className="w-3.5 h-3.5 text-[#60cdff]" />
-                Pusťte myš pro přesun do této složky
-              </span>
-              <span className="text-[10px] text-zinc-400 font-mono">Držte Ctrl pro kopírování</span>
-            </div>
-          )}
 
           {/* Row 0: Parent Directory [..] */}
           {parentDir && (
@@ -1743,11 +1734,6 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
                     : [it.path];
 
                   activeDragPayload = { paths: selPaths, sourcePane: paneKey };
-                  try {
-                    e.dataTransfer.setData('text/plain', selPaths.join('\n'));
-                    e.dataTransfer.setData('application/json', JSON.stringify({ paths: selPaths, sourcePane: paneKey }));
-                  } catch {}
-                  e.dataTransfer.effectAllowed = 'copyMove';
 
                   // Defer React selection state update to next tick so Chromium doesn't abort dragstart
                   setTimeout(() => {
@@ -1761,6 +1747,18 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
                       }));
                     }
                   }, 0);
+
+                  if (isDesktopApp() && selPaths.length > 0) {
+                    e.preventDefault();
+                    void startNativeFileDrag(selPaths);
+                    return;
+                  }
+
+                  try {
+                    e.dataTransfer.setData('text/plain', selPaths.join('\n'));
+                    e.dataTransfer.setData('application/json', JSON.stringify({ paths: selPaths, sourcePane: paneKey }));
+                  } catch {}
+                  e.dataTransfer.effectAllowed = 'copyMove';
                 }}
                 onDragEnd={() => {
                   setTimeout(() => {
@@ -1991,7 +1989,7 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
         <div className="flex items-center gap-2.5">
           <Columns2 className="w-4 h-4 text-[#60cdff]" />
           <span className="font-semibold text-white tracking-wide">
-            Commander — Dvoupanelový správce souborů
+            Commender — Dvoupanelový správce souborů
           </span>
           <span className="text-[10px] bg-white/[0.06] px-1.5 py-0.5 rounded text-zinc-400 font-mono">
             Total Commander Mode

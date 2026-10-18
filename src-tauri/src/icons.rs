@@ -181,7 +181,8 @@ mod win {
 
     unsafe fn shell_thumbnail_worker(path: &str, size: u32) -> Option<Vec<u8>> {
         use windows::Win32::UI::Shell::{
-            IShellItemImageFactory, SHCreateItemFromParsingName, SIIGBF_BIGGERSIZEOK, SIIGBF_THUMBNAILONLY,
+            IShellItemImageFactory, SHCreateItemFromParsingName, SIIGBF_BIGGERSIZEOK,
+            SIIGBF_SCALEUP, SIIGBF_THUMBNAILONLY,
         };
         use windows::Win32::Foundation::SIZE;
         use windows::Win32::System::Com::{CoInitializeEx, CoUninitialize, COINIT_APARTMENTTHREADED};
@@ -200,9 +201,15 @@ mod win {
 
         let sz = SIZE { cx: size as i32, cy: size as i32 };
         // SIIGBF_THUMBNAILONLY ensures Windows only returns actual thumbnails from thumbnail providers.
-        // It prevents Windows from returning the generic file icon when no thumbnail provider exists.
-        let bmp = item.GetImage(sz, SIIGBF_THUMBNAILONLY | SIIGBF_BIGGERSIZEOK)
-            .or_else(|_| item.GetImage(sz, SIIGBF_THUMBNAILONLY));
+        // Try requested size with SCALEUP first; then fallback to 256px if provider caps at standard size.
+        let bmp = item.GetImage(sz, SIIGBF_THUMBNAILONLY | SIIGBF_SCALEUP)
+            .or_else(|_| item.GetImage(sz, SIIGBF_THUMBNAILONLY | SIIGBF_BIGGERSIZEOK))
+            .or_else(|_| item.GetImage(sz, SIIGBF_THUMBNAILONLY))
+            .or_else(|_| {
+                let sz256 = SIZE { cx: 256, cy: 256 };
+                item.GetImage(sz256, SIIGBF_THUMBNAILONLY | SIIGBF_SCALEUP)
+                    .or_else(|_| item.GetImage(sz256, SIIGBF_THUMBNAILONLY))
+            });
 
         let Ok(bmp) = bmp else {
             if co_init {

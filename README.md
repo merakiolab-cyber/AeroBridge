@@ -109,18 +109,24 @@ cd AeroBridge
 # 2. Instalace závislostí
 npm install
 
-# 3a. Spuštění jako nativní Windows 11 desktop aplikace (Doporučeno)
+# 3a. Spuštění ve vývojovém režimu (s hot-reloadem změn)
 npm run desktop:dev
 
 # 3b. Nebo spuštění ve webovém prohlížeči
 npm run dev
 ```
 
-### Sestavení standalone instalačního balíčku (.exe / MSI)
+### Sestavení a spuštění finálního balíčku (.exe)
 
 ```bash
-# Vytvoří kompaktní instalační balíček (~15 MB) bez závislosti na Node.js
+# 1. Pouhé sestavení standalone instalátoru a release .exe (skončí po sestavení bez spuštění)
 npm run desktop:build
+
+# 2. Spuštění již sestavené release .exe aplikace
+npm run desktop:preview
+
+# 3. Sestavení a okamžité spuštění release verze
+npm run desktop:start
 ```
 
 ### Sestavení pro produkční web

@@ -1,6 +1,6 @@
 export type WorkspaceView = 'browser' | 'essentials' | 'filmstrip' | 'compare' | 'table' | 'commander';
 export type BrowserViewMode = 'grid' | 'table';
-export type AssetType = 'image' | 'raw' | 'vector' | 'document' | 'video' | 'adobe-psd' | 'adobe-ai' | 'adobe-indd' | 'adobe-ae' | 'adobe-pr' | 'adobe-xd' | 'pdf' | 'painter' | 'figma' | 'html' | 'krita' | 'blend' | 'other';
+export type AssetType = 'image' | 'raw' | 'vector' | 'document' | 'video' | 'adobe-psd' | 'adobe-ai' | 'adobe-indd' | 'adobe-ae' | 'adobe-pr' | 'adobe-xd' | 'pdf' | 'painter' | 'figma' | 'html' | 'krita' | 'blend' | '3d' | 'other';
 
 export interface ExifData {
   camera?: string;
@@ -33,7 +33,7 @@ export interface AssetItem {
   fullPath?: string;
   url: string;
   type: AssetType;
-  category: 'image' | 'raw' | 'adobe-psd' | 'adobe-ai' | 'adobe-indd' | 'adobe-ae' | 'adobe-pr' | 'adobe-xd' | 'pdf' | 'video' | 'vector' | 'painter' | 'figma' | 'html' | 'krita' | 'blend' | 'other';
+  category: 'image' | 'raw' | 'adobe-psd' | 'adobe-ai' | 'adobe-indd' | 'adobe-ae' | 'adobe-pr' | 'adobe-xd' | 'pdf' | 'video' | 'vector' | 'painter' | 'figma' | 'html' | 'krita' | 'blend' | '3d' | 'other';
   format: string;
   extension: string;
   colorBadge: string;

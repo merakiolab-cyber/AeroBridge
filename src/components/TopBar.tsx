@@ -140,6 +140,8 @@ export const TopBar: React.FC<TopBarProps> = ({
     { id: 'painter', label: 'Corel Painter (.rif)', color: '#f97316' },
     { id: 'tiff', label: 'TIFF snímky (.tif)', color: '#14b8a6' },
     { id: 'pdf', label: 'PDF dokumenty', color: '#ff2d20' },
+    { id: 'blend', label: 'Blender 3D (.blend)', color: '#ea7600' },
+    { id: '3d', label: '3D Modely (.obj, .stl, .zpr)', color: '#06b6d4' },
     { id: 'image', label: 'Všechny obrázky a foto', color: '#84cc16' },
     { id: 'video', label: 'Videa a klipy', color: '#8b5cf6' },
   ];
@@ -163,9 +165,9 @@ export const TopBar: React.FC<TopBarProps> = ({
 
   return (
     <header className="flex flex-col bg-[#16171a] border-b border-white/[0.06] shrink-0 select-none">
-      {/* ROW 1: Brand, Breadcrumbs, Views & 3-Dots Menu */}
+      {/* ROW 1: Brand, Views & 3-Dots Menu */}
       <div className="flex items-center justify-between gap-6 px-6 py-2.5 border-b border-white/[0.04]">
-        {/* Left: Brand Wordmark + Breadcrumb */}
+        {/* Left: Brand Wordmark */}
         <div className="flex items-center gap-3 shrink-0">
           <a
             href="/"
@@ -175,22 +177,6 @@ export const TopBar: React.FC<TopBarProps> = ({
             <span className="tracking-widest">AeroBridge</span>
             <span className="text-[10px] text-zinc-400 font-mono tracking-normal normal-case px-1.5 py-0.5 rounded bg-white/[0.06] border border-white/10">v3.27.25</span>
           </a>
-
-          <span className="text-white/20">/</span>
-
-          <div className="flex items-center gap-1.5 text-xs text-zinc-400 truncate max-w-xs sm:max-w-md">
-            <Folder className="w-3.5 h-3.5 text-[#e2e4e9] shrink-0" />
-            <span className="text-[#e2e4e9] font-medium truncate">
-              {activeFolder === '/'
-                ? 'Všechna média'
-                : activeFolder.startsWith('native:')
-                ? activeFolder.slice(7)
-                : activeFolder.replace(/^\//, '').replace(/\//g, ' / ')}
-            </span>
-            <span className="text-zinc-500 font-mono text-[11px] tabular-nums">
-              ({totalFilteredCount})
-            </span>
-          </div>
         </div>
 
         {/* Center: Workspace View Selector */}
@@ -245,7 +231,7 @@ export const TopBar: React.FC<TopBarProps> = ({
             title="Dvoupanelový správce souborů (a la Total Commander)"
           >
             <Columns2 className="w-3.5 h-3.5" />
-            <span>Commander</span>
+            <span>Commender</span>
           </button>
         </nav>
 

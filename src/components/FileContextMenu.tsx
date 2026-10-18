@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ExternalLink,
   FolderOpen,
@@ -14,9 +14,17 @@ import {
   CheckSquare,
   Sparkles,
   Terminal,
+  AppWindow,
+  ChevronRight,
 } from 'lucide-react';
 import { AssetItem } from '../types';
 import { Win11Star } from './Win11Icons';
+import {
+  getAssociatedApps,
+  openFileWithApp,
+  type AssociatedApp,
+  isDesktopApp,
+} from '../utils/tauriBridge';
 
 export interface ContextMenuTarget {
   type: 'asset' | 'background' | 'folder';
@@ -132,6 +140,38 @@ export const FileContextMenu: React.FC<FileContextMenuProps> = ({
 
   const canPaste = !!destFolder;
 
+  // Single or primary file path for Open With
+  const targetFilePath = singleAsset?.fullPath || (isAssetTarget && selectedList[0]?.fullPath);
+
+  const [associatedApps, setAssociatedApps] = useState<AssociatedApp[]>([]);
+  const [isOpenWithOpen, setIsOpenWithOpen] = useState(false);
+  const openWithTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!targetFilePath || isFolderAsset || !isDesktopApp()) {
+      setAssociatedApps([]);
+      return;
+    }
+    let isCurrent = true;
+    getAssociatedApps(targetFilePath).then((apps) => {
+      if (isCurrent) setAssociatedApps(apps);
+    });
+    return () => {
+      isCurrent = false;
+    };
+  }, [targetFilePath, isFolderAsset]);
+
+  const handleOpenWithMouseEnter = () => {
+    if (openWithTimeoutRef.current) clearTimeout(openWithTimeoutRef.current);
+    setIsOpenWithOpen(true);
+  };
+
+  const handleOpenWithMouseLeave = () => {
+    openWithTimeoutRef.current = setTimeout(() => {
+      setIsOpenWithOpen(false);
+    }, 200);
+  };
+
   // Calculate adjusted position to keep menu inside viewport
   const menuWidth = 240;
   const menuEstimatedHeight = isAssetTarget ? 320 : 180;
@@ -168,6 +208,80 @@ export const FileContextMenu: React.FC<FileContextMenuProps> = ({
             </div>
             <span className="text-[10px] text-zinc-500 font-mono">Enter</span>
           </button>
+
+          {/* Otevřít v programu (Open with...) submenu */}
+          {!isFolderAsset && targetFilePath && (
+            <div
+              className="relative"
+              onMouseEnter={handleOpenWithMouseEnter}
+              onMouseLeave={handleOpenWithMouseLeave}
+            >
+              <button
+                type="button"
+                onClick={() => setIsOpenWithOpen((prev) => !prev)}
+                className={`w-full flex items-center justify-between px-3 py-1.5 text-left rounded-none transition-colors cursor-pointer group ${
+                  isOpenWithOpen ? 'bg-white/[0.08] text-white' : 'hover:bg-white/[0.08] hover:text-white'
+                }`}
+              >
+                <div className="flex items-center gap-2.5 font-normal">
+                  <AppWindow className="w-4 h-4 text-zinc-400 group-hover:text-white" />
+                  <span>Otevřít v programu</span>
+                </div>
+                <ChevronRight className="w-3.5 h-3.5 text-zinc-500 group-hover:text-white transition-transform" />
+              </button>
+
+              {isOpenWithOpen && (
+                <div
+                  className={`absolute z-[120] min-w-[220px] max-w-[280px] py-1 px-1 bg-[#181a20]/95 backdrop-blur-xl border border-white/10 rounded-none shadow-[0_12px_40px_rgba(0,0,0,0.7)] text-xs text-zinc-300 font-sans select-none animate-in fade-in zoom-in-95 duration-100 ${
+                    left + menuWidth + 230 > screenW ? 'right-full mr-1' : 'left-full ml-1'
+                  } top-0`}
+                  onMouseEnter={handleOpenWithMouseEnter}
+                  onMouseLeave={handleOpenWithMouseLeave}
+                >
+                  {associatedApps.length > 0 ? (
+                    associatedApps.map((app) => (
+                      <button
+                        key={app.exe_name}
+                        onClick={() => {
+                          onClose();
+                          void openFileWithApp(targetFilePath, app.path || app.exe_name);
+                        }}
+                        className="w-full flex items-center justify-between px-2.5 py-1.5 text-left rounded-none hover:bg-white/[0.08] hover:text-white transition-colors cursor-pointer group"
+                        title={app.path || app.exe_name}
+                      >
+                        <div className="flex items-center gap-2 truncate pr-2">
+                          <AppWindow className="w-3.5 h-3.5 text-zinc-400 group-hover:text-[#60cdff] shrink-0" />
+                          <span className="truncate">{app.name}</span>
+                        </div>
+                        {app.is_default && (
+                          <span className="text-[9px] px-1.5 py-0.5 bg-[#60cdff]/15 text-[#60cdff] font-medium border border-[#60cdff]/30 shrink-0">
+                            výchozí
+                          </span>
+                        )}
+                      </button>
+                    ))
+                  ) : (
+                    <div className="px-3 py-1.5 text-[11px] text-zinc-500 italic">
+                      Hledám aplikace...
+                    </div>
+                  )}
+
+                  <div className="h-px bg-white/[0.08] my-1" />
+
+                  <button
+                    onClick={() => {
+                      onClose();
+                      void openFileWithApp(targetFilePath, 'openas');
+                    }}
+                    className="w-full flex items-center gap-2 px-2.5 py-1.5 text-left rounded-none hover:bg-white/[0.08] hover:text-white transition-colors cursor-pointer group"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5 text-zinc-400 group-hover:text-white shrink-0" />
+                    <span>Vybrat jinou aplikaci...</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           {singleAsset?.fullPath && (
             <button

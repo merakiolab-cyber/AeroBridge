@@ -2,7 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import { AssetItem, SortField, SortOrder } from '../types';
 import { formatBytes, formatDate } from '../utils/localFileSystem';
 import { Copy, FileText, ArrowUp, ArrowDown } from 'lucide-react';
-import { getNativeFileIcon, toDesktopAssetUrl } from '../utils/tauriBridge';
+import { getNativeFileIcon, toDesktopAssetUrl, isDesktopApp, startNativeFileDrag } from '../utils/tauriBridge';
 import { getResolutionInfo } from '../utils/extractors';
 import { Win11Folder } from './Win11Icons';
 import { FileTypeBadge } from './AppIcons';
@@ -83,6 +83,13 @@ export const MetadataTableView: React.FC<MetadataTableViewProps> = ({
     const paths = itemsToDrag.map((a) => a.fullPath).filter(Boolean) as string[];
     const ids = itemsToDrag.map((a) => a.id);
 
+    if (isDesktopApp() && paths.length > 0) {
+      e.preventDefault();
+      const icon = asset.url?.startsWith('data:image/png;base64,') ? asset.url : undefined;
+      void startNativeFileDrag(paths, icon);
+      return;
+    }
+
     e.dataTransfer.setData('application/json', JSON.stringify({ assetIds: ids, paths }));
     e.dataTransfer.setData('text/plain', paths.length > 0 ? paths.join('\r\n') : ids.join(','));
     e.dataTransfer.effectAllowed = 'copyMove';
@@ -109,6 +116,20 @@ export const MetadataTableView: React.FC<MetadataTableViewProps> = ({
       const items = plain.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
       if (items.length > 0) {
         onMoveAssets?.(items, targetFolderPath, isCopy);
+        return;
+      }
+    }
+
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const filePaths: string[] = [];
+      for (let i = 0; i < e.dataTransfer.files.length; i++) {
+        const file = e.dataTransfer.files[i];
+        const p = (file as unknown as { path?: string }).path;
+        if (p) filePaths.push(p);
+      }
+      if (filePaths.length > 0) {
+        onMoveAssets?.(filePaths, targetFolderPath, isCopy);
+        return;
       }
     }
   };

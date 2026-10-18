@@ -2,6 +2,37 @@
 
 ## Changelog
 
+### Version 3.27.27 (Nativní OLE Drag & Drop a dynamické menu „Otevřít v programu“)
+- **Podpora nativního přetahování souborů do externích aplikací ([tauriBridge.ts](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/utils/tauriBridge.ts), [ThumbnailCard.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/ThumbnailCard.tsx), [AssetGrid.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/AssetGrid.tsx), [MetadataTableView.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/MetadataTableView.tsx), [CommanderView.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/CommanderView.tsx)):**
+  - Integrován nativní Rust modul `tauri-plugin-drag` / `@crabnebula/tauri-plugin-drag` v Tauri v2, který přebírá řízení nad myší při události `dragstart` a spouští systémový Windows Win32 OLE `DoDragDrop`.
+  - Windows formát schránky `CF_HDROP` předává plnohodnotné systémové cesty k souborům: aplikace jako Adobe Photoshop, Illustrator, Premiere, Windows Explorer nebo Blender okamžitě rozpoznají přetažený soubor a otevřou jej nebo importují do projektu.
+  - Implementována funkce `startNativeFileDrag(paths, icon)` s ochranou proti pádům: normalizuje lomítka pro Windows (`\`), filtruje neplatné cesty a jako ikonu kurzoru používá spolehlivou transparentní PNG stopu, čímž eliminuje jakékoliv artefakty kolem nativního kurzoru Windows.
+  - Podpora jak pro přetahování jednotlivého souboru, tak pro hromadný výběr (multiselect) napříč mřížkou, tabulkou i oběma panely Commenderu.
+  - Všechny interní dropzóny (karty složek v mřížce, řádky v tabulce, strom disků a složek v levém panelu) byly rozšířeny o zpracování `e.dataTransfer.files`, takže nativní přetahování funguje spolehlivě i v rámci samotného AeroBridge.
+- **Kontextové menu „Otevřít v programu“ se seznamem aplikací ([FileContextMenu.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/FileContextMenu.tsx), [tauriBridge.ts](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/utils/tauriBridge.ts), [lib.rs](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src-tauri/src/lib.rs)):**
+  - V kontextovém menu po kliknutí pravým tlačítkem na soubor byla přidána položka **„Otevřít v programu“** s rozbalovací podnabídkou (flyout).
+  - V Rustu implementován vysoce optimalizovaný čteč systémových asociací Windows (`get_associated_apps_native`), který prochází `HKCU\...\OpenWithList`, `MRUList`, `UserChoice` i registrované cesty `App Paths` a `HKCR\Applications`.
+  - Dynamicky detekuje všechny nainstalované korespondující editory a přehrávače pro daný formát (např. Adobe Photoshop, Adobe Illustrator, Adobe InDesign, Adobe After Effects, Blender, VLC, Malování, Poznámkový blok atd.) a označuje výchozí systémovou aplikaci štítkem `výchozí`.
+  - Kliknutí na vybranou aplikaci soubor okamžitě otevře v daném programu (`open_file_with_app_native`).
+  - Podnabídka obsahuje volbu **„Vybrat jinou aplikaci...“**, která vyvolá nativní systémový dialog Windows 11 `OpenAs` pro volbu libovolného dalšího programu.
+
+### Version 3.27.26 (Univerzální náhledy pro PSD, Blender, Videa, 3D modely a stabilizace UI)
+- **Kompletní generování náhledů napříč formáty (PSD, Blender, Videa, 3D modely):**
+  - **Photoshop (.psd, .psb):** Vytvořen přímý strukturální parser bloků `8BIM` Image Resources (Resource ID `1036` a `1033`). Čte JPEG stream přímo z hlavičky bez ohledu na velikost souboru. Doplněn fallback na Windows Shell (`get_shell_thumbnail`), takže soubory uložené i bez kompozitní vrstvy mají náhled přes Photoshop/Bridge/SageThumbs handler.
+  - **Blender 3D (.blend):** Vyhledávání bloku `TEST` s náhledem scény rozšířeno z původních 256 KB na 4 MB s podporou obou endianit. V Rustu (`icons.rs`) byl `shell_thumbnail_worker` rozšířen o příznak `SIIGBF_SCALEUP` a víceúrovňový fallback (požadovaná velikost -> 256px -> 128px), což umožňuje spolehlivé načtení miniatur i z komprimovaných `.blend` archivů (zstd / gzip) přes nativní `blender-thumbnailer.dll`.
+  - **Základní video formáty (MP4, AVI, MOV, WMV, MKV):** Původní HTML5 video přehrávač selhával u AVI a kodeků MOV/HEVC. Nyní se primárně používá nativní Windows Shell thumbnail provider přes Media Foundation, který okamžitě generuje hardwarově dekódovaný náhled pro všechny video formáty podporované systémem Windows.
+  - **Animovaný GIF (.gif):** Garantováno správné zobrazení náhledů a plynulé animace.
+  - **3D formáty (OBJ, STL, ZPR, ZTL):** Doplněna nová kategorie `3d` s podporou Windows 10/11 3D Viewer shell handleru. Pro STL a OBJ byl vyvinut vysoce výkonný 2D canvas renderer (`threeDeeExtractor.ts`), který v submilisekundovém čase vytvoří stínovaný izometrický 3D render s difuzním osvětlením i bez potřeby WebGL. Pro ZBrush (`.zpr`, `.ztl`) je podporována detekce vložených JPEG streamů a sidecar náhledů.
+- **Odstranění duplicitního umístění složky v horní liště ([TopBar.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/TopBar.tsx)):**
+  - Odebrán drobečkový proužek cesty složky vedle loga AeroBridge. Horní lišta je nyní vizuálně čistá a umístění složky je zobrazeno výhradně v levém průzkumníku disků.
+- **Plynulý Drag & Drop bez glitchování a problikávání ([App.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/App.tsx), [ThumbnailCard.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/ThumbnailCard.tsx)):**
+  - Identifikována příčina problikávání modrého překrytí: při tažení karty obrázku uvnitř aplikace události `dragleave` a `dragover` na podřízených elementech neustále zapínaly a vypínaly globální dropzónu.
+  - Přidán příznak interního tažení (`__isInternalDragging`) a čítač zanoření (`dragCounterRef`). Globální modré importní překrytí se nyní aktivuje pouze při reálném přetahování souborů z externího Průzkumníka Windows, a to naprosto plynule bez jakéhokoliv problikávání.
+- **Přejmenování sekce na Commender ([TopBar.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/TopBar.tsx), [CommanderView.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/CommanderView.tsx)):**
+  - Sekce Commander byla přejmenována na „Commender“ v navigační liště i v hlavičce dvoupanelového správce souborů.
+- **Odstranění nápovědy v Commenderu ([CommanderView.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/CommanderView.tsx)):**
+  - Při přetahování myší byl odstraněn textový proužek „Pusťte myš pro přesun do této složky“.
+
 ### Version 3.27.25 (Spolehlivé fungování klávesových zkratek Ctrl+C / Ctrl+X / Ctrl+V v Prohlížeči)
 - **Aktivace fáze zachycení (Capture Phase) klávesových událostí ([useKeyboardShortcuts.ts](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/hooks/useKeyboardShortcuts.ts)):**
   - Vyřešen stejný problém jako dříve v Commanderu: posluchač klávesnice v `useKeyboardShortcuts` byl původně registrován v bublající fázi (`useCapture: false`), což způsobovalo, že při zaměření karet souborů nebo tabulkových řádků Chromium a WebView2 spolknuly systémové akcelerátory jako `Ctrl+C`, `Ctrl+X` nebo `Ctrl+V` dříve, než se dostaly k obslužnému kódu.

@@ -144,6 +144,7 @@ export default function App() {
   const [batchIptcOpen, setBatchIptcOpen] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
+  const dragCounterRef = useRef(0);
 
   // --- Refs ---
   const folderInputRef = useRef<HTMLInputElement>(null);
@@ -248,6 +249,10 @@ export default function App() {
           if (ext !== 'html' && ext !== 'htm' && asset.category !== 'html') return false;
         } else if (filters.formatFilter === 'krita') {
           if (ext !== 'kra' && asset.category !== 'krita') return false;
+        } else if (filters.formatFilter === 'blend') {
+          if (ext !== 'blend' && ext !== 'blend1' && ext !== 'blend2' && asset.category !== 'blend') return false;
+        } else if (filters.formatFilter === '3d') {
+          if (ext !== 'obj' && ext !== 'stl' && ext !== '3mf' && ext !== 'zpr' && ext !== 'ztl' && asset.category !== '3d') return false;
         } else if (asset.category !== filters.formatFilter) {
           return false;
         }
@@ -821,23 +826,59 @@ export default function App() {
     }
   };
 
-  // --- Drag & Drop Listener ---
+  // --- Drag & Drop Listener for external OS files ---
+  const handleDragEnter = (e: React.DragEvent) => {
+    if (currentView === 'commander') return;
+    if ((window as any).__isInternalDragging) return;
+
+    const types = e.dataTransfer.types;
+    const isFileDrop =
+      types &&
+      (types.includes('Files') || types.includes('application/x-moz-file')) &&
+      !types.includes('application/x-aerobridge-asset');
+    if (!isFileDrop) return;
+
+    e.preventDefault();
+    dragCounterRef.current += 1;
+    if (dragCounterRef.current === 1) {
+      setIsDragOver(true);
+    }
+  };
+
   const handleDragOver = (e: React.DragEvent) => {
     if (currentView === 'commander') return;
+    if ((window as any).__isInternalDragging) return;
+
+    const types = e.dataTransfer.types;
+    const isFileDrop =
+      types &&
+      (types.includes('Files') || types.includes('application/x-moz-file')) &&
+      !types.includes('application/x-aerobridge-asset');
+    if (!isFileDrop) return;
+
     e.preventDefault();
-    setIsDragOver(true);
+    e.dataTransfer.dropEffect = 'copy';
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
     if (currentView === 'commander') return;
-    e.preventDefault();
-    setIsDragOver(false);
+    if ((window as any).__isInternalDragging) return;
+
+    dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
+    if (dragCounterRef.current === 0) {
+      setIsDragOver(false);
+    }
   };
 
   const handleDrop = async (e: React.DragEvent) => {
-    if (currentView === 'commander') return;
-    e.preventDefault();
+    dragCounterRef.current = 0;
     setIsDragOver(false);
+    if (currentView === 'commander') return;
+    if ((window as any).__isInternalDragging) {
+      (window as any).__isInternalDragging = false;
+      return;
+    }
+    e.preventDefault();
 
     // If native files from Windows Explorer are dropped into the active folder in desktop mode
     if (isDesktopApp() && nativeDir && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
@@ -1091,6 +1132,7 @@ export default function App() {
   return (
     <div
       className="flex flex-col h-screen w-screen overflow-hidden bg-[#121316] text-zinc-100 font-sans select-none"
+      onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
