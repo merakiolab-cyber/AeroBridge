@@ -22,7 +22,6 @@ import {
   FileText,
   Terminal,
   Scissors,
-  ClipboardPaste,
 } from 'lucide-react';
 import {
   scanNativeFolder,
@@ -61,16 +60,7 @@ import { getAppIcon } from './AppIcons';
 import { AssetItem } from '../types';
 import { CommanderNotepad } from './CommanderNotepad';
 import { CommanderTerminal } from './CommanderTerminal';
-
-const TEXT_EXTENSIONS = new Set([
-  'txt', 'md', 'markdown', 'json', 'log', 'csv', 'tsv', 'ini', 'cfg', 'conf',
-  'js', 'ts', 'jsx', 'tsx', 'html', 'css', 'scss', 'xml', 'yaml', 'yml',
-  'rs', 'py', 'bat', 'cmd', 'ps1', 'sh', 'sql', 'toml', 'env'
-]);
-
-function isTextLikeFile(ext: string): boolean {
-  return TEXT_EXTENSIONS.has(ext.toLowerCase().replace(/^\./, ''));
-}
+import { isTextLikeFile } from '../utils/fileTypes';
 
 export interface CommanderViewProps {
   initialLeftPath?: string;
@@ -227,18 +217,19 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
   // Pane view mode: each pane can be toggled between 'files' (explorer), 'notepad' (scratchpad), and 'terminal'
   const [leftViewMode, setLeftViewMode] = useState<'files' | 'notepad' | 'terminal'>('files');
   const [rightViewMode, setRightViewMode] = useState<'files' | 'notepad' | 'terminal'>('files');
-  const [leftNotepadFile, setLeftNotepadFile] = useState<string | null>(null);
-  const [rightNotepadFile, setRightNotepadFile] = useState<string | null>(null);
+  const [leftNotepadTarget, setLeftNotepadTarget] = useState<{ path: string; timestamp: number } | null>(null);
+  const [rightNotepadTarget, setRightNotepadTarget] = useState<{ path: string; timestamp: number } | null>(null);
 
   // Open file in Notepad handler
   const handleOpenInNotepad = useCallback((filePath: string, preferredPane?: 'left' | 'right') => {
     const target = preferredPane || activePane;
+    const targetItem = { path: filePath, timestamp: Date.now() };
     if (target === 'left') {
-      setLeftNotepadFile(filePath);
+      setLeftNotepadTarget(targetItem);
       setLeftViewMode('notepad');
       setActivePane('left');
     } else {
-      setRightNotepadFile(filePath);
+      setRightNotepadTarget(targetItem);
       setRightViewMode('notepad');
       setActivePane('right');
     }
@@ -540,8 +531,8 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
     rightDisplayItems,
     leftViewMode,
     rightViewMode,
-    leftNotepadFile,
-    rightNotepadFile,
+    leftNotepadTarget,
+    rightNotepadTarget,
     clipboard,
     operationModal,
     contextMenuPos,
@@ -554,8 +545,8 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
     rightDisplayItems,
     leftViewMode,
     rightViewMode,
-    leftNotepadFile,
-    rightNotepadFile,
+    leftNotepadTarget,
+    rightNotepadTarget,
     clipboard,
     operationModal,
     contextMenuPos,
@@ -731,6 +722,8 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
     async (item: NativeFileEntry, paneKey: 'left' | 'right') => {
       if (item.is_dir) {
         navigatePane(item.path, paneKey);
+      } else if (isTextLikeFile(item.name, item.extension)) {
+        handleOpenInNotepad(item.path, paneKey);
       } else {
         try {
           await openFileNative(item.path);
@@ -740,7 +733,7 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
         }
       }
     },
-    [navigatePane, onNotify]
+    [navigatePane, handleOpenInNotepad, onNotify]
   );
 
   // Execute operation modal submit
@@ -1014,14 +1007,27 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
   // Keyboard navigation & Total Commander function shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if user is typing inside an input/textarea (blur if Escape)
+      const s = stateRef.current;
       const targetEl = e.target as HTMLElement | null;
-      if (
+
+      // Check if user is typing inside terminal or notepad, or an input/textarea
+      const isTerminalActive = (s.activePane === 'left' ? s.leftViewMode : s.rightViewMode) === 'terminal';
+      const isInsideTerminal = !!targetEl?.closest('.xterm') || !!targetEl?.closest('[data-terminal-container]');
+      const isInsideInput =
         targetEl?.tagName === 'INPUT' ||
         targetEl?.tagName === 'TEXTAREA' ||
-        targetEl?.isContentEditable
-      ) {
-        const s = stateRef.current;
+        targetEl?.isContentEditable;
+
+      // When terminal is active or focused, DO NOT steal keys!
+      if (isInsideTerminal || isTerminalActive) {
+        if (e.key === 'Escape' && s.operationModal.type) {
+          setOperationModal({ type: null, sourcePaths: [], sourceNames: [], targetDir: '', inputValue: '' });
+        }
+        return;
+      }
+
+      // Ignore if user is typing inside an input/textarea (blur if Escape)
+      if (isInsideInput) {
         if (e.key === 'Escape') {
           if (s.operationModal.type) {
             setOperationModal({ type: null, sourcePaths: [], sourceNames: [], targetDir: '', inputValue: '' });
@@ -1030,8 +1036,6 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
         }
         return;
       }
-
-      const s = stateRef.current;
 
       // Close modal on Escape
       if (s.operationModal.type) {
@@ -1473,18 +1477,6 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
                 </button>
               );
             })}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (isLeft) setLeftViewMode('terminal');
-                else setRightViewMode('terminal');
-              }}
-              className="p-1 rounded bg-white/[0.03] hover:bg-white/[0.1] text-zinc-400 hover:text-white transition-colors cursor-pointer ml-1"
-              title="Spustit integrovaný terminál v tomto okně"
-            >
-              <Terminal className="w-3.5 h-3.5 text-emerald-400" />
-            </button>
 
             {/* Pane View Mode Toggle: Soubory / Zápisník / Terminál */}
             <div className="flex items-center bg-black/40 p-0.5 rounded border border-white/10 shrink-0 ml-1.5">
@@ -1548,7 +1540,8 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
             paneKey={paneKey}
             currentPath={pane.currentPath}
             oppositeSelectedPaths={Array.from(oppositePane.selectedPaths)}
-            initialFilePath={isLeft ? leftNotepadFile : rightNotepadFile}
+            fileToOpen={isLeft ? leftNotepadTarget : rightNotepadTarget}
+            initialFilePath={isLeft ? leftNotepadTarget?.path : rightNotepadTarget?.path}
             onCloseNotepad={() => {
               if (isLeft) setLeftViewMode('files');
               else setRightViewMode('files');
@@ -1691,6 +1684,13 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
               </button>
             )}
           </div>
+
+          {/* Selected Count & Total Size Badge at the top of the pane */}
+          {pane.selectedPaths.size > 0 && (
+            <span className="text-[11px] font-mono text-[#60cdff] px-2 py-0.5 rounded bg-[#60cdff]/15 border border-[#60cdff]/30 shrink-0 font-medium whitespace-nowrap shadow-xs select-none">
+              {pane.selectedPaths.size} vybráno ({formatFileSize(selectedBytes, false)})
+            </span>
+          )}
         </div>
 
         {/* Table Column Headers */}
@@ -2195,48 +2195,6 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
         </div>
 
         <div className="flex items-center gap-1.5">
-          {/* Clipboard Action Buttons (Explorer style) */}
-          <button
-            type="button"
-            onClick={() => handleCut()}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-white/[0.05] hover:bg-white/[0.12] text-zinc-300 hover:text-white border border-white/10 transition-colors cursor-pointer text-xs font-medium"
-            title="Vyjmout vybrané soubory (Ctrl+X)"
-          >
-            <Scissors className="w-3.5 h-3.5 text-amber-400" />
-            <span>Vyjmout</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleCopyClipboard()}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-white/[0.05] hover:bg-white/[0.12] text-zinc-300 hover:text-white border border-white/10 transition-colors cursor-pointer text-xs font-medium"
-            title="Kopírovat do schránky (Ctrl+C)"
-          >
-            <Copy className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Kopírovat</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => void handlePasteClipboard()}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded border transition-colors text-xs font-medium cursor-pointer ${
-              (clipboard && clipboard.paths.length > 0) || (clipboardRef.current && clipboardRef.current.paths.length > 0)
-                ? 'bg-[#60cdff]/15 hover:bg-[#60cdff]/25 text-[#60cdff] border-[#60cdff]/40 shadow-xs'
-                : 'bg-white/[0.04] text-zinc-300 hover:bg-white/[0.1] hover:text-white border-white/10'
-            }`}
-            title="Vložit ze schránky do aktivního panelu (Ctrl+V)"
-          >
-            <ClipboardPaste className="w-3.5 h-3.5" />
-            <span>Vložit</span>
-            {((clipboard && clipboard.paths.length > 0) || (clipboardRef.current && clipboardRef.current.paths.length > 0)) && (
-              <span className="text-[10px] bg-[#60cdff]/30 text-white font-mono px-1 rounded-full font-bold">
-                {clipboard?.paths.length || clipboardRef.current?.paths.length}
-              </span>
-            )}
-          </button>
-
-          <div className="h-4 w-px bg-white/10 mx-1" />
-
           <button
             type="button"
             onClick={handleSyncPaths}
@@ -2295,99 +2253,6 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
         <div style={{ width: `${100 - splitRatio}%` }} className="h-full flex flex-col min-w-[200px]">
           {renderPane('right')}
         </div>
-      </div>
-
-      {/* Bottom Total Commander Function Key Bar (F3 - F8, Tab) */}
-      <div className="grid grid-cols-7 gap-1 px-1.5 py-1.5 bg-[#14151a] border-t border-white/[0.08] shrink-0 text-xs select-none">
-        <button
-          type="button"
-          onClick={triggerQuickLook}
-          className="flex items-center justify-center gap-1.5 py-1 px-2 rounded bg-white/[0.04] hover:bg-white/[0.1] text-zinc-300 hover:text-white border border-white/[0.06] transition-colors cursor-pointer font-medium"
-          title="Zobrazit rychlý náhled vybraného souboru (F3)"
-        >
-          <span className="font-mono text-[#60cdff] font-bold text-[11px]">F3</span>
-          <span className="truncate">Zobrazit</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            const isLeft = activePane === 'left';
-            const currentMode = isLeft ? leftViewMode : rightViewMode;
-            if (currentMode === 'notepad') {
-              if (isLeft) setLeftViewMode('files');
-              else setRightViewMode('files');
-            } else {
-              const pane = isLeft ? left : right;
-              const list = isLeft ? leftDisplayItems : rightDisplayItems;
-              const hasParent = !!getParentDir(pane.currentPath);
-              const itemIdx = hasParent ? pane.focusedIndex - 1 : pane.focusedIndex;
-              const it = itemIdx >= 0 && itemIdx < list.length ? list[itemIdx] : null;
-
-              if (it && !it.is_dir && isTextLikeFile(it.extension)) {
-                handleOpenInNotepad(it.path, activePane);
-              } else {
-                if (isLeft) setLeftViewMode('notepad');
-                else setRightViewMode('notepad');
-              }
-            }
-          }}
-          className="flex items-center justify-center gap-1.5 py-1 px-2 rounded bg-white/[0.04] hover:bg-white/[0.1] text-zinc-300 hover:text-white border border-white/[0.06] transition-colors cursor-pointer font-medium"
-          title="Přepnout do zápisníku / upravit textový soubor (F4)"
-        >
-          <span className="font-mono text-amber-400 font-bold text-[11px]">F4</span>
-          <span className="truncate">{(activePane === 'left' ? leftViewMode : rightViewMode) === 'notepad' ? 'Soubory' : 'Zápisník'}</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={triggerCopy}
-          className="flex items-center justify-center gap-1.5 py-1 px-2 rounded bg-white/[0.04] hover:bg-white/[0.1] text-zinc-300 hover:text-white border border-white/[0.06] transition-colors cursor-pointer font-medium"
-          title="Kopírovat vybrané soubory do cílového panelu (F5)"
-        >
-          <span className="font-mono text-emerald-400 font-bold text-[11px]">F5</span>
-          <span className="truncate">Kopírovat</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={triggerMove}
-          className="flex items-center justify-center gap-1.5 py-1 px-2 rounded bg-white/[0.04] hover:bg-white/[0.1] text-zinc-300 hover:text-white border border-white/[0.06] transition-colors cursor-pointer font-medium"
-          title="Přesunout vybrané soubory do cílového panelu (F6)"
-        >
-          <span className="font-mono text-amber-400 font-bold text-[11px]">F6</span>
-          <span className="truncate font-semibold text-amber-300">Přesunout</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={triggerNewFolder}
-          className="flex items-center justify-center gap-1.5 py-1 px-2 rounded bg-white/[0.04] hover:bg-white/[0.1] text-zinc-300 hover:text-white border border-white/[0.06] transition-colors cursor-pointer font-medium"
-          title="Vytvořit novou podsložku v aktivním panelu (F7)"
-        >
-          <span className="font-mono text-sky-400 font-bold text-[11px]">F7</span>
-          <span className="truncate">Nová složka</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={triggerDelete}
-          className="flex items-center justify-center gap-1.5 py-1 px-2 rounded bg-white/[0.04] hover:bg-white/[0.1] text-zinc-300 hover:text-rose-300 border border-white/[0.06] transition-colors cursor-pointer font-medium"
-          title="Smazat vybrané soubory do Koše (F8 / Delete)"
-        >
-          <span className="font-mono text-rose-400 font-bold text-[11px]">F8</span>
-          <span className="truncate">Smazat</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActivePane((prev) => (prev === 'left' ? 'right' : 'left'))}
-          className="flex items-center justify-center gap-1.5 py-1 px-2 rounded bg-white/[0.06] hover:bg-white/[0.12] text-zinc-200 hover:text-white border border-white/10 transition-colors cursor-pointer font-semibold"
-          title="Přepnout fokus mezi levým a pravým panelem (Tab)"
-        >
-          <span className="font-mono text-[#60cdff] font-bold text-[11px]">Tab</span>
-          <span className="truncate">Přepnout</span>
-        </button>
       </div>
 
       {/* Operation Confirmation / Input Modal */}

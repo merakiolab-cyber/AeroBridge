@@ -1,5 +1,7 @@
 mod icons;
+mod pty;
 
+use pty::{pty_spawn, pty_write, pty_resize, pty_kill, PtyManager};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{Read, Seek, SeekFrom};
@@ -540,7 +542,8 @@ async fn extract_xmp_thumbnail(path: String, max_scan_mb: u64) -> Option<String>
     .flatten()
 }
 
-/// Scans a file on disk for the largest embedded JPEG image (SOI FF D8 FF ... EOI FF D9).
+/// Scans a file on disk for embedded JPEG images (SOI FF D8 FF ... EOI FF D9),
+/// accurately parses JPEG segments and SOF dimensions, and selects the highest resolution valid image.
 /// Highly optimized for InDesign (.indd), camera RAW files, EPS, etc.
 fn extract_embedded_jpeg_blocking(path: &str, min_size: usize, max_scan_bytes: u64) -> Option<Vec<u8>> {
     let mut file = fs::File::open(path).ok()?;
@@ -555,31 +558,105 @@ fn extract_embedded_jpeg_blocking(path: &str, min_size: usize, max_scan_bytes: u
     let data = &buf[..n];
 
     let mut best_slice: Option<(usize, usize)> = None;
-    let mut best_len = 0usize;
+    let mut best_score: u64 = 0; // pixel_count (width * height), fallback to length
+    let mut fallback_slice: Option<(usize, usize)> = None;
+    let mut fallback_len = 0usize;
 
     let limit = data.len().saturating_sub(4);
     let mut i = 0usize;
     while i < limit {
+        // Look for JPEG SOI: 0xFF, 0xD8, 0xFF
         if data[i] == 0xFF && data[i + 1] == 0xD8 && data[i + 2] == 0xFF {
-            let max_search = data.len().min(i + 16 * 1024 * 1024);
-            let mut j = i + min_size;
-            while j + 1 < max_search {
-                if data[j] == 0xFF && data[j + 1] == 0xD9 {
-                    let length = (j + 2) - i;
-                    if length > best_len {
-                        best_len = length;
-                        best_slice = Some((i, j + 2));
-                    }
-                    i = j + 1;
+            let max_bound = data.len().min(i + 16 * 1024 * 1024);
+            let mut pos = i + 2;
+            let mut width: u32 = 0;
+            let mut height: u32 = 0;
+            let mut has_sof = false;
+            let mut end_pos: Option<usize> = None;
+
+            while pos + 1 < max_bound {
+                if data[pos] != 0xFF {
                     break;
                 }
-                j += 1;
+                let marker = data[pos + 1];
+
+                // EOI (End of Image)
+                if marker == 0xD9 {
+                    end_pos = Some(pos + 2);
+                    break;
+                }
+
+                // SOS (Start of Scan) - compressed entropy data follows
+                if marker == 0xDA {
+                    if pos + 4 > max_bound {
+                        break;
+                    }
+                    let sos_len = ((data[pos + 2] as usize) << 8) | (data[pos + 3] as usize);
+                    let mut scan_pos = pos + 2 + sos_len;
+                    while scan_pos + 1 < max_bound {
+                        if data[scan_pos] == 0xFF {
+                            let next = data[scan_pos + 1];
+                            if next == 0xD9 {
+                                end_pos = Some(scan_pos + 2);
+                                break;
+                            }
+                            if next == 0x00 || (next >= 0xD0 && next <= 0xD7) {
+                                scan_pos += 2;
+                                continue;
+                            }
+                        }
+                        scan_pos += 1;
+                    }
+                    break;
+                }
+
+                // Standalone markers without length payload (RST, TEM, SOI)
+                if marker == 0xD8 || marker == 0x01 || (marker >= 0xD0 && marker <= 0xD7) {
+                    pos += 2;
+                    continue;
+                }
+
+                // Variable-length markers (APPn, DQT, DHT, SOFn, etc.)
+                if pos + 4 > max_bound {
+                    break;
+                }
+                let seg_len = ((data[pos + 2] as usize) << 8) | (data[pos + 3] as usize);
+                if seg_len < 2 {
+                    break;
+                }
+
+                // SOF0, SOF1, SOF2 (Start of Frame: contains dimensions)
+                if (marker == 0xC0 || marker == 0xC1 || marker == 0xC2) && pos + 9 <= max_bound {
+                    height = ((data[pos + 5] as u32) << 8) | (data[pos + 6] as u32);
+                    width = ((data[pos + 7] as u32) << 8) | (data[pos + 8] as u32);
+                    has_sof = true;
+                }
+
+                pos += 2 + seg_len;
+            }
+
+            if let Some(end) = end_pos {
+                let length = end - i;
+                if length >= min_size {
+                    if has_sof && width >= 64 && height >= 64 {
+                        let score = (width as u64) * (height as u64);
+                        if score > best_score {
+                            best_score = score;
+                            best_slice = Some((i, end));
+                        }
+                    } else if length > fallback_len {
+                        fallback_len = length;
+                        fallback_slice = Some((i, end));
+                    }
+                }
             }
         }
         i += 1;
     }
 
-    best_slice.map(|(start, end)| data[start..end].to_vec())
+    best_slice
+        .or(fallback_slice)
+        .map(|(start, end)| data[start..end].to_vec())
 }
 
 #[tauri::command]
@@ -1143,8 +1220,9 @@ fn open_file_with_app_native(file_path: String, app_path: Option<String>) -> Res
 
 
 /// Opens a terminal (Windows Terminal / PowerShell / CMD) in the specified folder or file's parent folder.
+/// Optionally executes an initial command in the terminal.
 #[tauri::command]
-fn open_terminal_native(path: String) -> Result<(), String> {
+fn open_terminal_native(path: String, command: Option<String>) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::process::CommandExt;
@@ -1163,18 +1241,25 @@ fn open_terminal_native(path: String) -> Result<(), String> {
             return Err("Cílová složka neexistuje".to_string());
         }
 
-        // 1. Try Windows Terminal wt.exe with -d <dir>
-        let wt_res = Command::new("wt.exe")
-            .args(["-d", &folder_path])
-            .spawn();
+        let cmd_to_run = command.as_deref().map(|s| s.trim()).filter(|s| !s.is_empty());
 
-        if wt_res.is_ok() {
+        // 1. Try Windows Terminal wt.exe with -d <dir>
+        let mut wt = Command::new("wt.exe");
+        wt.args(["-d", &folder_path]);
+        if let Some(cmd_str) = cmd_to_run {
+            wt.args(["powershell.exe", "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", cmd_str]);
+        }
+        if wt.spawn().is_ok() {
             return Ok(());
         }
 
         // 2. Fallback: PowerShell in the directory
         let mut ps_cmd = Command::new("powershell.exe");
-        ps_cmd.arg("-NoLogo");
+        if let Some(cmd_str) = cmd_to_run {
+            ps_cmd.args(["-NoExit", "-ExecutionPolicy", "Bypass", "-Command", cmd_str]);
+        } else {
+            ps_cmd.arg("-NoLogo");
+        }
         ps_cmd.current_dir(&folder_path);
         if ps_cmd.spawn().is_ok() {
             return Ok(());
@@ -1183,7 +1268,11 @@ fn open_terminal_native(path: String) -> Result<(), String> {
         // 3. Fallback: cmd.exe
         let mut cmd = Command::new("cmd.exe");
         cmd.current_dir(&folder_path);
-        cmd.raw_arg("/K");
+        if let Some(cmd_str) = cmd_to_run {
+            cmd.args(["/K", cmd_str]);
+        } else {
+            cmd.raw_arg("/K");
+        }
         cmd.spawn().map_err(|e| format!("Nelze otevřít terminál: {}", e))?;
         Ok(())
     }
@@ -1559,8 +1648,7 @@ async fn execute_shell_command_native(
             c
         } else {
             let mut c = std::process::Command::new("powershell.exe");
-            c.arg("-NoProfile")
-                .arg("-NonInteractive")
+            c.arg("-NonInteractive")
                 .arg("-ExecutionPolicy")
                 .arg("Bypass")
                 .arg("-Command")
@@ -1597,6 +1685,7 @@ async fn execute_shell_command_native(
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .manage(PtyManager::new())
         .plugin(tauri_plugin_drag::init())
         .plugin(
             tauri_plugin_log::Builder::default()
@@ -1628,7 +1717,11 @@ pub fn run() {
             open_file_with_app_native,
             read_text_file_native,
             write_text_file_native,
-            execute_shell_command_native
+            execute_shell_command_native,
+            pty_spawn,
+            pty_write,
+            pty_resize,
+            pty_kill
         ])
         .run(tauri::generate_context!())
         .expect("error while building tauri application");

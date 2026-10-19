@@ -321,6 +321,11 @@ export default function App() {
     return assets.filter((a) => selectedIds.has(a.id));
   }, [assets, selectedIds]);
 
+  // Total size of selected files in bytes
+  const selectedBytes = useMemo(() => {
+    return selectedAssets.reduce((acc, a) => acc + (a.isFolder ? 0 : a.size || 0), 0);
+  }, [selectedAssets]);
+
   // --- File Operations Hook (Clipboard, Context Menu, Dialogs, Deletes, Renames) ---
   const {
     clipboard,
@@ -1169,6 +1174,7 @@ export default function App() {
         onBrowserViewModeChange={handleBrowserViewModeChange}
         onOpenFolder={handleOpenLocalFolder}
         selectedCount={selectedIds.size}
+        selectedBytes={selectedBytes}
         activeFolder={activeFolder}
         totalFilteredCount={filteredAssets.length}
         searchQuery={filters.searchQuery}

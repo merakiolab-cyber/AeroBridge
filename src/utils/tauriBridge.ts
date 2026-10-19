@@ -5,6 +5,7 @@
  */
 
 import { isTauri, invoke, convertFileSrc } from '@tauri-apps/api/core';
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { startDrag } from '@crabnebula/tauri-plugin-drag';
 
 export interface NativeFileEntry {
@@ -241,11 +242,12 @@ export async function openFileNative(filePath: string): Promise<void> {
 
 /**
  * Opens a terminal (Windows Terminal, PowerShell, CMD) in the specified folder or file's parent folder.
+ * Optionally runs an initial command (e.g. `c` or `claude`).
  */
-export async function openTerminalNative(folderOrFilePath: string): Promise<void> {
+export async function openTerminalNative(folderOrFilePath: string, command?: string): Promise<void> {
   if (!isDesktopApp()) return;
   try {
-    await invoke('open_terminal_native', { path: folderOrFilePath });
+    await invoke('open_terminal_native', { path: folderOrFilePath, command: command ?? null });
   } catch (err) {
     console.error('[TauriBridge] Error opening terminal:', err);
     throw err;
@@ -473,3 +475,66 @@ export async function executeShellCommandNative(
     shell: shell || 'powershell',
   });
 }
+
+/**
+ * Spawns an interactive PTY session (PowerShell, CMD, WSL) for embedded terminal.
+ */
+export async function ptySpawn(
+  id: string,
+  cwd?: string,
+  shell?: 'powershell' | 'cmd' | 'wsl',
+  cols = 80,
+  rows = 24
+): Promise<void> {
+  if (!isDesktopApp()) return;
+  await invoke('pty_spawn', { id, cwd, shell, cols, rows });
+}
+
+/**
+ * Writes raw input data to the PTY session.
+ */
+export async function ptyWrite(id: string, data: string): Promise<void> {
+  if (!isDesktopApp()) return;
+  await invoke('pty_write', { id, data });
+}
+
+/**
+ * Resizes the PTY terminal window dimensions (columns and rows).
+ */
+export async function ptyResize(id: string, cols: number, rows: number): Promise<void> {
+  if (!isDesktopApp()) return;
+  await invoke('pty_resize', { id, cols, rows });
+}
+
+/**
+ * Terminates the PTY session.
+ */
+export async function ptyKill(id: string): Promise<void> {
+  if (!isDesktopApp()) return;
+  await invoke('pty_kill', { id });
+}
+
+/**
+ * Listens for incoming stdout / stderr stream chunks from the PTY session.
+ */
+export async function onPtyData(id: string, callback: (data: string) => void): Promise<UnlistenFn> {
+  if (!isDesktopApp()) {
+    return () => {};
+  }
+  return await listen<{ data: string }>(`pty-data-${id}`, (event) => {
+    callback(event.payload.data);
+  });
+}
+
+/**
+ * Listens for child process exit from the PTY session.
+ */
+export async function onPtyExit(id: string, callback: (exitCode: number | null) => void): Promise<UnlistenFn> {
+  if (!isDesktopApp()) {
+    return () => {};
+  }
+  return await listen<{ exit_code: number | null }>(`pty-exit-${id}`, (event) => {
+    callback(event.payload.exit_code);
+  });
+}
+

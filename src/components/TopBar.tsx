@@ -26,6 +26,7 @@ import {
   FolderSync,
   Trash2,
 } from 'lucide-react';
+import { formatBytes } from '../utils/localFileSystem';
 
 interface TopBarProps {
   currentView: WorkspaceView;
@@ -34,6 +35,7 @@ interface TopBarProps {
   onBrowserViewModeChange?: (mode: BrowserViewMode) => void;
   onOpenFolder: () => void;
   selectedCount: number;
+  selectedBytes?: number;
   activeFolder: string;
   totalFilteredCount: number;
   searchQuery: string;
@@ -66,6 +68,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   onBrowserViewModeChange,
   onOpenFolder,
   selectedCount,
+  selectedBytes,
   activeFolder,
   totalFilteredCount,
   searchQuery,
@@ -264,8 +267,8 @@ export const TopBar: React.FC<TopBarProps> = ({
           )}
 
           {selectedCount > 0 && (
-            <span className="text-[11px] font-mono text-[#e2e4e9] px-2.5 py-0.5 rounded-full bg-white/[0.06] border border-white/10 tabular-nums">
-              {selectedCount} vybráno
+            <span className="text-[11px] font-mono text-[#e2e4e9] px-2.5 py-0.5 rounded-full bg-white/[0.06] border border-white/10 tabular-nums font-medium">
+              {selectedCount} vybráno{selectedBytes !== undefined && selectedBytes > 0 ? ` (${formatBytes(selectedBytes)})` : ''}
             </span>
           )}
 

@@ -1,412 +1,448 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { Terminal as XTerm } from '@xterm/xterm';
+import { FitAddon } from '@xterm/addon-fit';
+import { WebLinksAddon } from '@xterm/addon-web-links';
+import '@xterm/xterm/css/xterm.css';
 import {
-  Terminal,
-  Folder,
-  Play,
+  Terminal as TerminalIcon,
+  RotateCw,
   Trash2,
   Copy,
-  ExternalLink,
-  FileCode,
-  CornerDownLeft,
-  RotateCw,
-  CheckCircle2,
-  XCircle,
-  Clock,
   Sparkles,
+  ExternalLink,
+  ZoomIn,
+  ZoomOut,
+  Folder,
 } from 'lucide-react';
 import {
-  executeShellCommandNative,
+  isDesktopApp,
+  ptySpawn,
+  ptyWrite,
+  ptyResize,
+  ptyKill,
+  onPtyData,
+  onPtyExit,
   openTerminalNative,
-  type ShellCommandResult,
 } from '../utils/tauriBridge';
-import { copyTextToClipboard } from '../utils/localFileSystem';
 
 export interface CommanderTerminalProps {
   paneKey: 'left' | 'right';
   currentPath: string;
   oppositeSelectedPaths?: string[];
-  onCloseTerminal: () => void;
+  onCloseTerminal?: () => void;
   onNotify?: (title: string, message?: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
-}
-
-interface CommandHistoryItem {
-  id: string;
-  command: string;
-  timestamp: string;
-  durationMs?: number;
-  result?: ShellCommandResult;
-  loading?: boolean;
 }
 
 export const CommanderTerminal: React.FC<CommanderTerminalProps> = ({
   paneKey,
   currentPath,
-  oppositeSelectedPaths = [],
-  onCloseTerminal,
+  onCloseTerminal: _onCloseTerminal,
   onNotify,
 }) => {
-  const [shellType, setShellType] = useState<'powershell' | 'cmd'>('powershell');
-  const [inputCommand, setInputCommand] = useState<string>('');
-  const [history, setHistory] = useState<CommandHistoryItem[]>(() => [
-    {
-      id: 'init-msg',
-      command: '# Integrovaný terminál AeroBridge Commander',
-      timestamp: new Date().toLocaleTimeString(),
-      result: {
-        stdout: `Pracovní adresář: ${currentPath}\nZadejte libovolný příkaz (např. dir, git status, npm run...) nebo stiskněte šipku nahoru pro historii.`,
-        stderr: '',
-        exit_code: 0,
-        success: true,
-      },
+  const [shellType, setShellType] = useState<'powershell' | 'cmd' | 'wsl'>('powershell');
+  const [fontSize, setFontSize] = useState<number>(13);
+  const [sessionCount, setSessionCount] = useState<number>(1);
+  const [isProcessActive, setIsProcessActive] = useState<boolean>(true);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const xtermRef = useRef<XTerm | null>(null);
+  const fitAddonRef = useRef<FitAddon | null>(null);
+  const sessionIdRef = useRef<string>(`pty-${paneKey}-${Date.now()}`);
+  const spawnPathRef = useRef<string>(currentPath);
+
+  // Switch shell handler without breaking running session if clicking same shell
+  const handleSwitchShell = useCallback(
+    (newShell: 'powershell' | 'cmd' | 'wsl') => {
+      if (newShell === shellType) {
+        // Already active: do NOT kill session, just refocus terminal
+        xtermRef.current?.focus();
+        return;
+      }
+      setShellType(newShell);
+      setTimeout(() => xtermRef.current?.focus(), 80);
     },
-  ]);
+    [shellType]
+  );
 
-  // History navigation with Arrow Up / Arrow Down
-  const [historyIndex, setHistoryIndex] = useState<number>(-1);
-  const [executedCommands, setExecutedCommands] = useState<string[]>([]);
-  const [isRunning, setIsRunning] = useState<boolean>(false);
-
-  const outputEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  // Auto-scroll to bottom whenever history updates
+  // Ensure xterm receives focus when user begins typing while looking at terminal
   useEffect(() => {
-    outputEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [history]);
+    const handleGlobalTyping = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target?.tagName === 'INPUT' ||
+        (target?.tagName === 'TEXTAREA' && !target.classList.contains('xterm-helper-textarea')) ||
+        target?.isContentEditable
+      ) {
+        return;
+      }
 
-  // Focus input on mount
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
-
-  // Execute command
-  const handleExecute = useCallback(async (cmdToRun?: string) => {
-    const raw = (cmdToRun !== undefined ? cmdToRun : inputCommand).trim();
-    if (!raw) return;
-
-    // Built-in cls / clear
-    if (raw.toLowerCase() === 'cls' || raw.toLowerCase() === 'clear') {
-      setHistory([]);
-      setInputCommand('');
-      setHistoryIndex(-1);
-      return;
-    }
-
-    const id = `${Date.now()}-${Math.random()}`;
-    const startTime = performance.now();
-
-    const newItem: CommandHistoryItem = {
-      id,
-      command: raw,
-      timestamp: new Date().toLocaleTimeString(),
-      loading: true,
+      // If user presses standard keys and xterm isn't focused, bring focus into xterm
+      if (!e.ctrlKey && !e.altKey && !e.metaKey && (e.key.length === 1 || e.key === 'Enter' || e.key === 'Backspace')) {
+        xtermRef.current?.focus();
+      }
     };
 
-    setHistory((prev) => [...prev, newItem]);
-    setExecutedCommands((prev) => [raw, ...prev.filter((c) => c !== raw)]);
-    setHistoryIndex(-1);
-    setInputCommand('');
-    setIsRunning(true);
+    window.addEventListener('keydown', handleGlobalTyping);
+    return () => window.removeEventListener('keydown', handleGlobalTyping);
+  }, []);
 
-    try {
-      const res = await executeShellCommandNative(currentPath, raw, shellType);
-      const durationMs = Math.round(performance.now() - startTime);
+  // Restart session
+  const restartSession = useCallback(() => {
+    spawnPathRef.current = currentPath;
+    setSessionCount((prev) => prev + 1);
+  }, [currentPath]);
 
-      setHistory((prev) =>
-        prev.map((item) =>
-          item.id === id ? { ...item, loading: false, result: res, durationMs } : item
-        )
-      );
-    } catch (err) {
-      const durationMs = Math.round(performance.now() - startTime);
-      setHistory((prev) =>
-        prev.map((item) =>
-          item.id === id
-            ? {
-                ...item,
-                loading: false,
-                durationMs,
-                result: {
-                  stdout: '',
-                  stderr: String(err),
-                  exit_code: 1,
-                  success: false,
-                },
-              }
-            : item
-        )
-      );
-      onNotify?.('Chyba příkazu', String(err), 'error');
-    } finally {
-      setIsRunning(false);
-      setTimeout(() => inputRef.current?.focus(), 50);
+  // Quick run Claude Code
+  const handleLaunchClaude = useCallback(() => {
+    if (!sessionIdRef.current) return;
+    // Send 'claude' command followed by Enter (\r)
+    void ptyWrite(sessionIdRef.current, 'claude\r').catch((err) => {
+      console.error('[Terminal launch Claude error]:', err);
+    });
+    setTimeout(() => {
+      xtermRef.current?.focus();
+    }, 50);
+    onNotify?.('Claude Code spuštěn', 'Spouštím claude přímo v terminálu', 'info');
+  }, [onNotify]);
+
+  // Clear terminal buffer
+  const handleClear = useCallback(() => {
+    xtermRef.current?.clear();
+  }, []);
+
+  // Copy selection
+  const handleCopySelection = useCallback(() => {
+    const sel = xtermRef.current?.getSelection();
+    if (sel) {
+      void navigator.clipboard.writeText(sel);
+      onNotify?.('Zkopírováno', 'Výběr z terminálu byl zkopírován do schránky', 'success');
     }
-  }, [inputCommand, currentPath, shellType, onNotify]);
+  }, [onNotify]);
 
-  // Handle KeyDown in Command Input (History, Execution, Clear)
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      void handleExecute();
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      if (executedCommands.length === 0) return;
-      const nextIdx = Math.min(executedCommands.length - 1, historyIndex + 1);
-      setHistoryIndex(nextIdx);
-      setInputCommand(executedCommands[nextIdx]);
-    } else if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      if (historyIndex <= 0) {
-        setHistoryIndex(-1);
-        setInputCommand('');
-      } else {
-        const nextIdx = historyIndex - 1;
-        setHistoryIndex(nextIdx);
-        setInputCommand(executedCommands[nextIdx]);
-      }
-    } else if (e.ctrlKey && e.key.toLowerCase() === 'l') {
-      e.preventDefault();
-      setHistory([]);
-    }
-  };
-
-  // Insert selected file paths from opposite pane into input
-  const handleInsertSelectedPaths = () => {
-    if (oppositeSelectedPaths.length === 0) {
-      onNotify?.('Vložení cest', 'V druhém panelu nejsou vybrány žádné soubory', 'warning');
-      return;
-    }
-    const formatted = oppositeSelectedPaths.map((p) => `"${p}"`).join(' ');
-    setInputCommand((prev) => (prev ? `${prev} ${formatted}` : formatted));
-    inputRef.current?.focus();
-  };
-
-  // Open in External Windows Terminal / PowerShell
-  const handleOpenExternal = () => {
+  // Open external terminal window fallback
+  const handleOpenExternal = useCallback(() => {
     void openTerminalNative(currentPath);
-    onNotify?.('Terminál', 'Otevřeno v externím okně Windows', 'info');
-  };
+    onNotify?.('Externí terminál', 'Otevřeno samostatné okno konzole', 'info');
+  }, [currentPath, onNotify]);
 
-  // Copy full terminal log to clipboard
-  const handleCopyLog = () => {
-    const text = history
-      .map((item) => {
-        let out = `[${item.timestamp}] ${item.command}\n`;
-        if (item.result?.stdout) out += `${item.result.stdout}\n`;
-        if (item.result?.stderr) out += `[ERROR] ${item.result.stderr}\n`;
-        return out;
-      })
-      .join('\n');
-    void copyTextToClipboard(text);
-    onNotify?.('Zkopírováno', 'Výstup terminálu byl zkopírován do schránky', 'success');
-  };
+  // Zoom controls
+  const handleZoom = useCallback((delta: number) => {
+    setFontSize((prev) => {
+      const next = Math.max(10, Math.min(22, prev + delta));
+      if (xtermRef.current) {
+        xtermRef.current.options.fontSize = next;
+        setTimeout(() => fitAddonRef.current?.fit(), 50);
+      }
+      return next;
+    });
+  }, []);
 
-  const folderName = currentPath.split('\\').pop() || currentPath;
+  // Initialize PTY and xterm
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const id = `pty-${paneKey}-${Date.now()}-${sessionCount}`;
+    sessionIdRef.current = id;
+    setIsProcessActive(true);
+
+    // Create xterm instance with Windows 11 Fluent dark palette
+    const term = new XTerm({
+      fontFamily: "'Cascadia Code', 'Consolas', 'Fira Code', 'Lucida Console', monospace",
+      fontSize,
+      fontWeight: '400',
+      lineHeight: 1.25,
+      cursorBlink: true,
+      cursorStyle: 'block',
+      allowProposedApi: true,
+      theme: {
+        background: '#0d1117',
+        foreground: '#e6edf3',
+        cursor: '#38bdf8',
+        cursorAccent: '#0d1117',
+        selectionBackground: 'rgba(56, 189, 248, 0.35)',
+        black: '#484f58',
+        red: '#ff7b72',
+        green: '#3fb950',
+        yellow: '#d29922',
+        blue: '#58a6ff',
+        magenta: '#bc8cff',
+        cyan: '#39c5cf',
+        white: '#b1bac4',
+        brightBlack: '#6e7681',
+        brightRed: '#ffa198',
+        brightGreen: '#56d364',
+        brightYellow: '#e3b341',
+        brightBlue: '#79c0ff',
+        brightMagenta: '#d2a8ff',
+        brightCyan: '#56d4dd',
+        brightWhite: '#ffffff',
+      },
+    });
+
+    const fitAddon = new FitAddon();
+    const webLinksAddon = new WebLinksAddon();
+
+    term.loadAddon(fitAddon);
+    term.loadAddon(webLinksAddon);
+
+    // Custom key event handler for copy/paste
+    term.attachCustomKeyEventHandler((event: KeyboardEvent) => {
+      if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 'c') {
+        const sel = term.getSelection();
+        if (sel) void navigator.clipboard.writeText(sel);
+        return false;
+      }
+      if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 'v') {
+        void navigator.clipboard.readText().then((txt) => {
+          if (txt) void ptyWrite(id, txt);
+        });
+        return false;
+      }
+      return true;
+    });
+
+    // Clear previous children
+    containerRef.current.innerHTML = '';
+    term.open(containerRef.current);
+
+    xtermRef.current = term;
+    fitAddonRef.current = fitAddon;
+
+    // Initial fit
+    requestAnimationFrame(() => {
+      try {
+        fitAddon.fit();
+      } catch {}
+    });
+
+    let unlistenData: (() => void) | null = null;
+    let unlistenExit: (() => void) | null = null;
+    let isCleanedUp = false;
+
+    // Connect to PTY
+    const startPty = async () => {
+      if (!isDesktopApp()) {
+        term.writeln('\x1b[33m[Upozornění] Plnohodnotný PTY terminál je dostupný v desktopové aplikaci AeroBridge.\x1b[0m\r\n');
+        return;
+      }
+
+      try {
+        const cols = term.cols || 80;
+        const rows = term.rows || 24;
+
+        unlistenData = await onPtyData(id, (chunk) => {
+          if (!isCleanedUp) {
+            term.write(chunk);
+          }
+        });
+
+        unlistenExit = await onPtyExit(id, (code) => {
+          if (!isCleanedUp) {
+            setIsProcessActive(false);
+            term.writeln(`\r\n\x1b[90m[Proces shellu byl ukončen (kód ${code ?? 0})]\x1b[0m\r\n`);
+          }
+        });
+
+        await ptySpawn(id, spawnPathRef.current, shellType, cols, rows);
+
+        // Immediate fit & resize sync
+        setTimeout(() => {
+          if (isCleanedUp) return;
+          try {
+            fitAddon.fit();
+            void ptyResize(id, term.cols, term.rows);
+          } catch {}
+        }, 100);
+      } catch (err) {
+        term.writeln(`\r\n\x1b[31m[Chyba spuštění terminálu: ${String(err)}]\x1b[0m\r\n`);
+      }
+    };
+
+    void startPty();
+
+    // Stream user keystrokes into PTY
+    const onDataDisposable = term.onData((data) => {
+      void ptyWrite(id, data).catch((err) => {
+        console.error('[Terminal ptyWrite error]:', err);
+      });
+    });
+
+    // Auto-fit on container resize with ResizeObserver
+    const resizeObserver = new ResizeObserver(() => {
+      if (isCleanedUp) return;
+      try {
+        fitAddon.fit();
+        void ptyResize(id, term.cols, term.rows);
+      } catch {}
+    });
+
+    resizeObserver.observe(containerRef.current);
+
+    // Focus terminal
+    term.focus();
+
+    return () => {
+      isCleanedUp = true;
+      resizeObserver.disconnect();
+      onDataDisposable.dispose();
+      if (unlistenData) unlistenData();
+      if (unlistenExit) unlistenExit();
+      void ptyKill(id);
+      term.dispose();
+      xtermRef.current = null;
+      fitAddonRef.current = null;
+    };
+  }, [paneKey, shellType, sessionCount]);
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 h-full bg-[#0d0e12] text-zinc-200 select-none overflow-hidden relative font-mono text-xs">
-      {/* Top Header Bar */}
-      <div className="flex items-center justify-between px-2.5 py-1.5 bg-[#171920] border-b border-white/[0.08] text-xs shrink-0 gap-2 font-sans">
-        {/* Left: Close & Active Folder */}
-        <div className="flex items-center gap-2 min-w-0">
-          <button
-            type="button"
-            onClick={onCloseTerminal}
-            className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-white/[0.06] hover:bg-white/[0.12] text-zinc-300 hover:text-white transition-colors cursor-pointer text-[11px] font-medium border border-white/10 shrink-0"
-            title="Přepnout zpět do správce souborů"
-          >
-            <Folder className="w-3.5 h-3.5 text-[#60cdff]" />
-            <span>Zpět k souborům</span>
-          </button>
-
-          <div className="flex items-center gap-1.5 min-w-0 truncate" title={currentPath}>
-            <Terminal className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span className="font-semibold text-white truncate text-xs">Terminál: {folderName}</span>
-          </div>
-        </div>
-
-        {/* Right: Shell Switcher & Actions */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          {/* Shell Toggle (PowerShell / CMD) */}
-          <div className="flex items-center bg-black/40 p-0.5 rounded border border-white/10 text-[11px]">
+    <div className="flex flex-col h-full bg-[#0d1117] text-[#e6edf3] font-mono select-none overflow-hidden border-t border-slate-700/50">
+      {/* Top Terminal Toolbar */}
+      <div className="flex items-center justify-between px-3 py-1.5 bg-[#161b22] border-b border-slate-700/60 text-xs shrink-0 select-none">
+        {/* Left: Shell selector & Status */}
+        <div className="flex items-center gap-2">
+          <TerminalIcon className="w-3.5 h-3.5 text-sky-400" />
+          <div className="flex items-center bg-[#21262d] p-0.5 rounded border border-slate-700/60 font-sans">
             <button
               type="button"
-              onClick={() => setShellType('powershell')}
-              className={`px-2 py-0.5 rounded font-mono transition-colors cursor-pointer ${
+              onClick={() => handleSwitchShell('powershell')}
+              className={`px-2 py-0.5 rounded text-[11px] font-medium transition-all cursor-pointer ${
                 shellType === 'powershell'
-                  ? 'bg-[#60cdff]/20 text-[#60cdff] font-bold'
-                  : 'text-zinc-400 hover:text-white'
+                  ? 'bg-sky-500/25 text-sky-300 font-semibold shadow-xs'
+                  : 'text-slate-400 hover:text-slate-200'
               }`}
+              title="Aktivovat PowerShell shell"
             >
               PowerShell
             </button>
             <button
               type="button"
-              onClick={() => setShellType('cmd')}
-              className={`px-2 py-0.5 rounded font-mono transition-colors cursor-pointer ${
+              onClick={() => handleSwitchShell('cmd')}
+              className={`px-2 py-0.5 rounded text-[11px] font-medium transition-all cursor-pointer ${
                 shellType === 'cmd'
-                  ? 'bg-[#60cdff]/20 text-[#60cdff] font-bold'
-                  : 'text-zinc-400 hover:text-white'
+                  ? 'bg-sky-500/25 text-sky-300 font-semibold shadow-xs'
+                  : 'text-slate-400 hover:text-slate-200'
               }`}
+              title="Aktivovat Command Prompt (cmd.exe)"
             >
               CMD
             </button>
+            <button
+              type="button"
+              onClick={() => handleSwitchShell('wsl')}
+              className={`px-2 py-0.5 rounded text-[11px] font-medium transition-all cursor-pointer ${
+                shellType === 'wsl'
+                  ? 'bg-sky-500/25 text-sky-300 font-semibold shadow-xs'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+              title="Aktivovat Windows Subsystem for Linux"
+            >
+              WSL
+            </button>
           </div>
 
-          <button
-            type="button"
-            onClick={handleInsertSelectedPaths}
-            disabled={oppositeSelectedPaths.length === 0}
-            className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] transition-colors ${
-              oppositeSelectedPaths.length > 0
-                ? 'bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 border border-emerald-500/30 cursor-pointer font-medium'
-                : 'bg-white/[0.02] text-zinc-600 border border-white/[0.04] cursor-default'
+          <span
+            className={`w-2 h-2 rounded-full ${
+              isProcessActive ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'
             }`}
-            title="Vložit cesty vybraných souborů z protějšího panelu do příkazové řádky"
+            title={isProcessActive ? 'Terminál aktivní' : 'Proces ukončen'}
+          />
+
+          {/* Directory path indicator */}
+          <div className="hidden sm:flex items-center gap-1 text-[11px] text-slate-400 bg-[#21262d] px-2 py-0.5 rounded border border-slate-700/50 max-w-[280px] truncate">
+            <Folder className="w-3 h-3 text-amber-400 shrink-0" />
+            <span className="truncate" title={currentPath}>
+              {currentPath}
+            </span>
+          </div>
+        </div>
+
+        {/* Right: Quick actions */}
+        <div className="flex items-center gap-1.5">
+          {/* Claude Code quick start button */}
+          <button
+            onClick={handleLaunchClaude}
+            title="Spustit Claude Code (c) v tomto terminálu"
+            className="flex items-center gap-1.5 px-2.5 py-1 bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 text-amber-300 border border-amber-500/40 rounded text-xs font-semibold shadow-sm transition-all cursor-pointer font-sans"
           >
-            <FileCode className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Vložit cesty ({oppositeSelectedPaths.length})</span>
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            <span>Claude Code</span>
           </button>
 
+          <div className="h-3.5 w-px bg-slate-700 mx-0.5" />
+
+          {/* Zoom controls */}
           <button
-            type="button"
-            onClick={handleOpenExternal}
-            className="flex items-center gap-1 px-2 py-1 rounded bg-white/[0.04] hover:bg-white/[0.1] text-zinc-300 hover:text-white border border-white/[0.06] transition-colors cursor-pointer text-[11px]"
-            title="Otevřít v externím okně Windows Terminal / PowerShell"
+            onClick={() => handleZoom(1)}
+            onMouseUp={() => setTimeout(() => xtermRef.current?.focus(), 30)}
+            title="Zvětšit písmo (Ctrl +)"
+            className="p-1 hover:bg-[#30363d] rounded text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
           >
-            <ExternalLink className="w-3.5 h-3.5 text-zinc-400" />
-            <span className="hidden sm:inline">Externí okno</span>
+            <ZoomIn className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => handleZoom(-1)}
+            onMouseUp={() => setTimeout(() => xtermRef.current?.focus(), 30)}
+            title="Zmenšit písmo (Ctrl -)"
+            className="p-1 hover:bg-[#30363d] rounded text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+          >
+            <ZoomOut className="w-3.5 h-3.5" />
           </button>
 
+          {/* Copy selection */}
           <button
-            type="button"
-            onClick={handleCopyLog}
-            className="p-1.5 rounded bg-white/[0.04] hover:bg-white/[0.1] text-zinc-300 hover:text-white transition-colors cursor-pointer"
-            title="Kopírovat výstup"
+            onClick={handleCopySelection}
+            onMouseUp={() => setTimeout(() => xtermRef.current?.focus(), 30)}
+            title="Kopírovat označený text"
+            className="p-1 hover:bg-[#30363d] rounded text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
           >
             <Copy className="w-3.5 h-3.5" />
           </button>
 
+          {/* Clear screen */}
           <button
-            type="button"
-            onClick={() => setHistory([])}
-            className="p-1.5 rounded bg-white/[0.04] hover:bg-rose-500/20 hover:text-rose-400 text-zinc-400 transition-colors cursor-pointer"
-            title="Vymazat výstup (Ctrl + L)"
+            onClick={handleClear}
+            onMouseUp={() => setTimeout(() => xtermRef.current?.focus(), 30)}
+            title="Vymazat obrazovku"
+            className="p-1 hover:bg-[#30363d] rounded text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
           >
             <Trash2 className="w-3.5 h-3.5" />
+          </button>
+
+          {/* Restart shell */}
+          <button
+            onClick={restartSession}
+            onMouseUp={() => setTimeout(() => xtermRef.current?.focus(), 50)}
+            title="Restartovat terminál"
+            className="p-1 hover:bg-[#30363d] rounded text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+          >
+            <RotateCw className="w-3.5 h-3.5" />
+          </button>
+
+          {/* External window */}
+          <button
+            onClick={handleOpenExternal}
+            onMouseUp={() => setTimeout(() => xtermRef.current?.focus(), 50)}
+            title="Otevřít v samostatném okně Windows Terminal"
+            className="p-1 hover:bg-[#30363d] rounded text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
-      {/* Main Terminal Output Area */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-3 font-mono text-[12px] leading-relaxed selection:bg-[#60cdff]/30">
-        {history.map((item) => (
-          <div key={item.id} className="space-y-1">
-            {/* Command Header */}
-            <div className="flex items-center justify-between text-zinc-500 text-[11px] select-none border-b border-white/[0.03] pb-0.5">
-              <div className="flex items-center gap-1.5 text-zinc-400 font-bold">
-                <span className="text-[#60cdff]">
-                  {shellType === 'powershell' ? 'PS' : 'CMD'}
-                </span>
-                <span className="text-zinc-500">›</span>
-                <span className="text-white">{item.command}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                {item.durationMs !== undefined && (
-                  <span className="text-zinc-600 flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
-                    {item.durationMs}ms
-                  </span>
-                )}
-                {item.loading ? (
-                  <span className="flex items-center gap-1 text-[#60cdff]">
-                    <RotateCw className="w-3 h-3 animate-spin" />
-                    Běží...
-                  </span>
-                ) : item.result?.success ? (
-                  <span className="text-emerald-400 flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3" />
-                    0
-                  </span>
-                ) : item.result && item.result.exit_code !== 0 ? (
-                  <span className="text-rose-400 flex items-center gap-1 font-bold">
-                    <XCircle className="w-3 h-3" />
-                    exit {item.result.exit_code}
-                  </span>
-                ) : null}
-              </div>
-            </div>
-
-            {/* Standard Output */}
-            {item.result?.stdout && (
-              <pre className="text-zinc-300 whitespace-pre-wrap break-all pl-2">
-                {item.result.stdout}
-              </pre>
-            )}
-
-            {/* Error Output */}
-            {item.result?.stderr && (
-              <pre className="text-rose-400 whitespace-pre-wrap break-all pl-2 bg-rose-500/10 p-1.5 rounded border border-rose-500/20">
-                {item.result.stderr}
-              </pre>
-            )}
-          </div>
-        ))}
-
-        <div ref={outputEndRef} />
-      </div>
-
-      {/* Interactive Command Input Line */}
-      <div className="flex items-center gap-2 px-3 py-2 bg-[#14151b] border-t border-white/[0.08] shrink-0">
-        <div className="flex items-center gap-1 text-emerald-400 font-bold text-xs shrink-0 select-none">
-          <span>{shellType === 'powershell' ? 'PS' : 'CMD'}</span>
-          <span className="text-zinc-500">›</span>
-        </div>
-
-        <input
-          ref={inputRef}
-          type="text"
-          value={inputCommand}
-          onChange={(e) => setInputCommand(e.target.value)}
-          onKeyDown={handleKeyDown}
-          disabled={isRunning}
-          placeholder={isRunning ? 'Čekejte na dokončení příkazu...' : 'Zadejte příkaz (např. dir, git status)...'}
-          className="flex-1 bg-transparent border-none outline-none text-white font-mono text-xs placeholder-zinc-600 focus:outline-none"
-        />
-
-        <button
-          type="button"
-          onClick={() => void handleExecute()}
-          disabled={isRunning || !inputCommand.trim()}
-          className={`flex items-center gap-1 px-3 py-1 rounded text-xs font-semibold transition-all cursor-pointer ${
-            inputCommand.trim() && !isRunning
-              ? 'bg-[#60cdff] text-[#111215] hover:brightness-110 shadow-xs'
-              : 'bg-white/[0.04] text-zinc-600 cursor-default'
-          }`}
-          title="Spustit příkaz (Enter)"
-        >
-          {isRunning ? (
-            <RotateCw className="w-3.5 h-3.5 animate-spin" />
-          ) : (
-            <Play className="w-3.5 h-3.5 fill-current" />
-          )}
-          <span>Spustit</span>
-        </button>
-      </div>
-
-      {/* Terminal Footer Info */}
-      <div className="flex items-center justify-between px-3 py-1 bg-[#101115] border-t border-white/[0.04] text-[10px] text-zinc-500 font-sans select-none shrink-0">
-        <div className="flex items-center gap-2 font-mono">
-          <span>Enter: Spustit</span>
-          <span>·</span>
-          <span>Šipky Nahoru/Dolů: Historie</span>
-          <span>·</span>
-          <span>Ctrl + L: Vymazat</span>
-        </div>
-        <div className="truncate max-w-[240px] font-mono text-zinc-400" title={currentPath}>
-          {currentPath}
-        </div>
-      </div>
+      {/* Main xterm container */}
+      <div
+        ref={containerRef}
+        data-terminal-container="true"
+        className="flex-1 w-full h-full p-2 bg-[#0d1117] overflow-hidden focus:outline-none cursor-text"
+        style={{ minHeight: 0 }}
+        onMouseDown={() => {
+          xtermRef.current?.focus();
+        }}
+        onClick={() => {
+          xtermRef.current?.focus();
+        }}
+      />
     </div>
   );
 };

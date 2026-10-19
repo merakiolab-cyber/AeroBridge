@@ -380,12 +380,12 @@ async function doGenerateNativeThumbnail(asset: AssetItem, path: string, ext: st
         }
 
         // 1. Ultra-fast native embedded JPEG extraction directly from binary file (InDesign stores full 512-1024px page renders)
-        const nativeJpeg = await extractNativeEmbeddedJpeg(path, 8192, 128);
+        const nativeJpeg = await extractNativeEmbeddedJpeg(path, 4096, 128);
         if (nativeJpeg) return await withDims(nativeJpeg);
 
         // 2. JavaScript embedded JPEG stream scan (fallback for head buffer up to 64MB)
         const head = await readNativeFileBinary(path, 64 * MB);
-        const jpeg = extractEmbeddedJpeg(head, 8192, 64 * MB);
+        const jpeg = extractEmbeddedJpeg(head, 4096, 64 * MB);
         if (jpeg) return await withDims(jpeg);
 
         // 3. Stream through file for verified XMP packet (<xmpGImg:image> Base64 JPEG)

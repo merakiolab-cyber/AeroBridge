@@ -41,35 +41,94 @@ export function extractXmpThumbnail(buffer: ArrayBuffer, maxScanBytes = 1024 * 1
 export function extractEmbeddedJpeg(
   buffer: ArrayBuffer,
   minSize = 4096,
-  maxScan = 1024 * 1024 * 12
+  maxScan = 1024 * 1024 * 64
 ): string | null {
   try {
     const bytes = new Uint8Array(buffer);
     const limit = Math.min(bytes.length - 4, maxScan);
     let bestBlob: Blob | null = null;
-    let bestLength = 0;
+    let bestScore = 0;
+    let fallbackBlob: Blob | null = null;
+    let fallbackLength = 0;
 
     for (let i = 0; i < limit; i++) {
-      // Check for JPEG SOI (0xFF, 0xD8, 0xFF)
       if (bytes[i] === 0xff && bytes[i + 1] === 0xd8 && bytes[i + 2] === 0xff) {
-        // Look for matching EOI (0xFF, 0xD9)
-        const maxSearch = Math.min(bytes.length - 1, i + 1024 * 1024 * 10);
-        for (let j = i + minSize; j < maxSearch; j++) {
-          if (bytes[j] === 0xff && bytes[j + 1] === 0xd9) {
-            const length = j + 2 - i;
-            if (length > bestLength) {
-              bestLength = length;
-              bestBlob = new Blob([bytes.subarray(i, j + 2)], { type: 'image/jpeg' });
-            }
-            i = j + 1; // Skip past this JPEG
+        const maxBound = Math.min(bytes.length - 1, i + 16 * 1024 * 1024);
+        let pos = i + 2;
+        let width = 0;
+        let height = 0;
+        let hasSof = false;
+        let endPos = -1;
+
+        while (pos + 1 < maxBound) {
+          if (bytes[pos] !== 0xff) break;
+          const marker = bytes[pos + 1];
+
+          if (marker === 0xd9) {
+            endPos = pos + 2;
             break;
+          }
+
+          if (marker === 0xda) {
+            if (pos + 4 > maxBound) break;
+            const sosLen = (bytes[pos + 2] << 8) | bytes[pos + 3];
+            let scanPos = pos + 2 + sosLen;
+            while (scanPos + 1 < maxBound) {
+              if (bytes[scanPos] === 0xff) {
+                const next = bytes[scanPos + 1];
+                if (next === 0xd9) {
+                  endPos = scanPos + 2;
+                  break;
+                }
+                if (next === 0x00 || (next >= 0xd0 && next <= 0xd7)) {
+                  scanPos += 2;
+                  continue;
+                }
+              }
+              scanPos += 1;
+            }
+            break;
+          }
+
+          if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) {
+            pos += 2;
+            continue;
+          }
+
+          if (pos + 4 > maxBound) break;
+          const segLen = (bytes[pos + 2] << 8) | bytes[pos + 3];
+          if (segLen < 2) break;
+
+          if ((marker === 0xc0 || marker === 0xc1 || marker === 0xc2) && pos + 9 <= maxBound) {
+            height = (bytes[pos + 5] << 8) | bytes[pos + 6];
+            width = (bytes[pos + 7] << 8) | bytes[pos + 8];
+            hasSof = true;
+          }
+
+          pos += 2 + segLen;
+        }
+
+        if (endPos !== -1) {
+          const length = endPos - i;
+          if (length >= minSize) {
+            if (hasSof && width >= 64 && height >= 64) {
+              const score = width * height;
+              if (score > bestScore) {
+                bestScore = score;
+                bestBlob = new Blob([bytes.subarray(i, endPos)], { type: 'image/jpeg' });
+              }
+            } else if (length > fallbackLength) {
+              fallbackLength = length;
+              fallbackBlob = new Blob([bytes.subarray(i, endPos)], { type: 'image/jpeg' });
+            }
           }
         }
       }
     }
 
-    if (bestBlob) {
-      return URL.createObjectURL(bestBlob);
+    const chosen = bestBlob || fallbackBlob;
+    if (chosen) {
+      return URL.createObjectURL(chosen);
     }
   } catch (err) {
     console.warn('Embedded JPEG search failed:', err);
@@ -85,8 +144,8 @@ export async function extractInddThumbnail(
   buffer: ArrayBuffer,
   _fileName: string
 ): Promise<{ url: string; width: number; height: number; isPlaceholder?: boolean }> {
-  // Method 1: Scan for embedded page preview JPEG (min 8KB) - InDesign embeds 512-1024px full page renders
-  const embeddedJpeg = extractEmbeddedJpeg(buffer, 8192, 64 * 1024 * 1024);
+  // Method 1: Scan for embedded page preview JPEG (min 4KB) - InDesign embeds 512-1024px full page renders
+  const embeddedJpeg = extractEmbeddedJpeg(buffer, 4096, 64 * 1024 * 1024);
   if (embeddedJpeg) {
     const dims = await getImageDimensions(embeddedJpeg);
     return { url: embeddedJpeg, width: dims.width, height: dims.height };

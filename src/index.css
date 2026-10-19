@@ -51,3 +51,132 @@ img {
   background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
 }
 
+/* Antigravity / GitHub style Markdown typography */
+.markdown-body h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #ffffff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 0.4rem;
+  margin-top: 1.25rem;
+  margin-bottom: 0.75rem;
+}
+.markdown-body h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #f4f4f5;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 0.3rem;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+}
+.markdown-body h3 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #e4e4e7;
+  margin-top: 0.75rem;
+  margin-bottom: 0.4rem;
+}
+.markdown-body h4, .markdown-body h5, .markdown-body h6 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #d4d4d8;
+  margin-top: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+.markdown-body p {
+  color: #d4d4d8;
+  line-height: 1.65;
+  margin-bottom: 0.75rem;
+}
+.markdown-body ul {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+  margin-bottom: 0.75rem;
+  color: #d4d4d8;
+}
+.markdown-body ol {
+  list-style-type: decimal;
+  padding-left: 1.5rem;
+  margin-bottom: 0.75rem;
+  color: #d4d4d8;
+}
+.markdown-body li {
+  margin-bottom: 0.25rem;
+  line-height: 1.6;
+}
+.markdown-body li > input[type="checkbox"] {
+  margin-right: 0.5rem;
+  accent-color: #60cdff;
+}
+.markdown-body blockquote {
+  border-left: 4px solid #60cdff;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 0.5rem 1rem;
+  margin: 0.75rem 0;
+  border-radius: 0 0.375rem 0.375rem 0;
+  font-style: italic;
+  color: #a1a1aa;
+}
+.markdown-body pre {
+  background: #090a0e;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0.85rem 1rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  margin: 0.85rem 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.85rem;
+  color: #e4e4e7;
+  line-height: 1.5;
+}
+.markdown-body code {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fcd34d;
+  padding: 0.15rem 0.35rem;
+  border-radius: 0.25rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.85em;
+}
+.markdown-body pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+.markdown-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  font-size: 0.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.markdown-body th {
+  background: rgba(255, 255, 255, 0.06);
+  padding: 0.5rem 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-weight: 600;
+  text-align: left;
+  color: #ffffff;
+}
+.markdown-body td {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #d4d4d8;
+}
+.markdown-body tr:nth-child(even) td {
+  background: rgba(255, 255, 255, 0.02);
+}
+.markdown-body a {
+  color: #60cdff;
+  text-decoration: none;
+}
+.markdown-body a:hover {
+  text-decoration: underline;
+}
+.markdown-body hr {
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin: 1.5rem 0;
+}
+
+

@@ -2,6 +2,28 @@
 
 ## Changelog
 
+### Version 3.27.29 (Plnohodnotný ConPTY terminál pro Claude Code, Vícezložkový Zápisník s Markdown/JSON náhledem, Indesign opravy)
+- **Plnohodnotný interaktivní ConPTY terminál v panelech Commanderu ([pty.rs](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src-tauri/src/pty.rs), [CommanderTerminal.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/CommanderTerminal.tsx), [tauriBridge.ts](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/utils/tauriBridge.ts)):**
+  - Integrován nativní backend `portable-pty` v Rustu pro plnou podporu Windows Pseudo Console (ConPTY).
+  - V UI nasazen `@xterm/xterm` s `@xterm/addon-fit` a `@xterm/addon-web-links`, streaming I/O přes Tauri eventy.
+  - Plná podpora interaktivních CLI aplikací jako **Claude Code**, Git, npm, Python REPL, PowerShell, CMD a WSL s plynulým ANSI vykreslováním.
+  - Vyřešena správa klávesového zaměření (focus) – kliknutí na přepínač shellu (`PowerShell`, `CMD`, `WSL`) znovu zaostří xterm a neukončí běžící Claude Code relaci.
+  - Odstraněno nechtěné odchytávání klávesových událostí správcem souborů při aktivní konzoli.
+- **Vícezložkový Zápisník / Editor s formátovaným náhledem ([CommanderNotepad.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/CommanderNotepad.tsx), [CommanderNotepadTabs.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/CommanderNotepadTabs.tsx), [CommanderNotepadPreview.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/CommanderNotepadPreview.tsx)):**
+  - Podpora více otevřených záložek současně s indikátorem neuložených změn a možností zavírání.
+  - Tři režimy zobrazení: **Editor**, **Rozdělený náhled (Split)** a **Čistý náhled (Preview)**.
+  - Formátovaný náhled Markdown (`marked`) s Fluent typografií, kódovými bloky, tabulkami a citacemi.
+  - Zvýrazňování syntaxe JSON s odsazením a barevným odlišením klíčů, řetězců, čísel a logických hodnot.
+  - Dvojklik nebo stisk Enter na libovolném textovém/kódovém souboru v Commanderu (`.md`, `.json`, `.txt`, `.ts`, `.rs`, `.css` atd.) jej automaticky otevře přímo v záložce Zápisníku.
+- **Odstranění spodní lišty funkčních kláves F3–F8 ([CommanderView.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/CommanderView.tsx)):**
+  - Spodní proužek kláves F3–F8 byl kompletně odstraněn, čímž vznikla maximální vertikální plocha pro panely souborů, zápisník i terminál.
+- **Zobrazení celkové velikosti vybraných souborů ([TopBar.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/TopBar.tsx), [CommanderView.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/CommanderView.tsx)):**
+  - Vedle počtu vybraných souborů se dynamicky sčítá a zobrazuje celková kapacita výběru (např. `5 vybráno (142.5 MB)`).
+- **Oprava a zpřesnění extrakce náhledů pro Adobe InDesign (.indd) ([adobeExtractor.ts](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/utils/extractors/adobeExtractor.ts)):**
+  - Vylepšen strukturální parser segmentů JPEG streamu uvnitř InDesign souborů (detekce SOF markerů, ošetření fragmentovaných streamů a robustní fallback na nativní Windows Shell thumbnailer).
+- **Vyčištění horní lišty Commanderu ([CommanderView.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/CommanderView.tsx)):**
+  - Odebrána tlačítka Vyjmout, Kopírovat, Vložit z horní lišty vedle „Shodná složka“ pro čistý a přehledný vzhled.
+
 ### Version 3.27.28 (Commander: Zápisník, Integrovaný Terminál a vylepšený Drag & Drop do kořene)
 - **Zápisník / Poznámkový blok v panelech Commanderu ([CommanderNotepad.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/CommanderNotepad.tsx), [CommanderView.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/CommanderView.tsx)):**
   - Možnost nezávisle přepnout levý nebo pravý panel na textový editor a poznámkový blok.
