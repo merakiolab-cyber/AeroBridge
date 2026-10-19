@@ -46,6 +46,10 @@ AeroBridge obsahuje vlastní binární parsery vyvinuté pro okamžité dekódov
 - **Compare (Porovnání):** Srovnání dvou i více snímků vedle sebe pro kontrolu ostrosti a barevného tónu.
 - **Metadata Table (Seznam):** Přehledná tabulka s technickými specifikacemi (rozměry, velikost, formát, datum, EXIF) s možností okamžitého řazení.
 
+<p align="center">
+  <img src="docs/screenshot-filmstrip.png" alt="AeroBridge Studio – režim Filmstrip" width="900">
+</p>
+
 ### 3. ⚡ Bleskový výkon pro Windows 11 (Tauri v2 + Rust)
 - **Virtualizované procházení:** Zvládá složky s 10 000+ soubory bez jakéhokoliv zasekávání rozhraní a bez paměťových úniků.
 - **Nativní přístup k diskům:** Žádná vyskakovací bezpečnostní okna prohlížeče — přímý přístup k interním SSD, externím diskům i síťovým úložištím (NAS).
