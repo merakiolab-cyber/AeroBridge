@@ -2,6 +2,10 @@
 
 ## Changelog
 
+### Nové logo / symbol aplikace (složka s okem)
+- **Brand assety v [branding/logo/](branding/logo/):** zdrojový `.ai`, SVG varianty (symbol černý/bílý/accent/`currentColor`, app ikony dark/light/accent/maskable, favicon) a PNG exporty 1024 px.
+- **Nasazení:** `public/icon.svg|png`, `favicon.svg`, `icon-maskable.*`, PWA manifest, kompletní sada `src-tauri/icons/` (přes `tauri icon`) a symbol v `TopBar.tsx` (`LogoMark.tsx`).
+
 ### Version 3.27.29 (Plnohodnotný ConPTY terminál pro Claude Code, Vícezložkový Zápisník s Markdown/JSON náhledem, Indesign opravy)
 - **Plnohodnotný interaktivní ConPTY terminál v panelech Commanderu ([pty.rs](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src-tauri/src/pty.rs), [CommanderTerminal.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/CommanderTerminal.tsx), [tauriBridge.ts](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/utils/tauriBridge.ts)):**
   - Integrován nativní backend `portable-pty` v Rustu pro plnou podporu Windows Pseudo Console (ConPTY).

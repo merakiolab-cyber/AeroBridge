@@ -26,6 +26,7 @@ import {
   FolderSync,
   Trash2,
 } from 'lucide-react';
+import { LogoMark } from './LogoMark';
 import { formatBytes } from '../utils/localFileSystem';
 
 interface TopBarProps {
@@ -176,7 +177,7 @@ export const TopBar: React.FC<TopBarProps> = ({
             href="/"
             className="text-xs font-semibold tracking-wider text-white whitespace-nowrap flex items-center gap-2 uppercase"
           >
-            <span className="w-1.5 h-1.5 bg-[#e2e4e9] shadow-[0_0_8px_rgba(237,232,223,0.8)]" />
+            <LogoMark className="w-5 h-[18px] text-[#e2e4e9]" />
             <span className="tracking-widest">AeroBridge</span>
             <span className="text-[10px] text-zinc-400 font-mono tracking-normal normal-case px-1.5 py-0.5 rounded bg-white/[0.06] border border-white/10">v3.27.25</span>
           </a>
