@@ -2,6 +2,22 @@
 
 ## Changelog
 
+### Version 3.27.28 (Commander: Zápisník, Integrovaný Terminál a vylepšený Drag & Drop do kořene)
+- **Zápisník / Poznámkový blok v panelech Commanderu ([CommanderNotepad.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/CommanderNotepad.tsx), [CommanderView.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/CommanderView.tsx)):**
+  - Možnost nezávisle přepnout levý nebo pravý panel na textový editor a poznámkový blok.
+  - Klávesová zkratka **F4** i volba v kontextovém menu pro okamžité otevření textových a kódových souborů (`.txt`, `.md`, `.json`, `.log`, `.csv`, `.ini`, `.js`, `.ts`, `.rs`, `.bat` atd.).
+  - Nativní ukládání na disk (`read_text_file_native`, `write_text_file_native`) přes klávesovou zkratku **Ctrl+S** nebo dialog „Uložit jako do složky“.
+  - Tlačítko „Vložit vybrané cesty“ pro rychlé vložení seznamu souborů z protějšího panelu do textu.
+  - Automatické zálohování rozepsaných konceptů v `localStorage`, přepínač fontů (Mono / Proporcionální), zalamování řádků a vyhledávání v textu (**Ctrl+F**).
+- **Integrovaný terminál v panelech Commanderu ([CommanderTerminal.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/CommanderTerminal.tsx), [lib.rs](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src-tauri/src/lib.rs)):**
+  - Každý panel lze přepnout na interaktivní konzoli s podporou **PowerShell** i **CMD**.
+  - Příkazy se vykonávají asynchronně na pozadí v kontextu otevřené složky s měřením doby běhu a exit kódem.
+  - Plná historie příkazů (šipky Nahoru / Dolů) a tlačítko pro rychlé vložení cest souborů z protějšího panelu do příkazu.
+- **Oprava a zpřehlednění Drag & Drop do kořene složky ([CommanderView.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/CommanderView.tsx)):**
+  - Přidána výrazná vizuální indikace pro kořenovou složku panelu (zářící modré ohraničení a plovoucí štítek `↳ Vložit do kořene složky`).
+  - Podpora pro upuštění souborů na prázdnou plochu, řádky souborů, adresní řádek i záhlaví tabulky.
+  - Přetažení v rámci téže složky automaticky vytvoří duplikát / kopii namísto chybového hlášení.
+
 ### Version 3.27.27 (Nativní OLE Drag & Drop a dynamické menu „Otevřít v programu“)
 - **Podpora nativního přetahování souborů do externích aplikací ([tauriBridge.ts](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/utils/tauriBridge.ts), [ThumbnailCard.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/ThumbnailCard.tsx), [AssetGrid.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/AssetGrid.tsx), [MetadataTableView.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/MetadataTableView.tsx), [CommanderView.tsx](file:///e:/_MY_APPS/Antigravity/MediaBridgeBrowser/src/components/CommanderView.tsx)):**
   - Integrován nativní Rust modul `tauri-plugin-drag` / `@crabnebula/tauri-plugin-drag` v Tauri v2, který přebírá řízení nad myší při události `dragstart` a spouští systémový Windows Win32 OLE `DoDragDrop`.

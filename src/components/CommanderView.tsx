@@ -59,6 +59,18 @@ import {
 } from './Win11Icons';
 import { getAppIcon } from './AppIcons';
 import { AssetItem } from '../types';
+import { CommanderNotepad } from './CommanderNotepad';
+import { CommanderTerminal } from './CommanderTerminal';
+
+const TEXT_EXTENSIONS = new Set([
+  'txt', 'md', 'markdown', 'json', 'log', 'csv', 'tsv', 'ini', 'cfg', 'conf',
+  'js', 'ts', 'jsx', 'tsx', 'html', 'css', 'scss', 'xml', 'yaml', 'yml',
+  'rs', 'py', 'bat', 'cmd', 'ps1', 'sh', 'sql', 'toml', 'env'
+]);
+
+function isTextLikeFile(ext: string): boolean {
+  return TEXT_EXTENSIONS.has(ext.toLowerCase().replace(/^\./, ''));
+}
 
 export interface CommanderViewProps {
   initialLeftPath?: string;
@@ -211,6 +223,28 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
     inputPath: initialRight,
     isEditingPath: false,
   });
+
+  // Pane view mode: each pane can be toggled between 'files' (explorer), 'notepad' (scratchpad), and 'terminal'
+  const [leftViewMode, setLeftViewMode] = useState<'files' | 'notepad' | 'terminal'>('files');
+  const [rightViewMode, setRightViewMode] = useState<'files' | 'notepad' | 'terminal'>('files');
+  const [leftNotepadFile, setLeftNotepadFile] = useState<string | null>(null);
+  const [rightNotepadFile, setRightNotepadFile] = useState<string | null>(null);
+
+  // Open file in Notepad handler
+  const handleOpenInNotepad = useCallback((filePath: string, preferredPane?: 'left' | 'right') => {
+    const target = preferredPane || activePane;
+    if (target === 'left') {
+      setLeftNotepadFile(filePath);
+      setLeftViewMode('notepad');
+      setActivePane('left');
+    } else {
+      setRightNotepadFile(filePath);
+      setRightViewMode('notepad');
+      setActivePane('right');
+    }
+    const name = filePath.split('\\').pop() || filePath;
+    onNotify?.('Zápisník', `Otevřen soubor: ${name}`, 'info');
+  }, [activePane, onNotify]);
 
   // Drag-and-drop hover state
   const [dragTargetFolder, setDragTargetFolder] = useState<{ pane: 'left' | 'right'; path: string } | null>(null);
@@ -504,6 +538,10 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
     right,
     leftDisplayItems,
     rightDisplayItems,
+    leftViewMode,
+    rightViewMode,
+    leftNotepadFile,
+    rightNotepadFile,
     clipboard,
     operationModal,
     contextMenuPos,
@@ -514,6 +552,10 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
     right,
     leftDisplayItems,
     rightDisplayItems,
+    leftViewMode,
+    rightViewMode,
+    leftNotepadFile,
+    rightNotepadFile,
     clipboard,
     operationModal,
     contextMenuPos,
@@ -923,13 +965,11 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
 
       const normDest = norm(destFolder);
 
-      // Prevent dropping into exact same folder if not copying
+      // If source and destination are the exact same folder, duplicate (copy with auto collision suffix) instead of failing
       const isCopy = e.ctrlKey;
       const firstParent = getParentDir(sourcePaths[0]);
-      if (!isCopy && firstParent && norm(firstParent) === normDest) {
-        onNotify?.('Přetažení', 'Zdrojová a cílová složka je stejná – otevřete v druhém panelu jinou složku', 'warning');
-        return;
-      }
+      const isSameFolder = !!(firstParent && norm(firstParent) === normDest);
+      const effectiveCopy = isCopy || isSameFolder;
 
       // Safety check: Prevent dropping folder into itself or its child
       const isDroppingIntoSelf = sourcePaths.some((p) => {
@@ -942,11 +982,11 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
       }
 
       try {
-        if (isCopy) {
+        if (effectiveCopy) {
           await copyFilesNative(sourcePaths, destFolder);
           onNotify?.(
-            'Zkopírováno',
-            `${sourcePaths.length} ${sourcePaths.length === 1 ? 'položka zkopírována' : 'položek zkopírováno'} do ${destFolder.split('\\').pop() || destFolder}`,
+            isSameFolder ? 'Duplikováno v kořeni' : 'Zkopírováno',
+            `${sourcePaths.length} ${sourcePaths.length === 1 ? 'položka' : 'položek'} ${isSameFolder ? 'zkopírována (vytvořena kopie)' : `zkopírováno do ${destFolder.split('\\').pop() || destFolder}`}`,
             'success'
           );
         } else {
@@ -1078,17 +1118,27 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
         return;
       }
 
-      // F4: Open
+      // F4: Toggle / Open in Notepad (Zápisník)
       if (e.key === 'F4') {
         e.preventDefault();
         const isLeft = s.activePane === 'left';
-        const pane = isLeft ? s.left : s.right;
-        const list = isLeft ? s.leftDisplayItems : s.rightDisplayItems;
-        const hasParent = !!getParentDir(pane.currentPath);
-        const itemIdx = hasParent ? pane.focusedIndex - 1 : pane.focusedIndex;
-        if (itemIdx >= 0 && itemIdx < list.length) {
-          const it = list[itemIdx];
-          if (it) void handleOpenItem(it, s.activePane);
+        const currentMode = isLeft ? s.leftViewMode : s.rightViewMode;
+        if (currentMode === 'notepad') {
+          if (isLeft) setLeftViewMode('files');
+          else setRightViewMode('files');
+        } else {
+          const pane = isLeft ? s.left : s.right;
+          const list = isLeft ? s.leftDisplayItems : s.rightDisplayItems;
+          const hasParent = !!getParentDir(pane.currentPath);
+          const itemIdx = hasParent ? pane.focusedIndex - 1 : pane.focusedIndex;
+          const it = itemIdx >= 0 && itemIdx < list.length ? list[itemIdx] : null;
+
+          if (it && !it.is_dir && isTextLikeFile(it.extension)) {
+            handleOpenInNotepad(it.path, s.activePane);
+          } else {
+            if (isLeft) setLeftViewMode('notepad');
+            else setRightViewMode('notepad');
+          }
         }
         return;
       }
@@ -1292,9 +1342,13 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
   const renderPane = (paneKey: 'left' | 'right') => {
     const isLeft = paneKey === 'left';
     const pane = isLeft ? left : right;
+    const oppositePane = isLeft ? right : left;
+    const viewMode = isLeft ? leftViewMode : rightViewMode;
     const items = isLeft ? leftDisplayItems : rightDisplayItems;
     const isActive = activePane === paneKey;
     const parentDir = getParentDir(pane.currentPath);
+
+    const isPaneDropTarget = dragTargetPane === paneKey && !dragTargetFolder;
 
     const totalBytes = items.reduce((acc, it) => acc + (it.is_dir ? 0 : it.size), 0);
     const selectedList = items.filter((it) => pane.selectedPaths.has(it.path));
@@ -1340,13 +1394,34 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
           void handleDropOnPane(e, pane.currentPath, paneKey);
         }}
         className={`flex-1 flex flex-col min-w-0 h-full border focus:outline-hidden ${
-          isActive
+          isPaneDropTarget
+            ? 'border-[#60cdff] ring-2 ring-[#60cdff]/60 bg-[#16202c] shadow-[0_0_25px_rgba(96,205,255,0.25)]'
+            : isActive
             ? 'border-[#60cdff]/50 bg-[#14161c] shadow-[0_0_15px_rgba(96,205,255,0.08)]'
             : 'border-white/[0.06] bg-[#111215]'
         } transition-all duration-150 overflow-hidden relative`}
       >
-        {/* Top: Drive Buttons & Quick Places */}
-        <div className="flex items-center justify-between px-2 py-1.5 bg-[#171920] border-b border-white/[0.06] text-xs shrink-0 select-none overflow-x-auto">
+        {/* Floating root drop indicator when dragging over pane (outside a subfolder) */}
+        {isPaneDropTarget && (
+          <div className="absolute top-12 left-1/2 -translate-x-1/2 z-40 pointer-events-none flex items-center gap-2 px-3.5 py-1.5 bg-[#60cdff] text-[#111215] font-bold text-xs rounded-full shadow-2xl animate-in fade-in zoom-in-95 duration-100">
+            <FolderPlus className="w-4 h-4 shrink-0" />
+            <span>↳ Vložit do kořene složky: <span className="font-mono underline">{pane.currentPath.split('\\').pop() || pane.currentPath}</span></span>
+          </div>
+        )}
+
+        {/* Top: Drive Buttons, Quick Places & Pane Mode Toggle */}
+        <div
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = e.ctrlKey ? 'copy' : 'move';
+            if (!dragTargetFolder) setDragTargetPane(paneKey);
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            void handleDropOnPane(e, pane.currentPath, paneKey);
+          }}
+          className="flex items-center justify-between px-2 py-1.5 bg-[#171920] border-b border-white/[0.06] text-xs shrink-0 select-none overflow-x-auto"
+        >
           {/* Drive selector pills */}
           <div className="flex items-center gap-1">
             {drives.map((d) => {
@@ -1373,7 +1448,7 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
             })}
           </div>
 
-          {/* Quick places shortcuts (Obrázky, Plocha, Dokumenty, Stažené) */}
+          {/* Quick places shortcuts & Mode Switcher */}
           <div className="flex items-center gap-1 shrink-0">
             {places.map((p) => {
               const lower = p.name.toLowerCase();
@@ -1402,18 +1477,113 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                void openTerminalNative(pane.currentPath);
+                if (isLeft) setLeftViewMode('terminal');
+                else setRightViewMode('terminal');
               }}
               className="p-1 rounded bg-white/[0.03] hover:bg-white/[0.1] text-zinc-400 hover:text-white transition-colors cursor-pointer ml-1"
-              title="Otevřít terminál v této složce"
+              title="Spustit integrovaný terminál v tomto okně"
             >
-              <Terminal className="w-3.5 h-3.5" />
+              <Terminal className="w-3.5 h-3.5 text-emerald-400" />
             </button>
+
+            {/* Pane View Mode Toggle: Soubory / Zápisník / Terminál */}
+            <div className="flex items-center bg-black/40 p-0.5 rounded border border-white/10 shrink-0 ml-1.5">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (isLeft) setLeftViewMode('files');
+                  else setRightViewMode('files');
+                }}
+                className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium transition-colors cursor-pointer ${
+                  viewMode === 'files'
+                    ? 'bg-white/15 text-white font-semibold shadow-xs'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+                title="Zobrazit správce souborů"
+              >
+                <Folder className="w-3.5 h-3.5 text-[#60cdff]" />
+                <span className="hidden sm:inline">Soubory</span>
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (isLeft) setLeftViewMode('notepad');
+                  else setRightViewMode('notepad');
+                }}
+                className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium transition-colors cursor-pointer ${
+                  viewMode === 'notepad'
+                    ? 'bg-amber-500/20 text-amber-300 font-semibold shadow-xs ring-1 ring-amber-500/30'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+                title="Přepnout do zápisníku / poznámkového bloku (F4)"
+              >
+                <FileText className="w-3.5 h-3.5 text-amber-400" />
+                <span>Zápisník</span>
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (isLeft) setLeftViewMode('terminal');
+                  else setRightViewMode('terminal');
+                }}
+                className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium transition-colors cursor-pointer ${
+                  viewMode === 'terminal'
+                    ? 'bg-emerald-500/20 text-emerald-300 font-semibold shadow-xs ring-1 ring-emerald-500/30'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+                title="Spustit integrovaný terminál v tomto okně"
+              >
+                <Terminal className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Terminál</span>
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Path Bar & Quick Filter */}
-        <div className="flex items-center gap-1.5 px-2 py-1.5 bg-[#1a1d24] border-b border-white/[0.06] text-xs shrink-0 select-none">
+        {viewMode === 'notepad' ? (
+          <CommanderNotepad
+            paneKey={paneKey}
+            currentPath={pane.currentPath}
+            oppositeSelectedPaths={Array.from(oppositePane.selectedPaths)}
+            initialFilePath={isLeft ? leftNotepadFile : rightNotepadFile}
+            onCloseNotepad={() => {
+              if (isLeft) setLeftViewMode('files');
+              else setRightViewMode('files');
+            }}
+            onNotify={onNotify}
+            onFileSaved={() => {
+              void fetchDirectory(pane.currentPath, paneKey);
+            }}
+          />
+        ) : viewMode === 'terminal' ? (
+          <CommanderTerminal
+            paneKey={paneKey}
+            currentPath={pane.currentPath}
+            oppositeSelectedPaths={Array.from(oppositePane.selectedPaths)}
+            onCloseTerminal={() => {
+              if (isLeft) setLeftViewMode('files');
+              else setRightViewMode('files');
+            }}
+            onNotify={onNotify}
+          />
+        ) : (
+          <>
+            {/* Path Bar & Quick Filter */}
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = e.ctrlKey ? 'copy' : 'move';
+                if (!dragTargetFolder) setDragTargetPane(paneKey);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                void handleDropOnPane(e, pane.currentPath, paneKey);
+              }}
+              className="flex items-center gap-1.5 px-2 py-1.5 bg-[#1a1d24] border-b border-white/[0.06] text-xs shrink-0 select-none"
+            >
           {/* Navigation Controls */}
           <button
             type="button"
@@ -1524,7 +1694,18 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
         </div>
 
         {/* Table Column Headers */}
-        <div className="grid grid-cols-[1fr_80px_100px_130px] px-2 py-1 bg-[#15171d] border-b border-white/[0.08] text-[11px] font-semibold text-zinc-400 uppercase tracking-wider select-none shrink-0">
+        <div
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = e.ctrlKey ? 'copy' : 'move';
+            if (!dragTargetFolder) setDragTargetPane(paneKey);
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            void handleDropOnPane(e, pane.currentPath, paneKey);
+          }}
+          className="grid grid-cols-[1fr_80px_100px_130px] px-2 py-1 bg-[#15171d] border-b border-white/[0.08] text-[11px] font-semibold text-zinc-400 uppercase tracking-wider select-none shrink-0"
+        >
           <button
             type="button"
             onClick={() => {
@@ -1948,6 +2129,21 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
               Složka je prázdná
             </div>
           )}
+
+          {/* Fill bottom empty space in file list for easy drop target */}
+          <div
+            className="flex-1 min-h-[60px]"
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = e.ctrlKey ? 'copy' : 'move';
+              if (dragTargetFolder !== null) setDragTargetFolder(null);
+              if (dragTargetPane !== paneKey) setDragTargetPane(paneKey);
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              void handleDropOnPane(e, pane.currentPath, paneKey);
+            }}
+          />
         </div>
 
         {/* Status Bar for this Pane */}
@@ -1975,9 +2171,11 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
             )}
           </div>
         </div>
-      </div>
-    );
-  };
+      </>
+    )}
+  </div>
+);
+};
 
   return (
     <div
@@ -2115,20 +2313,30 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
           type="button"
           onClick={() => {
             const isLeft = activePane === 'left';
-            const pane = isLeft ? left : right;
-            const list = isLeft ? leftDisplayItems : rightDisplayItems;
-            const hasParent = !!getParentDir(pane.currentPath);
-            const itemIdx = hasParent ? pane.focusedIndex - 1 : pane.focusedIndex;
-            if (itemIdx >= 0 && itemIdx < list.length) {
-              const it = list[itemIdx];
-              if (it) void handleOpenItem(it, activePane);
+            const currentMode = isLeft ? leftViewMode : rightViewMode;
+            if (currentMode === 'notepad') {
+              if (isLeft) setLeftViewMode('files');
+              else setRightViewMode('files');
+            } else {
+              const pane = isLeft ? left : right;
+              const list = isLeft ? leftDisplayItems : rightDisplayItems;
+              const hasParent = !!getParentDir(pane.currentPath);
+              const itemIdx = hasParent ? pane.focusedIndex - 1 : pane.focusedIndex;
+              const it = itemIdx >= 0 && itemIdx < list.length ? list[itemIdx] : null;
+
+              if (it && !it.is_dir && isTextLikeFile(it.extension)) {
+                handleOpenInNotepad(it.path, activePane);
+              } else {
+                if (isLeft) setLeftViewMode('notepad');
+                else setRightViewMode('notepad');
+              }
             }
           }}
           className="flex items-center justify-center gap-1.5 py-1 px-2 rounded bg-white/[0.04] hover:bg-white/[0.1] text-zinc-300 hover:text-white border border-white/[0.06] transition-colors cursor-pointer font-medium"
-          title="Otevřít soubor ve výchozím programu nebo vstoupit do složky (F4 / Enter)"
+          title="Přepnout do zápisníku / upravit textový soubor (F4)"
         >
-          <span className="font-mono text-[#60cdff] font-bold text-[11px]">F4</span>
-          <span className="truncate">Otevřít</span>
+          <span className="font-mono text-amber-400 font-bold text-[11px]">F4</span>
+          <span className="truncate">{(activePane === 'left' ? leftViewMode : rightViewMode) === 'notepad' ? 'Soubory' : 'Zápisník'}</span>
         </button>
 
         <button
@@ -2337,6 +2545,7 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
         onOpenTerminal={(path) => {
           void openTerminalNative(path);
         }}
+        onOpenInNotepad={(filePath) => handleOpenInNotepad(filePath, activePane)}
         onCopy={(paths) => handleCopyClipboard(paths)}
         onCut={(paths) => handleCut(paths)}
         onPaste={(destFolder) => void handlePasteClipboard(destFolder)}

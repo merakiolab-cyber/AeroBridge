@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "AeroBridge Studio",
-  "version": "3.27.27",
+  "version": "3.27.28",
   "identifier": "com.aerobridge.studio",
   "build": {
     "frontendDist": "../dist",

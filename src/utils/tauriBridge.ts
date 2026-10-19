@@ -427,3 +427,49 @@ export async function openFileWithApp(filePath: string, appPath?: string): Promi
     console.warn('[TauriBridge] Failed to open file with app:', err);
   }
 }
+
+/**
+ * Reads text file content safely using native UTF-8 file reading.
+ */
+export async function readTextFileNative(filePath: string): Promise<string> {
+  if (!isDesktopApp() || !filePath) return '';
+  return await invoke<string>('read_text_file_native', { path: filePath });
+}
+
+/**
+ * Writes text file content safely to the specified path.
+ */
+export async function writeTextFileNative(filePath: string, content: string): Promise<void> {
+  if (!isDesktopApp() || !filePath) return;
+  await invoke('write_text_file_native', { path: filePath, content });
+}
+
+export interface ShellCommandResult {
+  stdout: string;
+  stderr: string;
+  exit_code: number;
+  success: boolean;
+}
+
+/**
+ * Executes a shell command inside specified directory asynchronously.
+ */
+export async function executeShellCommandNative(
+  dir: string,
+  command: string,
+  shell?: 'powershell' | 'cmd'
+): Promise<ShellCommandResult> {
+  if (!isDesktopApp()) {
+    return {
+      stdout: `[Web simulace] Spuštěn příkaz: ${command}\n(Nativní terminál je dostupný v desktopové aplikaci)`,
+      stderr: '',
+      exit_code: 0,
+      success: true,
+    };
+  }
+  return await invoke<ShellCommandResult>('execute_shell_command_native', {
+    dir,
+    command,
+    shell: shell || 'powershell',
+  });
+}

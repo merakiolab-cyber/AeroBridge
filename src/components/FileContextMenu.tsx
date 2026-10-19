@@ -16,6 +16,7 @@ import {
   Terminal,
   AppWindow,
   ChevronRight,
+  FileText,
 } from 'lucide-react';
 import { AssetItem } from '../types';
 import { Win11Star } from './Win11Icons';
@@ -60,6 +61,7 @@ export interface FileContextMenuProps {
   onShowProperties?: (path: string) => void;
   favoriteFolders?: string[];
   onToggleFavorite?: (path: string) => void;
+  onOpenInNotepad?: (path: string) => void;
 }
 
 export const FileContextMenu: React.FC<FileContextMenuProps> = ({
@@ -82,6 +84,7 @@ export const FileContextMenu: React.FC<FileContextMenuProps> = ({
   onShowProperties,
   favoriteFolders,
   onToggleFavorite,
+  onOpenInNotepad,
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
   const [associatedApps, setAssociatedApps] = useState<AssociatedApp[]>([]);
@@ -214,6 +217,23 @@ export const FileContextMenu: React.FC<FileContextMenuProps> = ({
             </div>
             <span className="text-[10px] text-zinc-500 font-mono">Enter</span>
           </button>
+
+          {/* Otevřít v zápisníku */}
+          {!isFolderAsset && targetFilePath && onOpenInNotepad && (
+            <button
+              onClick={() => {
+                onClose();
+                onOpenInNotepad(targetFilePath);
+              }}
+              className="w-full flex items-center justify-between px-3 py-1.5 text-left rounded-none hover:bg-white/[0.08] hover:text-white transition-colors cursor-pointer group"
+            >
+              <div className="flex items-center gap-2.5 font-normal">
+                <FileText className="w-4 h-4 text-amber-400" />
+                <span>Otevřít v zápisníku</span>
+              </div>
+              <span className="text-[10px] text-amber-400/80 font-mono">F4</span>
+            </button>
+          )}
 
           {/* Otevřít v programu (Open with...) submenu */}
           {!isFolderAsset && targetFilePath && (

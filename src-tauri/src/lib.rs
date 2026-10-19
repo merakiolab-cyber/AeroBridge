@@ -1499,6 +1499,101 @@ fn show_file_properties_native(path: String) -> Result<(), String> {
     }
 }
 
+/// Reads text file content safely with UTF-8 decoding and size limit
+#[tauri::command]
+async fn read_text_file_native(path: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let p = Path::new(&path);
+        if !p.is_file() {
+            return Err("Soubor neexistuje nebo se nejedná o běžný soubor".to_string());
+        }
+        let metadata = fs::metadata(p).map_err(|e| format!("Nelze načíst metadata souboru: {}", e))?;
+        if metadata.len() > 20 * 1024 * 1024 {
+            return Err("Textový soubor je příliš velký (maximum je 20 MB)".to_string());
+        }
+        fs::read_to_string(p).map_err(|e| format!("Nelze přečíst textový soubor (možná se nejedná o platný text UTF-8): {}", e))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Writes text file content safely
+#[tauri::command]
+async fn write_text_file_native(path: String, content: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let p = Path::new(&path);
+        if let Some(parent) = p.parent() {
+            if !parent.exists() {
+                fs::create_dir_all(parent).map_err(|e| format!("Nelze vytvořit nadřazenou složku: {}", e))?;
+            }
+        }
+        fs::write(p, content.as_bytes()).map_err(|e| format!("Nelze zapsat do souboru: {}", e))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[derive(serde::Serialize)]
+struct CommandOutput {
+    stdout: String,
+    stderr: String,
+    exit_code: i32,
+    success: bool,
+}
+
+/// Executes a shell command inside specified directory without UI blocking
+#[tauri::command]
+async fn execute_shell_command_native(
+    dir: String,
+    command: String,
+    shell: Option<String>,
+) -> Result<CommandOutput, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let p = Path::new(&dir);
+        let work_dir = if p.is_dir() { p } else { Path::new(".") };
+        let sh = shell.as_deref().unwrap_or("powershell");
+
+        let mut cmd = if sh == "cmd" {
+            let mut c = std::process::Command::new("cmd.exe");
+            c.arg("/C").arg(&command);
+            c
+        } else {
+            let mut c = std::process::Command::new("powershell.exe");
+            c.arg("-NoProfile")
+                .arg("-NonInteractive")
+                .arg("-ExecutionPolicy")
+                .arg("Bypass")
+                .arg("-Command")
+                .arg(&command);
+            c
+        };
+
+        cmd.current_dir(work_dir);
+
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            const CREATE_NO_WINDOW: u32 = 0x08000000;
+            cmd.creation_flags(CREATE_NO_WINDOW);
+        }
+
+        let output = cmd.output().map_err(|e| format!("Chyba při spuštění příkazu: {}", e))?;
+        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        let exit_code = output.status.code().unwrap_or(-1);
+        let success = output.status.success();
+
+        Ok(CommandOutput {
+            stdout,
+            stderr,
+            exit_code,
+            success,
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -1530,7 +1625,10 @@ pub fn run() {
             get_folder_size,
             open_terminal_native,
             get_associated_apps_native,
-            open_file_with_app_native
+            open_file_with_app_native,
+            read_text_file_native,
+            write_text_file_native,
+            execute_shell_command_native
         ])
         .run(tauri::generate_context!())
         .expect("error while building tauri application");
