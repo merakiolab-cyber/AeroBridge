@@ -14,7 +14,7 @@
 </div>
 
 <p align="center">
-  <img src="docs/screenshot.png" alt="AeroBridge Studio – náhled aplikace" width="900">
+  <img src="docs/screenshots/01-browser-grid.jpg" alt="AeroBridge Studio – prohlížeč s náhledy PSD, AI, INDD, Figma, Blender, Krita, HTML a PDF" width="900">
 </p>
 
 ---
@@ -47,8 +47,15 @@ AeroBridge obsahuje vlastní binární parsery vyvinuté pro okamžité dekódov
 - **Metadata Table (Seznam):** Přehledná tabulka s technickými specifikacemi (rozměry, velikost, formát, datum, EXIF) s možností okamžitého řazení.
 
 <p align="center">
-  <img src="docs/screenshot-filmstrip.png" alt="AeroBridge Studio – režim Filmstrip" width="900">
+  <img src="docs/screenshots/03-filmstrip.jpg" alt="AeroBridge Studio – režim Filmstrip" width="445">
+  <img src="docs/screenshots/04-compare.jpg" alt="AeroBridge Studio – porovnání InDesign a Illustrator souboru" width="445">
 </p>
+<p align="center">
+  <img src="docs/screenshots/06-commander-terminal.jpg" alt="AeroBridge Studio – Commander s terminálem" width="445">
+  <img src="docs/screenshots/07-commander-notepad.jpg" alt="AeroBridge Studio – Commander se zápisníkem" width="445">
+</p>
+
+<sub>Snímky ukazují fiktivní projekt NOVA EXODUS z ukázkového režimu (viz níže). Ilustrace vytvořeny v Midjourney.</sub>
 
 ### 3. ⚡ Bleskový výkon pro Windows 11 (Tauri v2 + Rust)
 - **Virtualizované procházení:** Zvládá složky s 10 000+ soubory bez jakéhokoliv zasekávání rozhraní a bez paměťových úniků.
@@ -139,6 +146,22 @@ npm run desktop:start
 npm run build
 npm run preview
 ```
+
+### Ukázkový režim (prezentace a screenshoty)
+
+Webová verze umí simulovat desktopový backend s fiktivními disky, Commanderem, terminálem a zápisníkem.
+Ukázkové soubory (`demo/fs/`) jsou skutečné PSD, AI, INDD, FIG, BLEND, KRA, PDF a HTML soubory,
+takže všechny náhledy generují parsery aplikace – simulovaná je jen vrstva operačního systému.
+
+```bash
+npm run demo:fs      # vygeneruje demo/fs z ilustrací v demo/art (Python + Pillow + PyMuPDF)
+npm run dev          # pak otevřete http://localhost:3000/?demo
+```
+
+Volitelné parametry: `dir=` (složka prohlížeče), `left=` / `right=` (panely Commanderu).
+Demo režim existuje jen ve vývojovém serveru, produkční build ho neobsahuje.
+
+Landing page projektu je ve složce [`landing/`](landing/index.html) (statická stránka bez build kroku).
 
 ---
 

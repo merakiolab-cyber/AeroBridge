@@ -64,3 +64,5 @@ src-tauri/gen/
 
 # Local desktop build output
 dist-desktop/
+demo/fs/
+demo/.tmp/

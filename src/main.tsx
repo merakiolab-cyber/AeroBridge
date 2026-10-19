@@ -20,10 +20,20 @@ if ('serviceWorker' in navigator) {
   }
 }
 
-createRoot(document.getElementById('root')!).render(
-  <ErrorBoundary>
-    <App />
-  </ErrorBoundary>
-);
+async function bootstrap() {
+  // Dev-only presentation mode with a simulated desktop backend (stripped from production builds)
+  if (import.meta.env.DEV && new URLSearchParams(location.search).has('demo')) {
+    const { installDemoMode } = await import('./demo/demoMode');
+    await installDemoMode();
+  }
+
+  createRoot(document.getElementById('root')!).render(
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
+  );
+}
+
+void bootstrap();
 
 

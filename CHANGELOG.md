@@ -2,6 +2,20 @@
 
 ## Changelog
 
+### Kvalita náhledů: PSD v plném rozlišení, správné rozměry a DPI
+- **PSD / PSB v plné kvalitě ([psdComposite.ts](src/utils/extractors/psdComposite.ts), [hiResPreview.ts](src/utils/hiResPreview.ts)):** Photoshop vkládá jen ~160–256 px náhled, který ve velkých pohledech měkl. Aplikace teď přes nový Rust příkaz `read_file_range` načte jen sloučený obraz z konce souboru, dekóduje ho (8/16 bit, RGB, šedá, indexované, CMYK, RLE i raw, PSD i PSB) a zmenší na požadovanou šířku.
+  - **Filmstrip, Porovnání, QuickLook a Inspektor** po krátké prodlevě vymění náhled za ostrý; mřížka dostane ostřejší náhled v druhém, nízkoprioritním průchodu (výsledek se cachuje).
+  - Soubory uložené bez „Maximize Compatibility“ (prázdný kompozit), ZIP-komprimované a nepodporované varianty zůstanou u vloženého náhledu.
+  - Z dvou vložených náhledů PSD (resource 1036 a XMP) se vybírá ten větší.
+- **Skutečné rozměry a DPI:** PSD hlásí rozměry a tiskové DPI z hlavičky souboru (resource 1005), ne rozměry náhledu. PDF a AI uvádějí rozměr stránky v bodech místo rozměru 900 px renderu.
+- **PDF a AI:** velké pohledy znovu vykreslí první stranu ve větší šířce (dřív zůstalo 900 px).
+- **Krita a XD:** náhled z ZIP archivu dostane správný MIME typ, takže přežije převod na data URL.
+
+### Prezentace: ukázkový režim, screenshoty a landing page
+- **Ukázkový režim `?demo` ([src/demo/demoMode.ts](src/demo/demoMode.ts)):** jen ve vývojovém serveru simuluje Tauri backend přes `@tauri-apps/api/mocks` – fiktivní disky, Commander, PTY terminál se skriptovanou relací a zápisník s předvyplněnými záložkami.
+- **Generátor ukázkových souborů ([scripts/demo/build_demo_fs.py](scripts/demo/build_demo_fs.py)):** fiktivní herní produkce NOVA EXODUS ze strukturálně platných PSD, KRA, BLEND, FIG, AI, INDD, PDF, HTML a SVG souborů (`npm run demo:fs`, výstup `demo/fs/` je v `.gitignore`).
+- **Screenshoty v [docs/screenshots/](docs/screenshots/)** a **landing page v [landing/](landing/index.html)**.
+
 ### Nové logo / symbol aplikace (složka s okem)
 - **Brand assety v [branding/logo/](branding/logo/):** zdrojový `.ai`, SVG varianty (symbol černý/bílý/accent/`currentColor`, app ikony dark/light/accent/maskable, favicon) a PNG exporty 1024 px.
 - **Nasazení:** `public/icon.svg|png`, `favicon.svg`, `icon-maskable.*`, PWA manifest, kompletní sada `src-tauri/icons/` (přes `tauri icon`) a symbol v `TopBar.tsx` (`LogoMark.tsx`).
