@@ -374,7 +374,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <div>
                     <h3 className="font-bold text-white text-sm">AeroBridge Studio</h3>
                     <p className="text-[11px] text-zinc-400 mt-0.5">
-                      Verze 3.27.25 (Windows 11 x64 Native Desktop Application)
+                      Verze 3.27.29 (Windows 11 x64 Native Desktop Application)
                     </p>
                     <div className="flex items-center gap-2 mt-2">
                       <span className="px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-medium flex items-center gap-1">
