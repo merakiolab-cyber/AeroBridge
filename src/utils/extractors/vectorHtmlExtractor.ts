@@ -437,7 +437,10 @@ export async function extractKritaThumbnail(
 
       const target = candidateFiles[0];
       if (target) {
-        const blob = await target.async('blob');
+        // JSZip hands back an untyped blob; give it a real MIME type so it survives conversion to a data URL
+        const name = (target as unknown as { name?: string }).name || '';
+        const mime = /\.jpe?g$/i.test(name) ? 'image/jpeg' : /\.webp$/i.test(name) ? 'image/webp' : 'image/png';
+        const blob = new Blob([await target.async('arraybuffer')], { type: mime });
         const url = URL.createObjectURL(blob);
         const dims = await getImageDimensions(url);
         return {
@@ -499,7 +502,8 @@ export async function extractXdThumbnail(
 
       const target = candidateFiles[0];
       if (target) {
-        const blob = await target.async('blob');
+        // Typed blob so it survives conversion to a data URL (JSZip returns an untyped one)
+        const blob = new Blob([await target.async('arraybuffer')], { type: 'image/png' });
         const url = URL.createObjectURL(blob);
         const dims = await getImageDimensions(url);
         return {

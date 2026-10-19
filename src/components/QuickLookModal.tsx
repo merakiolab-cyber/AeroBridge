@@ -16,6 +16,7 @@ import { isVisualAsset } from '../utils/adobeThumbnailExtractor';
 import { getPdfDocInfo, renderPdfPage } from '../utils/pdfPreview';
 import { getResolutionInfo } from '../utils/extractors';
 import { toDesktopAssetUrl } from '../utils/tauriBridge';
+import { useHiResPreview, previewReflectsDocumentSize } from '../utils/hiResPreview';
 import { FileTypeBadge } from './AppIcons';
 
 const directImageExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg', 'bmp', 'ico', 'avif'];
@@ -67,6 +68,10 @@ export const QuickLookModal: React.FC<QuickLookModalProps> = ({
   const [currentUrl, setCurrentUrl] = useState<string>(asset?.url || '');
   const [isPageRendering, setIsPageRendering] = useState(false);
   const [renderedDimensions, setRenderedDimensions] = useState<{ width: number; height: number } | null>(null);
+
+  const hiResRaw = useHiResPreview(isOpen ? asset : null, 2400);
+  // Never let a page-1 rendition shadow a page the user navigated to
+  const hiRes = asset && pdfPage !== (asset.currentPage || 1) ? null : hiResRaw;
 
   const currentIndex = asset ? assets.findIndex((a) => a.id === asset.id) : -1;
 
@@ -222,12 +227,13 @@ export const QuickLookModal: React.FC<QuickLookModalProps> = ({
               className="absolute inset-0 flex items-center justify-center"
             >
               <ZoomableCanvas
-                src={currentUrl}
+                src={hiRes ?? currentUrl}
                 alt={asset.name}
                 enableOverlayControls={true}
                 onLoad={(e) => {
                   const img = e.currentTarget;
-                  if (img.naturalWidth > 0) {
+                  // A downsampled hi-res rendition must not overwrite the asset's real dimensions
+                  if (!hiRes && previewReflectsDocumentSize(asset) && img.naturalWidth > 0) {
                     if (asset.dimensions.width !== img.naturalWidth || asset.dimensions.height !== img.naturalHeight) {
                       asset.dimensions = {
                         width: img.naturalWidth,

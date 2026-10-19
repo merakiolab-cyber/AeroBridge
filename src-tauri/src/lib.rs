@@ -365,6 +365,34 @@ async fn read_file_binary(
     .map_err(|e| e.to_string())?
 }
 
+/// Reads `length` bytes starting at `offset` (clamped to the end of the file).
+/// Used for data that lives past the file head, e.g. the flattened composite of a PSD.
+#[tauri::command]
+async fn read_file_range(
+    path: String,
+    offset: u64,
+    length: u64,
+) -> Result<tauri::ipc::Response, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        const MAX_RANGE_BYTES: u64 = 400 * 1024 * 1024;
+        let mut file = fs::File::open(&path).map_err(|e| format!("Nelze otevřít soubor: {}", e))?;
+        let len = file.metadata().map(|m| m.len()).unwrap_or(0);
+        if offset >= len {
+            return Ok::<_, String>(tauri::ipc::Response::new(Vec::new()));
+        }
+        let want = length.min(len - offset).min(MAX_RANGE_BYTES);
+        let mut buf = Vec::with_capacity(want as usize);
+        file.seek(SeekFrom::Start(offset))
+            .map_err(|e| format!("Nelze se posunout v souboru: {}", e))?;
+        file.take(want)
+            .read_to_end(&mut buf)
+            .map_err(|e| format!("Nelze přečíst soubor: {}", e))?;
+        Ok(tauri::ipc::Response::new(buf))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 fn find_sub(hay: &[u8], needle: &[u8]) -> Option<usize> {
     if needle.is_empty() || hay.len() < needle.len() {
         return None;
@@ -1699,6 +1727,7 @@ pub fn run() {
             scan_folder_native,
             list_subdirs,
             read_file_binary,
+            read_file_range,
             extract_xmp_thumbnail,
             extract_embedded_jpeg,
             get_file_icon,

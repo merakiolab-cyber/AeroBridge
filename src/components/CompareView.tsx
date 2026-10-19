@@ -5,7 +5,37 @@ import { ZoomableCanvas } from './ZoomableCanvas';
 import { Copy, Maximize2, FileText } from 'lucide-react';
 import { getResolutionInfo } from '../utils/extractors';
 import { toDesktopAssetUrl } from '../utils/tauriBridge';
+import { useHiResPreview, previewReflectsDocumentSize } from '../utils/hiResPreview';
 import { FileTypeBadge } from './AppIcons';
+
+const DIRECT_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg', 'bmp', 'ico', 'avif'];
+
+/** Zoomable pane that swaps in a sharper PSD / PDF / AI rendition once it is decoded. */
+const CompareCanvas: React.FC<{ asset: AssetItem }> = ({ asset }) => {
+  const hiRes = useHiResPreview(asset, 1800);
+  const ext = (asset.extension || '').toLowerCase().replace(/^\./, '');
+  const base = DIRECT_IMAGE_EXTENSIONS.includes(ext) && asset.fullPath ? toDesktopAssetUrl(asset.fullPath) : asset.url;
+
+  return (
+    <ZoomableCanvas
+      src={hiRes ?? base}
+      alt={asset.name}
+      enableOverlayControls={false}
+      onLoad={(e) => {
+        const img = e.currentTarget;
+        // A downsampled hi-res rendition must not overwrite the asset's real dimensions
+        if (!hiRes && previewReflectsDocumentSize(asset) && img.naturalWidth > 0) {
+          if (asset.dimensions.width !== img.naturalWidth || asset.dimensions.height !== img.naturalHeight) {
+            asset.dimensions = {
+              width: img.naturalWidth,
+              height: img.naturalHeight,
+            };
+          }
+        }
+      }}
+    />
+  );
+};
 
 interface CompareViewProps {
   assets: AssetItem[];
@@ -102,28 +132,7 @@ export const CompareView: React.FC<CompareViewProps> = ({
 
             {/* Canvas with wheel zoom */}
             <div className="flex-1 bg-[#06070a] relative overflow-hidden">
-              <ZoomableCanvas
-                src={
-                  ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg', 'bmp', 'ico', 'avif'].includes(
-                    (asset.extension || '').toLowerCase().replace(/^\./, '')
-                  ) && asset.fullPath
-                    ? toDesktopAssetUrl(asset.fullPath)
-                    : asset.url
-                }
-                alt={asset.name}
-                enableOverlayControls={false}
-                onLoad={(e) => {
-                  const img = e.currentTarget;
-                  if (img.naturalWidth > 0) {
-                    if (asset.dimensions.width !== img.naturalWidth || asset.dimensions.height !== img.naturalHeight) {
-                      asset.dimensions = {
-                        width: img.naturalWidth,
-                        height: img.naturalHeight,
-                      };
-                    }
-                  }
-                }}
-              />
+              <CompareCanvas asset={asset} />
             </div>
 
             {/* Bottom Meta */}

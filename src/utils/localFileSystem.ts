@@ -2,6 +2,7 @@ import JSZip from 'jszip';
 import { AssetItem, BatchExportConfig } from '../types';
 import {
   extractPsdThumbnail,
+  parsePsdHeaderInfo,
   extractInddThumbnail,
   extractAiThumbnail,
   extractRawThumbnail,
@@ -103,7 +104,9 @@ export async function parseFilesToAssets(
         const psdThumb = extractPsdThumbnail(buffer);
         if (psdThumb) {
           previewUrl = psdThumb;
-          dimensions = await getImageDimensions(previewUrl);
+          // Real document size, not the size of the embedded thumbnail
+          const psdInfo = parsePsdHeaderInfo(buffer);
+          dimensions = psdInfo ? { width: psdInfo.width, height: psdInfo.height } : await getImageDimensions(previewUrl);
         } else {
           previewUrl = '';
           dimensions = { width: 0, height: 0 };

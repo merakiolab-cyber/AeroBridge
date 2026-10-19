@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { getResolutionInfo } from '../utils/extractors';
 import { toDesktopAssetUrl } from '../utils/tauriBridge';
+import { useHiResPreview, previewReflectsDocumentSize } from '../utils/hiResPreview';
 import { FileTypeBadge } from './AppIcons';
 
 interface FilmstripViewProps {
@@ -44,6 +45,7 @@ export const FilmstripView: React.FC<FilmstripViewProps> = ({
 
   const activeIndex = assets.findIndex((a) => a.id === selectedId);
   const currentAsset = activeIndex >= 0 ? assets[activeIndex] : assets[0] || null;
+  const hiRes = useHiResPreview(currentAsset, 2400);
 
   // Keep active thumbnail visible in horizontal carousel
   useEffect(() => {
@@ -167,11 +169,12 @@ export const FilmstripView: React.FC<FilmstripViewProps> = ({
       <div className="flex-1 relative flex items-center justify-center min-h-0 bg-[#06070a] overflow-hidden">
         <ZoomableCanvas
           src={
-            ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg', 'bmp', 'ico', 'avif'].includes(
+            hiRes ??
+            (['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg', 'bmp', 'ico', 'avif'].includes(
               (currentAsset.extension || '').toLowerCase().replace(/^\./, '')
             ) && currentAsset.fullPath
               ? toDesktopAssetUrl(currentAsset.fullPath)
-              : currentAsset.url
+              : currentAsset.url)
           }
           alt={currentAsset.name}
           enableOverlayControls={true}
@@ -181,7 +184,8 @@ export const FilmstripView: React.FC<FilmstripViewProps> = ({
           paddingClassName="p-4 md:p-6 pt-16 pb-16"
           onLoad={(e) => {
             const img = e.currentTarget;
-            if (img.naturalWidth > 0) {
+            // A downsampled hi-res rendition must not overwrite the asset's real dimensions
+            if (!hiRes && previewReflectsDocumentSize(currentAsset) && img.naturalWidth > 0) {
               if (currentAsset.dimensions.width !== img.naturalWidth || currentAsset.dimensions.height !== img.naturalHeight) {
                 currentAsset.dimensions = {
                   width: img.naturalWidth,

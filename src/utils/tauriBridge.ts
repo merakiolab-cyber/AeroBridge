@@ -69,6 +69,15 @@ export async function readNativeFileBinary(filePath: string, maxBytes?: number):
   return res instanceof ArrayBuffer ? res : new Uint8Array(res as unknown as number[]).buffer;
 }
 
+/**
+ * Reads `length` bytes starting at `offset` (clamped to the file end) via Tauri's binary IPC channel.
+ */
+export async function readNativeFileRange(filePath: string, offset: number, length: number): Promise<ArrayBuffer> {
+  if (!isDesktopApp()) throw new Error('Native binary reading requires desktop environment');
+  const res = await invoke<ArrayBuffer>('read_file_range', { path: filePath, offset, length });
+  return res instanceof ArrayBuffer ? res : new Uint8Array(res as unknown as number[]).buffer;
+}
+
 export interface NativePlace {
   name: string;
   path: string;

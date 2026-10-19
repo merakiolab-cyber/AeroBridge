@@ -163,6 +163,51 @@ export async function extractInddThumbnail(
 }
 
 /**
+ * Reads the true canvas size and print resolution of a Photoshop (.psd / .psb) file.
+ * The embedded thumbnail is only ~160-256 px wide, so its dimensions must never be reported as the document size.
+ * DPI comes from image resource 1005 (ResolutionInfo); returns `dpi: undefined` when absent.
+ */
+export function parsePsdHeaderInfo(buffer: ArrayBuffer): { width: number; height: number; dpi?: number } | null {
+  try {
+    if (!buffer || buffer.byteLength < 30) return null;
+    const view = new DataView(buffer);
+    if (view.getUint32(0, false) !== 0x38425053) return null; // '8BPS'
+    const height = view.getUint32(14, false);
+    const width = view.getUint32(18, false);
+    if (!width || !height) return null;
+
+    let dpi: number | undefined;
+    const colorModeLength = view.getUint32(26, false);
+    let offset = 30 + colorModeLength;
+    if (offset + 4 <= buffer.byteLength) {
+      const resEnd = Math.min(buffer.byteLength, offset + 4 + view.getUint32(offset, false));
+      offset += 4;
+      while (offset + 12 <= resEnd) {
+        if (view.getUint32(offset, false) !== 0x3842494d) break; // '8BIM'
+        const id = view.getUint16(offset + 4, false);
+        const nameLen = view.getUint8(offset + 6);
+        let p = offset + 7 + nameLen;
+        if ((nameLen + 1) % 2 !== 0) p++; // Pascal name padded to even length
+        if (p + 4 > resEnd) break;
+        const size = view.getUint32(p, false);
+        p += 4;
+        if (id === 0x03ed && size >= 8 && p + 8 <= buffer.byteLength) {
+          const hRes = view.getUint32(p, false) / 65536; // 16.16 fixed point
+          const unit = view.getUint16(p + 4, false); // 1 = pixels/inch, 2 = pixels/cm
+          const value = unit === 2 ? hRes * 2.54 : hRes;
+          if (value > 0 && value < 10000) dpi = Math.round(value);
+          break;
+        }
+        offset = p + size + (size % 2);
+      }
+    }
+    return { width, height, dpi };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Extracts embedded JFIF/JPEG thumbnail from a Photoshop (.psd) file binary buffer.
  */
 export function extractPsdThumbnail(buffer: ArrayBuffer): string | null {
@@ -175,6 +220,7 @@ export function extractPsdThumbnail(buffer: ArrayBuffer): string | null {
     if (view.getUint32(0, false) !== 0x38425053) return null;
 
     // 2. Parse Image Resources Section (where Photoshop stores embedded thumbnails 1036 and 1033)
+    let bestResourceThumb: string | null = null;
     try {
       const colorModeLength = view.getUint32(26, false);
       let offset = 26 + 4 + colorModeLength;
@@ -220,7 +266,9 @@ export function extractPsdThumbnail(buffer: ArrayBuffer): string | null {
                   for (let c = 0; c < jpegBytes.length; c += chunkLen) {
                     binary += String.fromCharCode.apply(null, Array.from(jpegBytes.subarray(c, c + chunkLen)));
                   }
-                  return `data:image/jpeg;base64,${btoa(binary)}`;
+                  // Keep scanning: the XMP thumbnail (resource 1060) is usually larger than the 160 px one
+                  const url = `data:image/jpeg;base64,${btoa(binary)}`;
+                  if (!bestResourceThumb || url.length > bestResourceThumb.length) bestResourceThumb = url;
                 }
               }
             }
@@ -229,7 +277,9 @@ export function extractPsdThumbnail(buffer: ArrayBuffer): string | null {
           // Resource ID 0x0424 (1060): XMP Metadata
           if (resId === 0x0424 && resDataSize > 100) {
             const xmpThumb = extractXmpThumbnail(buffer.slice(offset, offset + resDataSize), resDataSize);
-            if (xmpThumb) return xmpThumb;
+            if (xmpThumb && (!bestResourceThumb || xmpThumb.length > bestResourceThumb.length)) {
+              bestResourceThumb = xmpThumb;
+            }
           }
 
           offset += resDataSize;
@@ -239,6 +289,7 @@ export function extractPsdThumbnail(buffer: ArrayBuffer): string | null {
     } catch (e) {
       console.debug('PSD structured resource parsing exception:', e);
     }
+    if (bestResourceThumb) return bestResourceThumb;
 
     // 3. Fallback: Search for XMP metadata packet anywhere in the buffer
     const xmpThumb = extractXmpThumbnail(buffer, Math.min(buffer.byteLength, 16 * 1024 * 1024));

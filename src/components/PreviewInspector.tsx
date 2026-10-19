@@ -19,6 +19,7 @@ import { isVisualAsset } from '../utils/adobeThumbnailExtractor';
 import { getPdfDocInfo, renderPdfPage } from '../utils/pdfPreview';
 import { getNativeFolderSize, getNativeFileIcon, toDesktopAssetUrl, type FolderSizeInfo } from '../utils/tauriBridge';
 import { getResolutionInfo } from '../utils/extractors';
+import { useHiResPreview, previewReflectsDocumentSize } from '../utils/hiResPreview';
 import { Win11Folder } from './Win11Icons';
 import { FileTypeBadge } from './AppIcons';
 
@@ -67,6 +68,10 @@ export const PreviewInspector: React.FC<PreviewInspectorProps> = ({
   const [pdfPage, setPdfPage] = useState<number>(asset?.currentPage || 1);
   const [pdfTotalPages, setPdfTotalPages] = useState<number>(asset?.pageCount || 1);
   const [previewUrl, setPreviewUrl] = useState<string>(asset?.url || '');
+  // The inspector pane is ~400 px wide; 1200 px keeps it sharp on high-DPI screens without a heavy decode
+  const hiResRaw = useHiResPreview(asset, 1200);
+  // Never let a page-1 rendition shadow a page the user navigated to
+  const hiRes = asset && pdfPage !== (asset.currentPage || 1) ? null : hiResRaw;
   const [isPageRendering, setIsPageRendering] = useState(false);
   const [folderSize, setFolderSize] = useState<FolderSizeInfo | null>(null);
   const [isCalculatingSize, setIsCalculatingSize] = useState(false);
@@ -280,13 +285,14 @@ export const PreviewInspector: React.FC<PreviewInspectorProps> = ({
                     </div>
                   ) : (
                     <img
-                      src={previewUrl}
+                      src={hiRes ?? previewUrl}
                       alt={asset.name}
                       referrerPolicy="no-referrer"
                       onError={handleImgError}
                       onLoad={(e) => {
                         const img = e.currentTarget;
-                        if (img.naturalWidth > 0) {
+                        // A downsampled hi-res rendition must not overwrite the asset's real dimensions
+                        if (!hiRes && previewReflectsDocumentSize(asset) && img.naturalWidth > 0) {
                           if (asset.dimensions.width !== img.naturalWidth || asset.dimensions.height !== img.naturalHeight) {
                             asset.dimensions = {
                               width: img.naturalWidth,

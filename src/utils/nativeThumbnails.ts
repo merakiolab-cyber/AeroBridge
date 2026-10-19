@@ -17,6 +17,7 @@ import {
   extractHtmlThumbnail,
   extractBlendThumbnail,
   extractPsdThumbnail,
+  parsePsdHeaderInfo,
   extractRawThumbnail,
   extractTiffThumbnail,
   extractPostScriptThumbnail,
@@ -27,6 +28,7 @@ import {
   getImageDimensions,
 } from './adobeThumbnailExtractor';
 import { parseImageHeader } from './extractors/imageHeaderParser';
+import { decodePsdComposite } from './extractors/psdComposite';
 import {
   extractNativeXmpThumbnail,
   extractNativeEmbeddedJpeg,
@@ -34,6 +36,7 @@ import {
   getNativeFolderSize,
   getNativeShellThumbnail,
   readNativeFileBinary,
+  readNativeFileRange,
   toDesktopAssetUrl,
 } from './tauriBridge';
 
@@ -104,7 +107,8 @@ async function renderPdfFirstPage(buffer: ArrayBuffer, targetWidth = 900): Promi
       await page.render({ canvasContext: ctx, viewport, canvas }).promise;
       return {
         url: canvas.toDataURL('image/jpeg', 0.85),
-        dimensions: { width: canvas.width, height: canvas.height },
+        // Report the page size in points (1 pt = 1 px at 72 DPI), not the size of this 900 px render
+        dimensions: { width: Math.round(base.width), height: Math.round(base.height) },
         pageCount: doc.numPages,
         currentPage: 1,
       };
@@ -443,7 +447,14 @@ async function doGenerateNativeThumbnail(asset: AssetItem, path: string, ext: st
         // Step 1: Parse embedded Photoshop resource 1036/1033 / XMP thumbnail from file header
         const head = await readNativeFileBinary(path, 16 * MB);
         const thumb = extractPsdThumbnail(head);
-        if (thumb) return await withDims(thumb);
+        if (thumb) {
+          // Report the document's real size and print DPI, not the dimensions of the tiny embedded thumbnail
+          const info = parsePsdHeaderInfo(head);
+          if (info) {
+            return { url: thumb, dimensions: { width: info.width, height: info.height }, resolutionDpi: info.dpi };
+          }
+          return await withDims(thumb);
+        }
 
         // Step 2: Native XMP metadata scan through Rust
         const xmp = await extractNativeXmpThumbnail(path, 48);
@@ -740,6 +751,53 @@ async function doGenerateNativeThumbnail(asset: AssetItem, path: string, ext: st
 }
 
 // ---------------------------------------------------------------------------
+// PSD grid thumbnails: second, low-priority pass
+// Photoshop embeds only 160-256 px previews, which look soft on grid cards. After the fast embedded thumbnail is
+// shown, the flattened composite is decoded at a larger size and swapped in (and cached for the next visit).
+// ---------------------------------------------------------------------------
+const PSD_GRID_WIDTH = 640;
+const PSD_UPGRADE_MAX_BYTES = 1.2 * 1024 * MB;
+const upgradedKeys = new Set<string>();
+let upgradeChain: Promise<unknown> = Promise.resolve();
+
+const isPsdAsset = (a: AssetItem) => {
+  const e = (a.extension || '').toLowerCase().replace(/^\./, '');
+  return !a.isFolder && !!a.fullPath && (e === 'psd' || e === 'psb') && a.size <= PSD_UPGRADE_MAX_BYTES;
+};
+
+const thumbKey = (a: AssetItem) => `${a.fullPath}:${a.size}:${a.dateModified || ''}`;
+
+/** Serialised so that several large composites are never held in memory at once. */
+function upgradePsdGridThumbnail(asset: AssetItem): Promise<ThumbPatch | null> {
+  const run = async (): Promise<ThumbPatch | null> => {
+    const path = asset.fullPath;
+    if (!path) return null;
+    try {
+      const res = await decodePsdComposite((offset, length) => readNativeFileRange(path, offset, length), PSD_GRID_WIDTH);
+      if (!res) return null;
+      const base = thumbCache.get(thumbKey(asset));
+      const patch = await patchToDataUrl({
+        url: res.url,
+        dimensions: { width: res.sourceWidth, height: res.sourceHeight },
+        resolutionDpi: base?.resolutionDpi,
+        isIcon: false,
+      });
+      URL.revokeObjectURL(res.url);
+      if (!patch.url.startsWith('data:')) return null;
+      thumbCache.set(thumbKey(asset), patch);
+      upgradedKeys.add(thumbKey(asset));
+      return patch;
+    } catch (err) {
+      console.debug('[Thumbnails] PSD grid upgrade failed for', asset.name, err);
+      return null;
+    }
+  };
+  const result = upgradeChain.then(run, run);
+  upgradeChain = result.catch(() => null);
+  return result;
+}
+
+// ---------------------------------------------------------------------------
 // Public: generate preview for a single native asset with LRU caching
 // ---------------------------------------------------------------------------
 export async function generateNativeThumbnail(asset: AssetItem): Promise<ThumbPatch | null> {
@@ -803,13 +861,20 @@ export function hydrateNativeThumbnails(
   const immediate = new Map<string, ThumbPatch>();
   const queue: AssetItem[] = [];
 
+  // PSD files get a sharper composite-based thumbnail in a low-priority second pass
+  const upgradeTargets: AssetItem[] = [];
+  const firstPassDone = new Set<string>();
+
   for (const a of allTargets) {
     const cacheKey = `${a.fullPath}:${a.size}:${a.dateModified || ''}`;
     const hit = thumbCache.get(cacheKey);
     if (hit) {
       immediate.set(a.id, hit);
+      firstPassDone.add(a.id);
+      if (isPsdAsset(a) && !upgradedKeys.has(cacheKey)) upgradeTargets.push(a);
     } else {
       queue.push(a);
+      if (isPsdAsset(a)) upgradeTargets.push(a);
     }
   }
 
@@ -817,7 +882,7 @@ export function hydrateNativeThumbnails(
     applyPatches(immediate);
   }
 
-  if (queue.length === 0) {
+  if (queue.length === 0 && upgradeTargets.length === 0) {
     return job;
   }
 
@@ -842,6 +907,7 @@ export function hydrateNativeThumbnails(
       const asset = queue[index++];
       if (!asset) break;
       const patch = await generateNativeThumbnail(asset);
+      firstPassDone.add(asset.id);
       if (job.cancelled) break;
       if (patch && !patch.isPlaceholder && patch.url) {
         pending.set(asset.id, { ...patch, isIcon: patch.isIcon ?? false });
@@ -865,6 +931,24 @@ export function hydrateNativeThumbnails(
         }
       }
       schedule();
+    }
+
+    // Second pass: sharper PSD thumbnails once the quick first pass is on screen
+    while (!job.cancelled) {
+      const target = upgradeTargets.shift();
+      if (!target) break;
+      if (!firstPassDone.has(target.id)) {
+        // Never let the upgrade be overwritten by a still-pending first-pass patch
+        upgradeTargets.push(target);
+        await new Promise((resolve) => setTimeout(resolve, 40));
+        continue;
+      }
+      const upgraded = await upgradePsdGridThumbnail(target);
+      if (job.cancelled) break;
+      if (upgraded) {
+        pending.set(target.id, upgraded);
+        schedule();
+      }
     }
     if (index >= queue.length) flush();
   };
