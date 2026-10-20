@@ -57,15 +57,16 @@ export const TerminalSession = forwardRef<TerminalSessionHandle, TerminalSession
     const xtermRef = useRef<XTerm | null>(null);
     const fitAddonRef = useRef<FitAddon | null>(null);
 
-    // Paste text into xterm with bracketed paste mode support
+    // Paste text into terminal: normalize newlines and write directly to PTY for ConPTY/Claude Code reliability
     const handlePasteText = useCallback((text: string) => {
       if (!text) return;
-      if (xtermRef.current) {
+      const normalized = text.replace(/\r\n/g, '\r').replace(/\n/g, '\r');
+      if (isDesktopApp()) {
+        void ptyWrite(sessionId, normalized);
+      } else if (xtermRef.current) {
         xtermRef.current.paste(text);
-        xtermRef.current.focus();
-      } else {
-        void ptyWrite(sessionId, text);
       }
+      xtermRef.current?.focus();
     }, [sessionId]);
 
     // Expose methods to parent
@@ -211,7 +212,7 @@ export const TerminalSession = forwardRef<TerminalSessionHandle, TerminalSession
 
         if (isPaste) {
           void navigator.clipboard.readText().then((txt) => {
-            if (txt) term.paste(txt);
+            if (txt) handlePasteText(txt);
           }).catch((err) => {
             console.warn('[TerminalSession clipboard error]:', err);
           });
@@ -371,12 +372,19 @@ export const TerminalSession = forwardRef<TerminalSessionHandle, TerminalSession
         ref={containerRef}
         data-terminal-container="true"
         data-session-id={sessionId}
+        tabIndex={-1}
         className={`w-full h-full p-2 bg-[#0d1117] overflow-hidden focus:outline-none cursor-text ${
           isActive ? 'flex-1' : 'hidden'
         }`}
         style={{ display: isActive ? 'block' : 'none', minHeight: 0 }}
-        onMouseDown={() => xtermRef.current?.focus()}
-        onClick={() => xtermRef.current?.focus()}
+        onMouseDown={(e) => {
+          e.stopPropagation();
+          xtermRef.current?.focus();
+        }}
+        onClick={(e) => {
+          e.stopPropagation();
+          xtermRef.current?.focus();
+        }}
         onWheel={handleWheel}
         onContextMenu={handleContextMenu}
         onKeyDown={(e) => {

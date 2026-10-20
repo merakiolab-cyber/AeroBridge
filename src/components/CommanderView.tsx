@@ -61,6 +61,7 @@ import { AssetItem } from '../types';
 import { CommanderNotepad } from './CommanderNotepad';
 import { CommanderTerminal } from './CommanderTerminal';
 import { isTextLikeFile } from '../utils/fileTypes';
+import { beginPointerDrag, setPointerDropHandler } from '../utils/pointerDrag';
 
 export interface CommanderViewProps {
   initialLeftPath?: string;
@@ -1012,6 +1013,24 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
     [clipboard, fetchDirectory, left.currentPath, right.currentPath, onNotify]
   );
 
+  // Connect pointer-based drag & drop handler for reliable drag inside CommanderView (Desktop)
+  useEffect(() => {
+    setPointerDropHandler((paths, targetFolder, isCopy) => {
+      activeDragPayload = { paths, sourcePane: stateRef.current.activePane };
+      const dummyEvent = {
+        preventDefault: () => {},
+        stopPropagation: () => {},
+        ctrlKey: isCopy,
+        dataTransfer: {
+          getData: () => '',
+          files: [],
+        },
+      } as unknown as React.DragEvent;
+      void handleDropOnPane(dummyEvent, targetFolder, stateRef.current.activePane);
+    });
+    return () => setPointerDropHandler(null);
+  }, [handleDropOnPane]);
+
   // Keyboard navigation & Total Commander function shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -1371,16 +1390,19 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
     return (
       <div
         ref={isLeft ? leftPaneRef : rightPaneRef}
-        tabIndex={0}
+        tabIndex={viewMode === 'files' ? 0 : -1}
         onFocus={() => setActivePane(paneKey)}
         onClick={(e) => {
           setActivePane(paneKey);
-          if (
-            document.activeElement instanceof HTMLElement &&
-            document.activeElement !== e.target &&
-            (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')
-          ) {
-            document.activeElement.blur();
+          if (viewMode === 'files') {
+            if (
+              document.activeElement instanceof HTMLElement &&
+              document.activeElement !== e.target &&
+              !document.activeElement.closest('.xterm') &&
+              (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')
+            ) {
+              document.activeElement.blur();
+            }
           }
         }}
         onMouseUp={(e) => {
@@ -1407,6 +1429,7 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
           e.preventDefault();
           void handleDropOnPane(e, pane.currentPath, paneKey);
         }}
+        data-drop-path={pane.currentPath}
         className={`flex-1 flex flex-col min-w-0 h-full border focus:outline-hidden ${
           isPaneDropTarget
             ? 'border-[#60cdff] ring-2 ring-[#60cdff]/60 bg-[#16202c] shadow-[0_0_25px_rgba(96,205,255,0.25)]'
@@ -1871,6 +1894,7 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
             });
             setContextMenuPos({ x: e.clientX, y: e.clientY });
           }}
+          data-drop-path={pane.currentPath}
           className="flex-1 overflow-y-auto divide-y divide-white/[0.02] font-mono text-xs select-none focus:outline-none relative"
         >
 
@@ -1878,6 +1902,7 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
           {parentDir && (
             <div
               data-row="true"
+              data-drop-path={parentDir}
               onClick={() => {
                 setActivePane(paneKey);
                 if (
@@ -1957,8 +1982,19 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
               <div
                 key={it.path}
                 data-row="true"
-                draggable={true}
-                style={{ WebkitUserDrag: 'element' } as React.CSSProperties}
+                data-drop-path={it.is_dir ? it.path : undefined}
+                draggable={!isDesktopApp()}
+                style={!isDesktopApp() ? ({ WebkitUserDrag: 'element' } as React.CSSProperties) : undefined}
+                onPointerDown={(e) => {
+                  if (isDesktopApp()) {
+                    beginPointerDrag(e, () => {
+                      const selPaths = pane.selectedPaths.has(it.path)
+                        ? Array.from(pane.selectedPaths)
+                        : [it.path];
+                      return { paths: selPaths };
+                    });
+                  }
+                }}
                 onDragStart={(e) => {
                   const selPaths = pane.selectedPaths.has(it.path)
                     ? Array.from(pane.selectedPaths)
