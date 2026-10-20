@@ -1868,7 +1868,31 @@ async fn execute_shell_command_native(
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
+/// Removes any Service Worker storage left in the WebView2 profile by older builds.
+/// A stale worker serves a cached index.html that points to bundles which no longer exist
+/// in the executable, which leaves the window blank. The app never registers workers itself.
+/// Must run before the webview is created, while the profile files are not locked.
+#[cfg(windows)]
+fn purge_stale_service_workers() {
+    if let Some(local) = std::env::var_os("LOCALAPPDATA") {
+        let dir = Path::new(&local)
+            .join("com.aerobridge.studio")
+            .join("EBWebView")
+            .join("Default")
+            .join("Service Worker");
+        if dir.exists() {
+            if let Err(e) = fs::remove_dir_all(&dir) {
+                eprintln!("[startup] could not purge stale service workers: {e}");
+            }
+        }
+    }
+}
+
+#[cfg(not(windows))]
+fn purge_stale_service_workers() {}
+
 pub fn run() {
+    purge_stale_service_workers();
     tauri::Builder::default()
         .manage(PtyManager::new())
         .plugin(tauri_plugin_drag::init())
