@@ -7,6 +7,7 @@
 import { isTauri, invoke, convertFileSrc } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { startDrag } from '@crabnebula/tauri-plugin-drag';
+import { beginDragSession, endDragSession } from './dragSession';
 
 export interface NativeFileEntry {
   name: string;
@@ -390,6 +391,8 @@ export async function startNativeFileDrag(paths: string[], icon?: string): Promi
   if (validPaths.length === 0) return;
 
   (window as any).__isInternalDragging = true;
+  // In-app drop targets cannot read the DataTransfer of an OS-level drag, so remember what is being dragged
+  beginDragSession(validPaths);
   try {
     const dragIcon =
       icon && icon.startsWith('data:image/png;base64,') ? icon : TRANSPARENT_1X1_PNG;
@@ -401,6 +404,7 @@ export async function startNativeFileDrag(paths: string[], icon?: string): Promi
   } catch (err) {
     console.warn('[TauriBridge] Native drag failed:', err);
   } finally {
+    endDragSession();
     setTimeout(() => {
       (window as any).__isInternalDragging = false;
     }, 100);

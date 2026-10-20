@@ -2,6 +2,29 @@
 
 ## Changelog
 
+### Version 3.27.30 (Multi-Tab terminál, přetrvávání procesů na pozadí, oprava vkládání v Claude Code a zoom)
+- **Multi-Tab terminálový systém ([CommanderTerminal.tsx](src/components/CommanderTerminal.tsx), [TerminalSession.tsx](src/components/TerminalSession.tsx)):**
+  - Podpora více současně otevřených terminálových záložek s nezávislými PTY relacemi, historií a běžícími procesy.
+  - Tlačítko `+ Nová` pro otevření terminálu v aktuální složce, tlačítko `Z druhé strany` pro otevření v protějším panelu.
+  - Kontextová volba „Otevřít v terminálu“ na jakékoliv složce otevře novou záložku přímo v integrovaném terminálu pro danou složku.
+  - Každá záložka zobrazuje název složky, shell (`pwsh`, `cmd`, `wsl`), stavový indikátor a křížek `✕` pro bezpečné ukončení relace.
+- **Přetrvávání procesů na pozadí ([CommanderView.tsx](src/components/CommanderView.tsx)):**
+  - Při přepnutí z Terminálu na Soubory se procesy již nezabíjejí (`ptyKill`), ale bezpečně pokračují na pozadí s nulovou zátěží GPU/canvasu.
+  - V záhlaví panelu přibyl zeleně pulzující odznáček s počtem aktivních procesů běžících na pozadí.
+  - Přepnutí zpět na Terminál zachovává veškerý výstup, scrollback i běžící servery a Claude Code.
+- **Oprava vkládání a schránky v Claude Code:**
+  - Plná podpora Bracketed Paste Mode (`term.paste()`) a standardních zkratek `Ctrl+V`, `Ctrl+Shift+V`, `Shift+Insert` a pravého tlačítka myši.
+  - Ochrana před odchytáváním klávesových zkratek globálním správcem souborů.
+- **Oprava zoomu terminálu:**
+  - Synchronizace rozměrů PTY (`ptyResize`) při změně velikosti písma, zabránění ztrátě fokusu (`preventDefault` na mousedown), ukazatel velikosti písma s resetem na 13px, zkratky `Ctrl + +/-/0` a `Ctrl + Kolečko myši`.
+
+
+### Oprava: přesouvání souborů myší v Prohlížeči
+- **Příčina:** V desktopu se tažení souboru spouští jako OS drag (kvůli přetažení do Photoshopu, Průzkumníku či Blenderu) a HTML5 drag & drop ve WebView2 pak cílům uvnitř aplikace nedoručí použitelné události, takže se nic nepřesunulo.
+- **Oprava ([pointerDrag.ts](src/utils/pointerDrag.ts)):** přesun uvnitř aplikace běží na pointer událostech. Po posunu o pár pixelů se objeví štítek s názvem (nebo počtem) souborů, cíl pod kurzorem se zvýrazní (`data-drop-path`: strom, oblíbené, karty složek, řádky seznamu) a puštění provede přesun, s Ctrl kopii. Esc tažení zruší; pustit soubor do jeho vlastní složky nebo do sebe sama nic nedělá.
+- **Do jiných aplikací:** jakmile kurzor opustí okno, tažení se předá OS dragu (`startNativeFileDrag`), takže přetažení do Photoshopu, Průzkumníku nebo Blenderu funguje dál.
+- Webová verze zůstává na HTML5 drag & drop; společné čtení dropu zajišťuje `resolveDropItems` ([dragSession.ts](src/utils/dragSession.ts)).
+
 ### Kvalita náhledů: PSD v plném rozlišení, správné rozměry a DPI
 - **PSD / PSB v plné kvalitě ([psdComposite.ts](src/utils/extractors/psdComposite.ts), [hiResPreview.ts](src/utils/hiResPreview.ts)):** Photoshop vkládá jen ~160–256 px náhled, který ve velkých pohledech měkl. Aplikace teď přes nový Rust příkaz `read_file_range` načte jen sloučený obraz z konce souboru, dekóduje ho (8/16 bit, RGB, šedá, indexované, CMYK, RLE i raw, PSD i PSB) a zmenší na požadovanou šířku.
   - **Filmstrip, Porovnání, QuickLook a Inspektor** po krátké prodlevě vymění náhled za ostrý; mřížka dostane ostřejší náhled v druhém, nízkoprioritním průchodu (výsledek se cachuje).

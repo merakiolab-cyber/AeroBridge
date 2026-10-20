@@ -13,6 +13,7 @@ import {
   BatchIptcConfig,
 } from './types';
 import { INITIAL_ASSETS, INITIAL_FOLDERS } from './data/mockAssets';
+import { setPointerDropHandler } from './utils/pointerDrag';
 import {
   parseFilesToAssets,
   parseNativeEntriesToAssets,
@@ -520,6 +521,14 @@ export default function App() {
     },
     [assets, nativeDir, navigateNative, addToast]
   );
+
+  // Pointer-based drags inside the desktop app (see utils/pointerDrag.ts) end up here
+  useEffect(() => {
+    setPointerDropHandler((paths, targetFolder, isCopy) => {
+      void handleMoveAssetsToFolder(paths, targetFolder, isCopy);
+    });
+    return () => setPointerDropHandler(null);
+  }, [handleMoveAssetsToFolder]);
 
   // --- Dynamic Sidebar Resizing Handler ---
   const handleSidebarResizeStart = useCallback(

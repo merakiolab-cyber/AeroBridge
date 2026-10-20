@@ -6,6 +6,7 @@ import {
   listNativeSubdirs,
   type NativePlace,
 } from '../utils/tauriBridge';
+import { resolveDropItems } from '../utils/dragSession';
 import {
   Win11Folder,
   Win11Desktop,
@@ -102,41 +103,8 @@ export const NativeExplorerTree: React.FC<NativeExplorerTreeProps> = ({
     e.stopPropagation();
     setDragOverNode(null);
     if (!onMoveAssets) return;
-    const isCopy = e.ctrlKey;
-
-    try {
-      const raw = e.dataTransfer.getData('application/json');
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        const items = (parsed.paths && parsed.paths.length > 0) ? parsed.paths : parsed.assetIds;
-        if (items && Array.isArray(items) && items.length > 0) {
-          onMoveAssets(items, path, isCopy);
-          return;
-        }
-      }
-    } catch {}
-
-    const plain = e.dataTransfer.getData('text/plain');
-    if (plain) {
-      const ids = plain.split(/\r?\n|,/).map((s) => s.trim()).filter(Boolean);
-      if (ids.length > 0) {
-        onMoveAssets(ids, path, isCopy);
-        return;
-      }
-    }
-
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const filePaths: string[] = [];
-      for (let i = 0; i < e.dataTransfer.files.length; i++) {
-        const file = e.dataTransfer.files[i];
-        const p = (file as unknown as { path?: string }).path;
-        if (p) filePaths.push(p);
-      }
-      if (filePaths.length > 0) {
-        onMoveAssets(filePaths, path, isCopy);
-        return;
-      }
-    }
+    const items = resolveDropItems(e);
+    if (items.length > 0) onMoveAssets(items, path, e.ctrlKey);
   };
 
   const handleFavDragOver = (e: React.DragEvent, path: string) => {
@@ -157,38 +125,8 @@ export const NativeExplorerTree: React.FC<NativeExplorerTreeProps> = ({
     e.stopPropagation();
     setDragOverFav(null);
     if (!onMoveAssets) return;
-    const isCopy = e.ctrlKey;
-    try {
-      const raw = e.dataTransfer.getData('application/json');
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        const items = (parsed.paths && parsed.paths.length > 0) ? parsed.paths : parsed.assetIds;
-        if (items && Array.isArray(items) && items.length > 0) {
-          onMoveAssets(items, path, isCopy);
-          return;
-        }
-      }
-    } catch {}
-    const plain = e.dataTransfer.getData('text/plain');
-    if (plain) {
-      const ids = plain.split(/\r?\n|,/).map((s) => s.trim()).filter(Boolean);
-      if (ids.length > 0) {
-        onMoveAssets(ids, path, isCopy);
-        return;
-      }
-    }
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const filePaths: string[] = [];
-      for (let i = 0; i < e.dataTransfer.files.length; i++) {
-        const file = e.dataTransfer.files[i];
-        const p = (file as unknown as { path?: string }).path;
-        if (p) filePaths.push(p);
-      }
-      if (filePaths.length > 0) {
-        onMoveAssets(filePaths, path, isCopy);
-        return;
-      }
-    }
+    const items = resolveDropItems(e);
+    if (items.length > 0) onMoveAssets(items, path, e.ctrlKey);
   };
 
   const handleDropOnFavoritesHeader = (e: React.DragEvent) => {
@@ -558,6 +496,7 @@ export const NativeExplorerTree: React.FC<NativeExplorerTreeProps> = ({
         <div
           onClick={(e) => handleNodeClick(e, node)}
           onContextMenu={(e) => handleContextMenu(e, node)}
+          data-drop-path={node.path}
           onDragOver={(e) => handleNodeDragOver(e, node.path)}
           onDragLeave={(e) => handleNodeDragLeave(e, node.path)}
           onDrop={(e) => handleNodeDrop(e, node.path)}
@@ -674,6 +613,7 @@ export const NativeExplorerTree: React.FC<NativeExplorerTreeProps> = ({
                 return (
                   <div
                     key={favPath}
+                    data-drop-path={favPath}
                     onDragOver={(e) => handleFavDragOver(e, favPath)}
                     onDragLeave={(e) => handleFavDragLeave(e, favPath)}
                     onDrop={(e) => handleFavDrop(e, favPath)}

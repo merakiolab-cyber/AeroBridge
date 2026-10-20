@@ -89,15 +89,20 @@ export function useKeyboardShortcuts(props: UseKeyboardShortcutsProps) {
 
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      // 1. Don't intercept when user is typing in any text input, textarea, or contentEditable element
+      // 1. Don't intercept when user is typing in any text input, textarea, contentEditable, or inside terminal
       const target = e.target as HTMLElement | null;
+      const activeEl = document.activeElement as HTMLElement | null;
       if (
         target?.tagName === 'INPUT' ||
         target?.tagName === 'TEXTAREA' ||
         target?.isContentEditable ||
-        document.activeElement?.tagName === 'INPUT' ||
-        document.activeElement?.tagName === 'TEXTAREA' ||
-        (document.activeElement as HTMLElement)?.isContentEditable
+        target?.closest('.xterm') ||
+        target?.closest('[data-terminal-container]') ||
+        activeEl?.tagName === 'INPUT' ||
+        activeEl?.tagName === 'TEXTAREA' ||
+        activeEl?.isContentEditable ||
+        activeEl?.closest('.xterm') ||
+        activeEl?.closest('[data-terminal-container]')
       ) {
         return;
       }

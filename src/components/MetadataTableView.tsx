@@ -3,6 +3,8 @@ import { AssetItem, SortField, SortOrder } from '../types';
 import { formatBytes, formatDate } from '../utils/localFileSystem';
 import { Copy, FileText, ArrowUp, ArrowDown } from 'lucide-react';
 import { getNativeFileIcon, toDesktopAssetUrl, isDesktopApp, startNativeFileDrag } from '../utils/tauriBridge';
+import { resolveDropItems } from '../utils/dragSession';
+import { beginPointerDrag } from '../utils/pointerDrag';
 import { getResolutionInfo } from '../utils/extractors';
 import { Win11Folder } from './Win11Icons';
 import { FileTypeBadge } from './AppIcons';
@@ -98,40 +100,8 @@ export const MetadataTableView: React.FC<MetadataTableViewProps> = ({
   const handleDropOnFolder = (e: React.DragEvent, targetFolderPath: string) => {
     e.preventDefault();
     e.stopPropagation();
-    const isCopy = e.ctrlKey;
-    try {
-      const raw = e.dataTransfer.getData('application/json');
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        const items = (parsed.paths && parsed.paths.length > 0) ? parsed.paths : parsed.assetIds;
-        if (items && Array.isArray(items) && items.length > 0) {
-          onMoveAssets?.(items, targetFolderPath, isCopy);
-          return;
-        }
-      }
-    } catch {}
-
-    const plain = e.dataTransfer.getData('text/plain');
-    if (plain) {
-      const items = plain.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
-      if (items.length > 0) {
-        onMoveAssets?.(items, targetFolderPath, isCopy);
-        return;
-      }
-    }
-
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const filePaths: string[] = [];
-      for (let i = 0; i < e.dataTransfer.files.length; i++) {
-        const file = e.dataTransfer.files[i];
-        const p = (file as unknown as { path?: string }).path;
-        if (p) filePaths.push(p);
-      }
-      if (filePaths.length > 0) {
-        onMoveAssets?.(filePaths, targetFolderPath, isCopy);
-        return;
-      }
-    }
+    const items = resolveDropItems(e);
+    if (items.length > 0) onMoveAssets?.(items, targetFolderPath, e.ctrlKey);
   };
 
   const renderSortIndicator = (field: SortField) => {
@@ -215,7 +185,16 @@ export const MetadataTableView: React.FC<MetadataTableViewProps> = ({
                     e.stopPropagation();
                     onContextMenu?.(e, asset);
                   }}
-                  draggable
+                  draggable={!isDesktopApp()}
+                  data-drop-path={asset.isFolder ? asset.fullPath || undefined : undefined}
+                  onPointerDown={(e) =>
+                    beginPointerDrag(e, () => {
+                      const items = selectedIds.has(asset.id) && selectedIds.size > 1 ? assets.filter((a) => selectedIds.has(a.id)) : [asset];
+                      const paths = items.map((a) => a.fullPath).filter(Boolean) as string[];
+                      if (paths.length === 0) return null;
+                      return { paths, icon: asset.url?.startsWith('data:image/png;base64,') ? asset.url : undefined };
+                    })
+                  }
                   onDragStart={(e) => handleDragStart(asset, e)}
                   onDragOver={(e) => {
                     if (!asset.isFolder) return;

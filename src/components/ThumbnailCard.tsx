@@ -5,6 +5,7 @@ import { Copy, Eye, FileText, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Win11Folder } from './Win11Icons';
 import { FileTypeBadge } from './AppIcons';
 import { getNativeFileIcon, isDesktopApp, startNativeFileDrag } from '../utils/tauriBridge';
+import { beginPointerDrag, type PointerDragPayload } from '../utils/pointerDrag';
 
 interface ThumbnailCardProps {
   asset: AssetItem;
@@ -20,6 +21,8 @@ interface ThumbnailCardProps {
   onContextMenu?: (e: React.MouseEvent) => void;
   onPageChange?: (assetId: string, pageNum: number) => void;
   onDragStart?: (asset: AssetItem, e: React.DragEvent) => void;
+  /** Desktop: files to carry when this card is dragged (selection-aware); defaults to just this file. */
+  getDragPayload?: (asset: AssetItem) => PointerDragPayload | null;
   onDropOnFolder?: (e: React.DragEvent, targetFolderPath: string) => void;
 }
 
@@ -37,6 +40,7 @@ const ThumbnailCardComponent: React.FC<ThumbnailCardProps> = ({
   onContextMenu,
   onPageChange,
   onDragStart,
+  getDragPayload,
   onDropOnFolder,
 }) => {
   const fullFileName = React.useMemo(() => {
@@ -122,7 +126,16 @@ const ThumbnailCardComponent: React.FC<ThumbnailCardProps> = ({
 
   return (
     <div
-      draggable
+      // Desktop uses pointer-based dragging (see utils/pointerDrag.ts); HTML5 DnD stays for the web build
+      draggable={!isDesktopApp()}
+      data-drop-path={asset.isFolder ? asset.fullPath || undefined : undefined}
+      onPointerDown={(e) =>
+        beginPointerDrag(e, () => {
+          if (getDragPayload) return getDragPayload(asset);
+          if (!asset.fullPath) return null;
+          return { paths: [asset.fullPath], icon: asset.url?.startsWith('data:image/png;base64,') ? asset.url : undefined };
+        })
+      }
       onDragStart={handleDrag}
       onDragEnd={handleDragEnd}
       onDragOver={handleDragOver}

@@ -3,6 +3,8 @@ import { AssetItem } from '../types';
 import { ThumbnailCard } from './ThumbnailCard';
 import { Layers, Sparkles } from 'lucide-react';
 import { isDesktopApp, startNativeFileDrag } from '../utils/tauriBridge';
+import { resolveDropItems } from '../utils/dragSession';
+import type { PointerDragPayload } from '../utils/pointerDrag';
 
 interface AssetGridProps {
   assets: AssetItem[];
@@ -166,6 +168,17 @@ export const AssetGrid: React.FC<AssetGridProps> = ({
     }
   }, [focusedId, assets, columns, rowHeight, dimensions.height]);
 
+  /** Files carried by a pointer drag of `asset`: the whole selection when the dragged card is part of it. */
+  const getDragPayload = useCallback(
+    (asset: AssetItem): PointerDragPayload | null => {
+      const items = selectedIds.has(asset.id) && selectedIds.size > 1 ? assets.filter((a) => selectedIds.has(a.id)) : [asset];
+      const paths = items.map((a) => a.fullPath).filter(Boolean) as string[];
+      if (paths.length === 0) return null;
+      return { paths, icon: asset.url?.startsWith('data:image/png;base64,') ? asset.url : undefined };
+    },
+    [selectedIds, assets]
+  );
+
   const handleDragStart = useCallback(
     (asset: AssetItem, e: React.DragEvent) => {
       const isSelected = selectedIds.has(asset.id);
@@ -191,40 +204,8 @@ export const AssetGrid: React.FC<AssetGridProps> = ({
 
   const handleDropOnFolder = useCallback(
     (e: React.DragEvent, targetFolderPath: string) => {
-      const isCopy = e.ctrlKey;
-      try {
-        const raw = e.dataTransfer.getData('application/json');
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          const items = (parsed.paths && parsed.paths.length > 0) ? parsed.paths : parsed.assetIds;
-          if (items && Array.isArray(items) && items.length > 0) {
-            onMoveAssets?.(items, targetFolderPath, isCopy);
-            return;
-          }
-        }
-      } catch {}
-
-      const plain = e.dataTransfer.getData('text/plain');
-      if (plain) {
-        const items = plain.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
-        if (items.length > 0) {
-          onMoveAssets?.(items, targetFolderPath, isCopy);
-          return;
-        }
-      }
-
-      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-        const filePaths: string[] = [];
-        for (let i = 0; i < e.dataTransfer.files.length; i++) {
-          const file = e.dataTransfer.files[i];
-          const p = (file as unknown as { path?: string }).path;
-          if (p) filePaths.push(p);
-        }
-        if (filePaths.length > 0) {
-          onMoveAssets?.(filePaths, targetFolderPath, isCopy);
-          return;
-        }
-      }
+      const items = resolveDropItems(e);
+      if (items.length > 0) onMoveAssets?.(items, targetFolderPath, e.ctrlKey);
     },
     [onMoveAssets]
   );
@@ -297,6 +278,7 @@ export const AssetGrid: React.FC<AssetGridProps> = ({
                 fitMode={fitMode}
                 showAllInfo={showAllInfo}
                 onDragStart={handleDragStart}
+                getDragPayload={getDragPayload}
                 onClick={(e) => onSelect(asset.id, e)}
                 onDoubleClick={() => {
                   if (asset.isFolder && onNavigateFolder && asset.fullPath) {

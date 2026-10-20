@@ -220,6 +220,14 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
   const [leftNotepadTarget, setLeftNotepadTarget] = useState<{ path: string; timestamp: number } | null>(null);
   const [rightNotepadTarget, setRightNotepadTarget] = useState<{ path: string; timestamp: number } | null>(null);
 
+  // Background terminal lifecycle and multi-tab state
+  const [leftTerminalInitialized, setLeftTerminalInitialized] = useState(false);
+  const [rightTerminalInitialized, setRightTerminalInitialized] = useState(false);
+  const [leftTerminalProcessCount, setLeftTerminalProcessCount] = useState(0);
+  const [rightTerminalProcessCount, setRightTerminalProcessCount] = useState(0);
+  const [leftTerminalRequest, setLeftTerminalRequest] = useState<{ path: string; timestamp: number } | null>(null);
+  const [rightTerminalRequest, setRightTerminalRequest] = useState<{ path: string; timestamp: number } | null>(null);
+
   // Open file in Notepad handler
   const handleOpenInNotepad = useCallback((filePath: string, preferredPane?: 'left' | 'right') => {
     const target = preferredPane || activePane;
@@ -1348,6 +1356,8 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
     const pane = isLeft ? left : right;
     const oppositePane = isLeft ? right : left;
     const viewMode = isLeft ? leftViewMode : rightViewMode;
+    const terminalInitialized = isLeft ? leftTerminalInitialized : rightTerminalInitialized;
+    const terminalProcessCount = isLeft ? leftTerminalProcessCount : rightTerminalProcessCount;
     const items = isLeft ? leftDisplayItems : rightDisplayItems;
     const isActive = activePane === paneKey;
     const parentDir = getParentDir(pane.currentPath);
@@ -1518,24 +1528,40 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (isLeft) setLeftViewMode('terminal');
-                  else setRightViewMode('terminal');
+                  if (isLeft) {
+                    setLeftTerminalInitialized(true);
+                    setLeftViewMode('terminal');
+                  } else {
+                    setRightTerminalInitialized(true);
+                    setRightViewMode('terminal');
+                  }
                 }}
-                className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium transition-colors cursor-pointer ${
+                className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium transition-colors cursor-pointer ${
                   viewMode === 'terminal'
                     ? 'bg-emerald-500/20 text-emerald-300 font-semibold shadow-xs ring-1 ring-emerald-500/30'
                     : 'text-zinc-400 hover:text-white'
                 }`}
-                title="Spustit integrovaný terminál v tomto okně"
+                title={
+                  terminalProcessCount > 0 && viewMode !== 'terminal'
+                    ? `Terminál běží na pozadí (${terminalProcessCount} aktivní proces${terminalProcessCount > 1 ? 'y' : ''})`
+                    : 'Spustit integrovaný terminál v tomto okně'
+                }
               >
                 <Terminal className="w-3.5 h-3.5 text-emerald-400" />
                 <span>Terminál</span>
+                {terminalProcessCount > 0 && viewMode !== 'terminal' && (
+                  <span className="flex items-center gap-1 ml-0.5 px-1 py-0.2 bg-emerald-500/25 border border-emerald-500/40 rounded-full text-[10px] text-emerald-300 font-mono font-bold animate-pulse">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                    {terminalProcessCount}
+                  </span>
+                )}
               </button>
             </div>
           </div>
         </div>
 
-        {viewMode === 'notepad' ? (
+        {/* Notepad View */}
+        {viewMode === 'notepad' && (
           <CommanderNotepad
             paneKey={paneKey}
             currentPath={pane.currentPath}
@@ -1551,19 +1577,43 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
               void fetchDirectory(pane.currentPath, paneKey);
             }}
           />
-        ) : viewMode === 'terminal' ? (
-          <CommanderTerminal
-            paneKey={paneKey}
-            currentPath={pane.currentPath}
-            oppositeSelectedPaths={Array.from(oppositePane.selectedPaths)}
-            onCloseTerminal={() => {
-              if (isLeft) setLeftViewMode('files');
-              else setRightViewMode('files');
-            }}
-            onNotify={onNotify}
-          />
-        ) : (
-          <>
+        )}
+
+        {/* Terminal View - kept mounted once initialized so background PTY processes never die on folder switch! */}
+        {terminalInitialized && (
+          <div
+            className={`flex-1 flex flex-col min-h-0 w-full ${
+              viewMode === 'terminal' ? 'flex' : 'hidden'
+            }`}
+            style={{ display: viewMode === 'terminal' ? 'flex' : 'none' }}
+          >
+            <CommanderTerminal
+              paneKey={paneKey}
+              currentPath={pane.currentPath}
+              oppositePath={oppositePane.currentPath}
+              oppositeSelectedPaths={Array.from(oppositePane.selectedPaths)}
+              isVisible={viewMode === 'terminal'}
+              requestedNewTabPath={isLeft ? leftTerminalRequest : rightTerminalRequest}
+              onCloseTerminal={() => {
+                if (isLeft) setLeftViewMode('files');
+                else setRightViewMode('files');
+              }}
+              onActiveProcessCountChange={(count) => {
+                if (isLeft) setLeftTerminalProcessCount(count);
+                else setRightTerminalProcessCount(count);
+              }}
+              onNotify={onNotify}
+            />
+          </div>
+        )}
+
+        {/* File Explorer View - kept mounted when in notepad/terminal or shown when in files */}
+        <div
+          className={`flex-1 flex flex-col min-h-0 w-full ${
+            viewMode === 'files' ? 'flex' : 'hidden'
+          }`}
+          style={{ display: viewMode === 'files' ? 'flex' : 'none' }}
+        >
             {/* Path Bar & Quick Filter */}
             <div
               onDragOver={(e) => {
@@ -2171,8 +2221,7 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
             )}
           </div>
         </div>
-      </>
-    )}
+        </div>
   </div>
 );
 };
@@ -2408,7 +2457,15 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
           void revealInWindowsExplorer(path);
         }}
         onOpenTerminal={(path) => {
-          void openTerminalNative(path);
+          if (activePane === 'left') {
+            setLeftTerminalInitialized(true);
+            setLeftTerminalRequest({ path, timestamp: Date.now() });
+            setLeftViewMode('terminal');
+          } else {
+            setRightTerminalInitialized(true);
+            setRightTerminalRequest({ path, timestamp: Date.now() });
+            setRightViewMode('terminal');
+          }
         }}
         onOpenInNotepad={(filePath) => handleOpenInNotepad(filePath, activePane)}
         onCopy={(paths) => handleCopyClipboard(paths)}
