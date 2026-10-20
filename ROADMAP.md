@@ -4,9 +4,12 @@
 
 ---
 
-## 🧭 Aktuální stav: Verze 3.27.12 (Dvoupanelový Commander & Nativní Windows 11 DAM)
+## 🧭 Aktuální stav: Verze 3.27.30 (Dvoupanelový Commander s ConPTY Multi-Tab terminálem & Zápisníkem)
 - [x] Základní architektura v React 19 + TypeScript + Vite 8 + Tailwind CSS v4 + Tauri v2 (Rust)
 - [x] 5 pracovních režimů (Prohlížeč Mřížka/Seznam, Filmstrip, Porovnání / Compare, Commander dvoupanel)
+- [x] Integrovaný ConPTY terminál s multi-tab podporou pro více složek současně a přetrváváním procesů na pozadí
+- [x] Podpora Claude Code, Git, npm a interaktivních CLI nástrojů s Bracketed Paste Mode
+- [x] Vícezložkový Zápisník s formátovaným Markdown & JSON náhledem přímo v panelech Commanderu
 - [x] Bauhaus vizuální styl (tmavý motiv, JetBrains Mono + Plus Jakarta Sans, jemné dělicí linie)
 - [x] Pravý inspekční panel (zvětšený náhled 400px, EXIF data, IPTC, histogram, rozlišení & MP)
 - [x] Bezkontaktní výběr souborů (decentní 10% bílý závoj místo rušivého obrysu)
@@ -141,6 +144,34 @@
   - [x] Vyčištění veškeré paměťové i diskové mezipaměti jedním kliknutím s bezpečným uvolněním paměti (`URL.revokeObjectURL`, `.destroy()` pro PDF streamy a resetem tabulek)
   - [x] Nastavitelná kapacita paměťové mezipaměti miniatur (1 000 / 2 500 / 5 000 položek) s perzistencí v `localStorage`
   - [x] Informační záložka „O aplikaci & Systém“ s přehledem parametrů Windows 11 Fluent UX, 100% offline zabezpečení a podporovaných formátů
+
+---
+
+## 💻 Fáze 8: Integrovaný ConPTY Multi-Tab terminál, Zápisník a pokročilé Commander workflow (DOKONČENO ✅)
+- [x] **Multi-Tab terminálový systém (ConPTY + xterm.js):**
+  - [x] Nativní Rust backend `portable-pty` implementující Windows Pseudo Console (ConPTY)
+  - [x] Podpora více současně otevřených terminálových záložek s nezávislými PTY relacemi, historií a běžícími procesy
+  - [x] Tlačítko `+ Nová` pro otevření terminálu v aktuální složce a tlačítko `Z druhé strany` pro otevření v protějším panelu
+  - [x] Kontextové otevření z nabídky Průzkumníka/Commanderu na libovolné složce přímo do nové záložky integrovaného terminálu
+  - [x] Podpora shellů PowerShell, CMD a WSL s přepínáním bez restartu procesů
+  - [x] Křížek `✕` na záložce pro deterministické ukončení daného PTY procesu (`ptyKill`)
+- [x] **Plná podpora pro Claude Code & interaktivní CLI nástroje:**
+  - [x] Korektní implementace Bracketed Paste Mode (`\x1b[200~...\x1b[201~`) přes `term.paste()` a normalizace CRLF
+  - [x] Podpora vkládání přes <kbd>Ctrl+V</kbd>, <kbd>Ctrl+Shift+V</kbd>, <kbd>Shift+Insert</kbd> i pravé tlačítko myši
+  - [x] Inteligentní chování <kbd>Ctrl+C</kbd>: kopírování při aktivním výběru, jinak vyslání signálu `SIGINT` (`^C`) pro přerušení běžícího příkazu
+  - [x] Rychlé spouštěcí tlačítko Claude Code (`Sparkles`) přímo v nástrojové liště
+- [x] **Přetrvávání procesů na pozadí & optimalizace výkonu:**
+  - [x] Při přepnutí z Terminálu na Soubory se relace neodpojují, ale zůstávají běžet na pozadí (`display: none`) s 0 % GPU/canvasové zátěže
+  - [x] Živý zeleně pulzující indikátor počtu aktivních procesů běžících na pozadí v záhlaví panelu Commanderu
+  - [x] Návrat do Terminálu bez prodlevy a bez ztráty kontextu, rozpracovaných příkazů či scrollbacku
+- [x] **Spolehlivý zoom a škálování terminálu:**
+  - [x] Okamžitá synchronizace geometrie sloupců a řádků (`ptyResize`) při změně velikosti písma
+  - [x] Prevence ztráty fokusu při kliknutí na zoom tlačítka (`preventDefault` na mousedown)
+  - [x] Tlačítko ukazatele velikosti písma s funkcí okamžitého resetu na výchozích 13 px
+  - [x] Zkratky <kbd>Ctrl + +</kbd>, <kbd>Ctrl + -</kbd>, <kbd>Ctrl + 0</kbd> a <kbd>Ctrl + Kolečko myši</kbd> nad oknem terminálu
+- [x] **Vícezložkový Zápisník / Editor s Markdown & JSON náhledem:**
+  - [x] Současná práce s více textovými soubory v záložkách s indikátorem neuložených změn
+  - [x] Režimy Editor, Rozdělený náhled (Split) a Čistý náhled (Preview) s formátováním Markdown a barevnou syntaxí JSON
 
 ---
 
