@@ -69,6 +69,8 @@ export default function App() {
   const [isInitialLoadDone, setIsInitialLoadDone] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [currentView, setCurrentView] = useState<WorkspaceView>('browser');
+  const [commanderOpened, setCommanderOpened] = useState(false);
+  if (currentView === 'commander' && !commanderOpened) setCommanderOpened(true);
   const [browserViewMode, setBrowserViewMode] = useState<BrowserViewMode>(() => {
     try {
       const saved = localStorage.getItem('aerobridge_browser_view_mode');
@@ -351,6 +353,8 @@ export default function App() {
     handleDeleteSelected,
     handleShowProperties,
     handleOpenTerminal,
+    handleCompressZip,
+    handleExtractZip,
   } = useFileOperations({
     assets,
     setAssets,
@@ -1362,16 +1366,20 @@ export default function App() {
           )}
 
           {/* Commander Mode: Full-screen dual-pane file manager a la Total Commander */}
-          {currentView === 'commander' && (
-            <CommanderView
-              initialLeftPath={nativeDir && !nativeDir.toUpperCase().startsWith('C:') ? nativeDir : 'F:\\'}
-              initialRightPath={nativeDir && !nativeDir.toUpperCase().startsWith('C:') ? nativeDir : 'F:\\'}
-              onNotify={addToast}
-              onOpenQuickLook={(asset) => {
-                setFocusedId(asset.id);
-                setQuickLookOpen(true);
-              }}
-            />
+          {/* Stays mounted (hidden) after first open so running terminal sessions survive switching views */}
+          {commanderOpened && (
+            <div className={currentView === 'commander' ? 'contents' : 'hidden'}>
+              <CommanderView
+                isActive={currentView === 'commander'}
+                initialLeftPath={nativeDir && !nativeDir.toUpperCase().startsWith('C:') ? nativeDir : 'F:\\'}
+                initialRightPath={nativeDir && !nativeDir.toUpperCase().startsWith('C:') ? nativeDir : 'F:\\'}
+                onNotify={addToast}
+                onOpenQuickLook={(asset) => {
+                  setFocusedId(asset.id);
+                  setQuickLookOpen(true);
+                }}
+              />
+            </div>
           )}
         </main>
 
@@ -1493,6 +1501,8 @@ export default function App() {
         onShowProperties={handleShowProperties}
         favoriteFolders={favoriteFolders}
         onToggleFavorite={handleToggleFavoriteFolder}
+        onCompressZip={isDesktopApp() ? handleCompressZip : undefined}
+        onExtractZip={isDesktopApp() ? handleExtractZip : undefined}
       />
 
       {/* Input / Confirm Modal for Rename, New Folder, Delete */}

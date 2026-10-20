@@ -17,6 +17,8 @@ import {
   AppWindow,
   ChevronRight,
   FileText,
+  Archive,
+  PackageOpen,
 } from 'lucide-react';
 import { AssetItem } from '../types';
 import { Win11Star } from './Win11Icons';
@@ -62,6 +64,8 @@ export interface FileContextMenuProps {
   favoriteFolders?: string[];
   onToggleFavorite?: (path: string) => void;
   onOpenInNotepad?: (path: string) => void;
+  onCompressZip?: (paths: string[]) => void;
+  onExtractZip?: (zipPath: string) => void;
 }
 
 export const FileContextMenu: React.FC<FileContextMenuProps> = ({
@@ -85,6 +89,8 @@ export const FileContextMenu: React.FC<FileContextMenuProps> = ({
   favoriteFolders,
   onToggleFavorite,
   onOpenInNotepad,
+  onCompressZip,
+  onExtractZip,
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
   const [associatedApps, setAssociatedApps] = useState<AssociatedApp[]>([]);
@@ -428,6 +434,38 @@ export const FileContextMenu: React.FC<FileContextMenuProps> = ({
 
           <div className="h-px bg-white/[0.08] my-1" />
 
+          {/* ZIP: extract (single .zip file) / compress (any selection) */}
+          {!isFolderAsset && targetPaths.length === 1 && /\.zip$/i.test(targetPaths[0]) && onExtractZip && (
+            <button
+              onClick={() => {
+                onClose();
+                onExtractZip(targetPaths[0]);
+              }}
+              className="w-full flex items-center justify-between px-3 py-1.5 text-left rounded-none hover:bg-white/[0.08] hover:text-white transition-colors cursor-pointer"
+            >
+              <div className="flex items-center gap-2.5">
+                <PackageOpen className="w-4 h-4 text-amber-400" />
+                <span>Rozbalit ZIP do složky</span>
+              </div>
+            </button>
+          )}
+          {onCompressZip && targetPaths.length > 0 && (
+            <button
+              onClick={() => {
+                onClose();
+                onCompressZip(targetPaths);
+              }}
+              className="w-full flex items-center justify-between px-3 py-1.5 text-left rounded-none hover:bg-white/[0.08] hover:text-white transition-colors cursor-pointer"
+            >
+              <div className="flex items-center gap-2.5">
+                <Archive className="w-4 h-4 text-amber-400" />
+                <span>{targetPaths.length > 1 ? `Zabalit do ZIP (${targetPaths.length})` : 'Zabalit do ZIP'}</span>
+              </div>
+            </button>
+          )}
+
+          <div className="h-px bg-white/[0.08] my-1" />
+
           {/* Rename */}
           <button
             onClick={() => {
@@ -714,6 +752,21 @@ export const FileContextMenu: React.FC<FileContextMenuProps> = ({
           )}
 
           <div className="h-px bg-white/[0.08] my-1" />
+
+          {onCompressZip && targetPaths.length > 0 && (
+            <button
+              onClick={() => {
+                onClose();
+                onCompressZip(targetPaths);
+              }}
+              className="w-full flex items-center justify-between px-3 py-1.5 text-left rounded-none hover:bg-white/[0.08] hover:text-white transition-colors cursor-pointer"
+            >
+              <div className="flex items-center gap-2.5">
+                <Archive className="w-4 h-4 text-amber-400" />
+                <span>{targetPaths.length > 1 ? `Zabalit složky do ZIP (${targetPaths.length})` : 'Zabalit složku do ZIP'}</span>
+              </div>
+            </button>
+          )}
 
           <button
             onClick={() => {

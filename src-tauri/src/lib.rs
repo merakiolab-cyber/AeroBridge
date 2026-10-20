@@ -1436,6 +1436,163 @@ fn delete_files_native(paths: Vec<String>) -> Result<(), String> {
     }
 }
 
+/// Recursively adds `src` to the archive under `name` (forward-slash relative path).
+fn zip_add_path<W: std::io::Write + Seek>(
+    writer: &mut zip::ZipWriter<W>,
+    src: &Path,
+    name: &str,
+    opts: zip::write::SimpleFileOptions,
+    skip: &Path,
+) -> Result<(), String> {
+    if src == skip {
+        return Ok(());
+    }
+    if src.is_dir() {
+        writer
+            .add_directory(format!("{}/", name), opts)
+            .map_err(|e| e.to_string())?;
+        let entries = fs::read_dir(src).map_err(|e| format!("Nelze číst složku '{}': {}", name, e))?;
+        for entry in entries.flatten() {
+            let child_name = format!("{}/{}", name, entry.file_name().to_string_lossy());
+            zip_add_path(writer, &entry.path(), &child_name, opts, skip)?;
+        }
+    } else {
+        writer.start_file(name, opts).map_err(|e| e.to_string())?;
+        let mut f = fs::File::open(src).map_err(|e| format!("Nelze otevřít '{}': {}", name, e))?;
+        std::io::copy(&mut f, writer).map_err(|e| format!("Nelze zabalit '{}': {}", name, e))?;
+    }
+    Ok(())
+}
+
+fn create_zip_blocking(sources: Vec<String>) -> Result<String, String> {
+    let first = sources.first().ok_or_else(|| "Nejsou vybrány žádné položky".to_string())?;
+    let first_p = Path::new(first);
+    let parent = first_p
+        .parent()
+        .ok_or_else(|| "Nelze určit nadřazenou složku".to_string())?;
+    let base = if sources.len() == 1 {
+        first_p
+            .file_stem()
+            .or_else(|| first_p.file_name())
+            .and_then(|s| s.to_str())
+            .unwrap_or("Archiv")
+            .to_string()
+    } else {
+        "Archiv".to_string()
+    };
+    let target = generate_copy_name(parent, &format!("{}.zip", base), false);
+
+    let file = fs::File::create(&target).map_err(|e| format!("Nelze vytvořit ZIP: {}", e))?;
+    let mut writer = zip::ZipWriter::new(file);
+    let opts = zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+
+    let result = (|| {
+        for src in &sources {
+            let p = Path::new(src);
+            if !p.exists() {
+                continue;
+            }
+            let name = p
+                .file_name()
+                .and_then(|s| s.to_str())
+                .ok_or_else(|| "Neplatný název položky".to_string())?;
+            zip_add_path(&mut writer, p, name, opts, &target)?;
+        }
+        writer.finish().map(|_| ()).map_err(|e| e.to_string())
+    })();
+
+    if let Err(e) = result {
+        let _ = fs::remove_file(&target);
+        return Err(e);
+    }
+    Ok(target.to_string_lossy().to_string())
+}
+
+/// Packs files/folders into a new .zip next to the first item (unique name, never overwrites). Returns the zip path.
+#[tauri::command]
+async fn create_zip_native(sources: Vec<String>) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || create_zip_blocking(sources))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+fn extract_zip_blocking(zip_path: String, dest_folder: Option<String>) -> Result<String, String> {
+    let zip_p = Path::new(&zip_path);
+    let file = fs::File::open(zip_p).map_err(|e| format!("Nelze otevřít archiv: {}", e))?;
+    let mut archive = zip::ZipArchive::new(file).map_err(|e| format!("Neplatný ZIP archiv: {}", e))?;
+
+    let dest_parent = match dest_folder {
+        Some(d) => std::path::PathBuf::from(d),
+        None => zip_p
+            .parent()
+            .ok_or_else(|| "Nelze určit nadřazenou složku".to_string())?
+            .to_path_buf(),
+    };
+    let stem = zip_p.file_stem().and_then(|s| s.to_str()).unwrap_or("Rozbaleno");
+    let dest = generate_copy_name(&dest_parent, stem, true);
+    fs::create_dir_all(&dest).map_err(|e| format!("Nelze vytvořit cílovou složku: {}", e))?;
+
+    for i in 0..archive.len() {
+        let mut entry = archive.by_index(i).map_err(|e| e.to_string())?;
+        // enclosed_name() rejects absolute paths and `..` components (Zip Slip)
+        let rel = match entry.enclosed_name() {
+            Some(p) => p,
+            None => continue,
+        };
+        let out = dest.join(rel);
+        if entry.is_dir() {
+            fs::create_dir_all(&out).map_err(|e| e.to_string())?;
+        } else {
+            if let Some(dir) = out.parent() {
+                fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+            }
+            let mut f = fs::File::create(&out)
+                .map_err(|e| format!("Nelze vytvořit '{}': {}", out.display(), e))?;
+            std::io::copy(&mut entry, &mut f)
+                .map_err(|e| format!("Nelze rozbalit '{}': {}", out.display(), e))?;
+        }
+    }
+    Ok(dest.to_string_lossy().to_string())
+}
+
+/// Extracts a .zip into a new folder named after the archive (unique name, never overwrites). Returns the folder path.
+#[tauri::command]
+async fn extract_zip_native(zip_path: String, dest_folder: Option<String>) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || extract_zip_blocking(zip_path, dest_folder))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// True when the cursor is above a window that is not this app (e.g. a browser lying over AeroBridge).
+/// In-app drags use it to hand over to the OS drag even though the pointer never crossed our own window edge.
+#[tauri::command]
+fn cursor_over_other_window(window: tauri::Window) -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        use windows::Win32::Foundation::POINT;
+        use windows::Win32::UI::WindowsAndMessaging::{GetAncestor, GetCursorPos, WindowFromPoint, GA_ROOT};
+
+        let Ok(own) = window.hwnd() else { return false };
+        unsafe {
+            let mut pt = POINT::default();
+            if GetCursorPos(&mut pt).is_err() {
+                return false;
+            }
+            let under = WindowFromPoint(pt);
+            if under.0.is_null() {
+                return false;
+            }
+            let root = GetAncestor(under, GA_ROOT);
+            root.0 as isize != own.0 as isize
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = window;
+        false
+    }
+}
+
 fn generate_copy_name(dest_folder: &Path, original_name: &str, is_dir: bool) -> std::path::PathBuf {
     let mut candidate = dest_folder.join(original_name);
     if !candidate.exists() {
@@ -1739,6 +1896,9 @@ pub fn run() {
             delete_files_native,
             copy_files_native,
             move_files_native,
+            create_zip_native,
+            extract_zip_native,
+            cursor_over_other_window,
             show_file_properties_native,
             get_folder_size,
             open_terminal_native,

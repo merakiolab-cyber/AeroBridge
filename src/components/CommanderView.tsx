@@ -39,6 +39,8 @@ import {
   getNativeFileIcon,
   isDesktopApp,
   startNativeFileDrag,
+  createZipNative,
+  extractZipNative,
   type NativeFileEntry,
   type NativePlace,
 } from '../utils/tauriBridge';
@@ -60,7 +62,7 @@ import { getAppIcon } from './AppIcons';
 import { AssetItem } from '../types';
 import { CommanderNotepad } from './CommanderNotepad';
 import { CommanderTerminal } from './CommanderTerminal';
-import { isTextLikeFile } from '../utils/fileTypes';
+import { isTextLikeFile, isExecutableFile } from '../utils/fileTypes';
 import { beginPointerDrag, setPointerDropHandler } from '../utils/pointerDrag';
 
 export interface CommanderViewProps {
@@ -68,6 +70,8 @@ export interface CommanderViewProps {
   initialRightPath?: string;
   onNotify?: (title: string, message?: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
   onOpenQuickLook?: (asset: AssetItem) => void;
+  /** False while the view is kept mounted but hidden (keeps terminal sessions alive); disables global input handlers. */
+  isActive?: boolean;
 }
 
 type SortField = 'name' | 'ext' | 'size' | 'modified';
@@ -166,7 +170,11 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
   initialRightPath,
   onNotify,
   onOpenQuickLook,
+  isActive = true,
 }) => {
+  const isActiveRef = useRef(isActive);
+  isActiveRef.current = isActive;
+
   // Drives & Quick Places (loaded from OS)
   const [drives, setDrives] = useState<NativePlace[]>([]);
   const [places, setPlaces] = useState<NativePlace[]>([]);
@@ -464,6 +472,7 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
   // Mouse side buttons navigation (button 3 = Back, button 4 = Forward)
   useEffect(() => {
     const handleMouseNavBack = (e: Event) => {
+      if (!isActiveRef.current) return;
       const custom = e as CustomEvent<{ clientX?: number; clientY?: number }>;
       let targetPane = activePane;
       if (typeof custom.detail?.clientX === 'number' && containerRef.current) {
@@ -476,6 +485,7 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
     };
 
     const handleMouseNavForward = (e: Event) => {
+      if (!isActiveRef.current) return;
       const custom = e as CustomEvent<{ clientX?: number; clientY?: number }>;
       let targetPane = activePane;
       if (typeof custom.detail?.clientX === 'number' && containerRef.current) {
@@ -731,12 +741,16 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
     async (item: NativeFileEntry, paneKey: 'left' | 'right') => {
       if (item.is_dir) {
         navigatePane(item.path, paneKey);
-      } else if (isTextLikeFile(item.name, item.extension)) {
+      } else if (!isExecutableFile(item.name, item.extension) && isTextLikeFile(item.name, item.extension)) {
         handleOpenInNotepad(item.path, paneKey);
       } else {
         try {
           await openFileNative(item.path);
-          onNotify?.('Otevřeno ve výchozí aplikaci', item.name, 'info');
+          onNotify?.(
+            isExecutableFile(item.name, item.extension) ? 'Spuštěno' : 'Otevřeno ve výchozí aplikaci',
+            item.name,
+            'info'
+          );
         } catch (err) {
           onNotify?.('Nelze otevřít soubor', String(err), 'error');
         }
@@ -1015,6 +1029,7 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
 
   // Connect pointer-based drag & drop handler for reliable drag inside CommanderView (Desktop)
   useEffect(() => {
+    if (!isActive) return;
     setPointerDropHandler((paths, targetFolder, isCopy) => {
       activeDragPayload = { paths, sourcePane: stateRef.current.activePane };
       const dummyEvent = {
@@ -1029,11 +1044,12 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
       void handleDropOnPane(dummyEvent, targetFolder, stateRef.current.activePane);
     });
     return () => setPointerDropHandler(null);
-  }, [handleDropOnPane]);
+  }, [handleDropOnPane, isActive]);
 
   // Keyboard navigation & Total Commander function shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isActiveRef.current) return;
       const s = stateRef.current;
       const targetEl = e.target as HTMLElement | null;
 
@@ -1615,7 +1631,7 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
               currentPath={pane.currentPath}
               oppositePath={oppositePane.currentPath}
               oppositeSelectedPaths={Array.from(oppositePane.selectedPaths)}
-              isVisible={viewMode === 'terminal'}
+              isVisible={isActive && viewMode === 'terminal'}
               requestedNewTabPath={isLeft ? leftTerminalRequest : rightTerminalRequest}
               onCloseTerminal={() => {
                 if (isLeft) setLeftViewMode('files');
@@ -2504,6 +2520,32 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
           }
         }}
         onOpenInNotepad={(filePath) => handleOpenInNotepad(filePath, activePane)}
+        onCompressZip={(paths) => {
+          void (async () => {
+            try {
+              onNotify?.('Balím do ZIP...', `${paths.length} položek`, 'info');
+              const zipPath = await createZipNative(paths);
+              onNotify?.('ZIP vytvořen', zipPath.split(/[\\/]/).pop() || zipPath, 'success');
+              void fetchDirectory(left.currentPath, 'left');
+              void fetchDirectory(right.currentPath, 'right');
+            } catch (err) {
+              onNotify?.('Zabalení do ZIP selhalo', String(err), 'error');
+            }
+          })();
+        }}
+        onExtractZip={(zipPath) => {
+          void (async () => {
+            try {
+              onNotify?.('Rozbaluji ZIP...', zipPath.split(/[\\/]/).pop() || zipPath, 'info');
+              const dest = await extractZipNative(zipPath);
+              onNotify?.('ZIP rozbalen', dest.split(/[\\/]/).pop() || dest, 'success');
+              void fetchDirectory(left.currentPath, 'left');
+              void fetchDirectory(right.currentPath, 'right');
+            } catch (err) {
+              onNotify?.('Rozbalení ZIP selhalo', String(err), 'error');
+            }
+          })();
+        }}
         onCopy={(paths) => handleCopyClipboard(paths)}
         onCut={(paths) => handleCut(paths)}
         onPaste={(destFolder) => void handlePasteClipboard(destFolder)}

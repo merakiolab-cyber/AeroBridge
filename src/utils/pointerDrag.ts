@@ -11,7 +11,7 @@
  */
 
 import type React from 'react';
-import { isDesktopApp, startNativeFileDrag } from './tauriBridge';
+import { isDesktopApp, startNativeFileDrag, cursorOverOtherWindow } from './tauriBridge';
 
 export interface PointerDragPayload {
   paths: string[];
@@ -21,6 +21,7 @@ export interface PointerDragPayload {
 type DropHandler = (paths: string[], targetFolder: string, isCopy: boolean) => void;
 
 const DRAG_THRESHOLD_PX = 6;
+const PROBE_INTERVAL_MS = 60;
 const HOVER_ATTR = 'data-drop-hover';
 
 let dropHandler: DropHandler | null = null;
@@ -69,6 +70,8 @@ export function beginPointerDrag(e: React.PointerEvent, getPayload: () => Pointe
   let payload: PointerDragPayload | null = null;
   let ghost: HTMLDivElement | null = null;
   let hover: HTMLElement | null = null;
+  let probing = false;
+  let lastProbe = 0;
 
   const setHover = (next: HTMLElement | null) => {
     if (next === hover) return;
@@ -131,6 +134,21 @@ export function beginPointerDrag(e: React.PointerEvent, getPayload: () => Pointe
       swallowNextClick();
       void startNativeFileDrag(handOver.paths, handOver.icon);
       return;
+    }
+
+    // Another application's window may lie over ours, so the pointer never crosses our own edge: ask the OS what is under it
+    const now = performance.now();
+    if (!probing && now - lastProbe > PROBE_INTERVAL_MS) {
+      probing = true;
+      lastProbe = now;
+      void cursorOverOtherWindow().then((outside) => {
+        probing = false;
+        if (!outside || !active || !payload) return;
+        const handOver = payload;
+        cleanup();
+        swallowNextClick();
+        void startNativeFileDrag(handOver.paths, handOver.icon);
+      });
     }
 
     if (ghost) ghost.style.transform = `translate(${ev.clientX + 14}px, ${ev.clientY + 14}px)`;

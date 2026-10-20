@@ -2,6 +2,12 @@
 
 ## Changelog
 
+### Nevydáno (ZIP, spouštění souborů, trvalý terminál)
+- **Zabalit / rozbalit ZIP (desktop):** kontextové menu v Prohlížeči i Commanderu nabízí „Zabalit do ZIP“ (soubory, složky, víc položek) a „Rozbalit ZIP do složky“. Rust příkazy `create_zip_native` a `extract_zip_native` ([lib.rs](src-tauri/src/lib.rs)) používají crate `zip`; archiv i cílová složka dostanou unikátní název (nic se nepřepisuje), rozbalování ignoruje cesty s `..` a absolutní cesty (Zip Slip). Bridge: `createZipNative`, `extractZipNative` ([tauriBridge.ts](src/utils/tauriBridge.ts)).
+- **Spouštění programů v Commanderu:** `.exe`, `.com`, `.bat`, `.cmd`, `.msi` a `.lnk` se při Enter / dvojkliku spustí systémem, místo aby se `.bat` a `.cmd` otevřely v zápisníku (`isExecutableFile` v [fileTypes.ts](src/utils/fileTypes.ts)). F4 je dál otevře v zápisníku.
+- **Oprava: přetažení souboru do okna jiné aplikace (upload v prohlížeči):** předání dragu OS se dřív spouštělo jen při přejetí hrany okna AeroBridge, takže když okno prohlížeče leželo přes naše, drag se nikdy nepředal. Nový Rust příkaz `cursor_over_other_window` ([lib.rs](src-tauri/src/lib.rs)) zjistí, které okno je pod kurzorem, a [pointerDrag.ts](src/utils/pointerDrag.ts) ho při tažení dotazuje (max. ~16×/s).
+- **Oprava: terminál se zavřel po přepnutí pohledu:** `CommanderView` se při přepnutí na jiný pohled (např. Prohlížeč) odmontoval a `TerminalSession` zabil PTY procesy. Commander teď po prvním otevření zůstává připojený a jen skrytý ([App.tsx](src/App.tsx)); nový prop `isActive` vypíná jeho klávesové zkratky, tlačítka myši zpět/vpřed a drop handler, dokud je skrytý.
+
 ### Version 3.27.30 (Multi-Tab terminál, přetrvávání procesů na pozadí, oprava vkládání v Claude Code a zoom)
 - **Multi-Tab terminálový systém ([CommanderTerminal.tsx](src/components/CommanderTerminal.tsx), [TerminalSession.tsx](src/components/TerminalSession.tsx)):**
   - Podpora více současně otevřených terminálových záložek s nezávislými PTY relacemi, historií a běžícími procesy.

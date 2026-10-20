@@ -10,6 +10,8 @@ import {
   moveFilesNative,
   showFilePropertiesNative,
   openTerminalNative,
+  createZipNative,
+  extractZipNative,
 } from '../utils/tauriBridge';
 import { copyTextToClipboard } from '../utils/localFileSystem';
 import { isVisualAsset } from '../utils/adobeThumbnailExtractor';
@@ -404,7 +406,38 @@ export function useFileOperations({
     [nativeDir, addToast]
   );
 
+  const handleCompressZip = useCallback(
+    async (paths: string[]) => {
+      if (paths.length === 0) return;
+      try {
+        addToast('Balím do ZIP...', `${paths.length} ${paths.length === 1 ? 'položka' : 'položek'}`, 'info');
+        const zipPath = await createZipNative(paths);
+        addToast('ZIP vytvořen', zipPath.split(/[\\/]/).pop() || zipPath, 'success');
+        if (nativeDir) await navigateNative(nativeDir);
+      } catch (err) {
+        addToast('Zabalení do ZIP selhalo', String(err), 'warning');
+      }
+    },
+    [nativeDir, navigateNative, addToast]
+  );
+
+  const handleExtractZip = useCallback(
+    async (zipPath: string) => {
+      try {
+        addToast('Rozbaluji ZIP...', zipPath.split(/[\\/]/).pop() || zipPath, 'info');
+        const dest = await extractZipNative(zipPath);
+        addToast('ZIP rozbalen', dest.split(/[\\/]/).pop() || dest, 'success');
+        if (nativeDir) await navigateNative(nativeDir);
+      } catch (err) {
+        addToast('Rozbalení ZIP selhalo', String(err), 'warning');
+      }
+    },
+    [nativeDir, navigateNative, addToast]
+  );
+
   return {
+    handleCompressZip,
+    handleExtractZip,
     clipboard,
     setClipboard,
     contextMenuPos,

@@ -21,6 +21,15 @@ export const TEXT_FILENAMES = new Set([
   '.gitignore', '.gitattributes', '.editorconfig', '.prettierrc', '.eslintrc', '.npmrc', '.env'
 ]);
 
+// Files the OS runs rather than displays. Checked before the text list so `.bat`/`.cmd` execute instead of opening in the editor.
+export const EXECUTABLE_EXTENSIONS = new Set(['exe', 'com', 'bat', 'cmd', 'msi', 'lnk']);
+
+export function isExecutableFile(fileNameOrExt: string, ext?: string): boolean {
+  if (!fileNameOrExt) return false;
+  const e = (ext || (fileNameOrExt.includes('.') ? fileNameOrExt.split('.').pop() : fileNameOrExt) || '').toLowerCase().replace(/^\./, '');
+  return EXECUTABLE_EXTENSIONS.has(e);
+}
+
 export function isTextLikeFile(fileNameOrExt: string, ext?: string): boolean {
   if (!fileNameOrExt) return false;
   const e = (ext || (fileNameOrExt.includes('.') ? fileNameOrExt.split('.').pop() : fileNameOrExt) || '').toLowerCase().replace(/^\./, '');

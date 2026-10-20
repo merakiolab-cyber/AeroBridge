@@ -305,6 +305,34 @@ export async function moveFilesNative(sources: string[], destFolder: string): Pr
 }
 
 /**
+ * True when the cursor is over a window of another application (e.g. a browser lying on top of this one).
+ */
+export async function cursorOverOtherWindow(): Promise<boolean> {
+  if (!isDesktopApp()) return false;
+  try {
+    return await invoke<boolean>('cursor_over_other_window');
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Packs files/folders into a new .zip next to the first item. Returns the created archive path.
+ */
+export async function createZipNative(sources: string[]): Promise<string> {
+  if (!isDesktopApp()) throw new Error('Zabalení do ZIP vyžaduje desktopovou aplikaci');
+  return await invoke<string>('create_zip_native', { sources });
+}
+
+/**
+ * Extracts a .zip into a new folder named after the archive. Returns the created folder path.
+ */
+export async function extractZipNative(zipPath: string, destFolder?: string): Promise<string> {
+  if (!isDesktopApp()) throw new Error('Rozbalení ZIP vyžaduje desktopovou aplikaci');
+  return await invoke<string>('extract_zip_native', { zipPath, destFolder: destFolder ?? null });
+}
+
+/**
  * Opens the native Windows File Properties dialog.
  */
 export async function showFilePropertiesNative(filePath: string): Promise<void> {

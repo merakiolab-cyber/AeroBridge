@@ -26,6 +26,7 @@ png = "0.17"
 base64 = "0.22"
 tauri-plugin-drag = "2"
 portable-pty = "0.9.0"
+zip = { version = "2", default-features = false, features = ["deflate"] }
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.61", features = [
