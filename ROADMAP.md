@@ -175,6 +175,31 @@
 
 ---
 
+## 🚀 Fáze 9: Pokročilý Commander, 3D/Audio Ekosystém & Windows 11 Integrace (PLÁNOVÁNO ⏳)
+- [ ] **Pokročilé operace Commanderu:**
+  - [ ] **Porovnání a synchronizace složek (Folder Compare & Sync):**
+    - [ ] Vizuální porovnání obsahu levého a pravého panelu (identifikace novějších, chybějících a změněných souborů)
+    - [ ] Nástroj pro rychlou jednosměrnou i obousměrnou synchronizaci
+  - [ ] **Rychlé filtry a Quick Search v panelech Commanderu:**
+    - [ ] Okamžité filtrování podle typu (`*.psd`, `*.png`, `*.blend`, podle velikosti či data) psaním přímo v panelu
+  - [ ] **Dávkové přejmenování přímo v Commanderu (<kbd>Ctrl+T</kbd> / Multi-Rename Tool):**
+    - [ ] Integrace pokročilého batch renameru pro označené soubory v panelech Commanderu s živým náhledem
+  - [ ] **Kalkulace velikosti složek na pozadí:**
+    - [ ] Stisk <kbd>Space</kbd> na složce spočítá její skutečnou velikost na disku a počet položek (asynchronně bez blokování UI)
+- [ ] **Rozšíření médií: 3D, Video a Audio:**
+  - [ ] **Interaktivní 3D náhledy (Blender `.blend`, `.obj`, `.gltf` / `.glb`):**
+    - [ ] Lehký WebGL/Three.js náhled v Inspektoru nebo QuickLooku (rotace, wireframe, statistiky polygonů)
+  - [ ] **Video & Audio vylepšení:**
+    - [ ] Scrubbing náhledy při najetí myší na časovou osu videa
+    - [ ] Generování audio křivky (waveform) pro zvukové soubory (`.wav`, `.mp3`, `.ogg`, `.flac`)
+    - [ ] Rychlý export prvního/klíčového snímku (poster frame) z videa jedním kliknutím
+- [ ] **Windows 11 Shell & Distribuce:**
+  - [ ] Integrace do kontextového menu Windows 11 („Otevřít v AeroBridge“)
+  - [ ] Podpora Jump Listu Windows (nedávné a oblíbené složky v taskbaru)
+  - [ ] Finální optimalizace cold-startu, paměťové stopy a sestavení podepsaného instalátoru
+
+---
+
 ## 🚫 Vyřazené funkce ze záměru (Out of Scope / Záměrně neimplementovat)
 - ❌ **Typografie & OpenType (Font preview / Glyphs / Font management):** Zcela vyřazeno z DAM workflow jako zbytečné. AeroBridge se soustředí výhradně na kreativní média (foto, video, Adobe formáty, vektorovou grafiku).
 - ❌ **Barevné štítky & hodnocení hvězdičkami (Rating 1–5, Labels):** Odmítnuto pro zachování minimalistického, nerušivého prostředí bez vizuálního smogu.
