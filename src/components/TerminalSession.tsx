@@ -211,6 +211,8 @@ export const TerminalSession = forwardRef<TerminalSessionHandle, TerminalSession
           (event.shiftKey && event.key === 'Insert');
 
         if (isPaste) {
+          // preventDefault cancels the native paste event, otherwise xterm pastes a second time
+          event.preventDefault();
           void navigator.clipboard.readText().then((txt) => {
             if (txt) handlePasteText(txt);
           }).catch((err) => {
@@ -219,7 +221,16 @@ export const TerminalSession = forwardRef<TerminalSessionHandle, TerminalSession
           return false;
         }
 
-        // 3. Zoom shortcuts: Ctrl + '+', Ctrl + '-', Ctrl + '0'
+        // 3. Shift+Enter: insert newline without submitting (ESC+CR, same as Alt+Enter; Claude Code accepts it)
+        if (event.key === 'Enter' && event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey) {
+          event.preventDefault();
+          void ptyWrite(sessionId, '\x1b\r').catch((err) => {
+            console.error('[TerminalSession ptyWrite error]:', err);
+          });
+          return false;
+        }
+
+        // 4. Zoom shortcuts: Ctrl + '+', Ctrl + '-', Ctrl + '0'
         if (
           event.ctrlKey &&
           !event.altKey &&
@@ -387,18 +398,6 @@ export const TerminalSession = forwardRef<TerminalSessionHandle, TerminalSession
         }}
         onWheel={handleWheel}
         onContextMenu={handleContextMenu}
-        onKeyDown={(e) => {
-          const isPaste =
-            (e.ctrlKey && (e.key.toLowerCase() === 'v' || e.code === 'KeyV')) ||
-            (e.shiftKey && e.key === 'Insert');
-          if (isPaste) {
-            e.preventDefault();
-            e.stopPropagation();
-            void navigator.clipboard.readText().then((txt) => {
-              if (txt) handlePasteText(txt);
-            });
-          }
-        }}
       />
     );
   }
