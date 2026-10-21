@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import {
-  Columns2,
   ArrowLeft,
   ArrowRight,
   CornerLeftUp,
@@ -228,6 +228,15 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
   const [rightViewMode, setRightViewMode] = useState<'files' | 'notepad' | 'terminal'>('files');
   const [leftNotepadTarget, setLeftNotepadTarget] = useState<{ path: string; timestamp: number } | null>(null);
   const [rightNotepadTarget, setRightNotepadTarget] = useState<{ path: string; timestamp: number } | null>(null);
+
+  // Target element for the toolbar buttons, which live in the global TopBar row
+  const [commanderToolbarSlot, setCommanderToolbarSlot] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    setCommanderToolbarSlot(document.getElementById('commander-toolbar-slot'));
+  }, []);
+
+  /** Checks whether a path currently listed in either pane is a folder (used for modal icons) */
+  const isListedFolder = (path: string) => [...left.items, ...right.items].some((it) => it.is_dir && it.path === path);
 
   // Background terminal lifecycle and multi-tab state
   const [leftTerminalInitialized, setLeftTerminalInitialized] = useState(false);
@@ -1473,7 +1482,7 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
             e.preventDefault();
             void handleDropOnPane(e, pane.currentPath, paneKey);
           }}
-          className="flex items-center justify-between px-2 py-1.5 bg-[#171920] border-b border-white/[0.06] text-xs shrink-0 select-none overflow-x-auto"
+          className="flex items-center justify-between px-2 py-2.5 bg-[#171920] border-b border-white/[0.06] text-xs shrink-0 select-none overflow-x-auto"
         >
           {/* Drive selector pills */}
           <div className="flex items-center gap-1">
@@ -1487,14 +1496,14 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
                     e.stopPropagation();
                     navigatePane(d.path, paneKey);
                   }}
-                  className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-mono font-medium transition-colors cursor-pointer ${
+                  className={`flex items-center gap-1 px-2 py-1.5 rounded text-xs font-mono font-medium transition-colors cursor-pointer ${
                     isCurrentDrive
                       ? 'bg-[#60cdff] text-[#111215] font-bold shadow-xs'
                       : 'bg-white/[0.04] text-zinc-300 hover:bg-white/[0.1] hover:text-white border border-white/[0.06]'
                   }`}
                   title={`Disk ${d.name} (${d.path})`}
                 >
-                  <Win11Drive className="w-3.5 h-3.5" />
+                  <Win11Drive className="w-4 h-4" />
                   <span>{d.name.replace(/\\$/, '')}</span>
                 </button>
               );
@@ -1505,11 +1514,11 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
           <div className="flex items-center gap-1 shrink-0">
             {places.map((p) => {
               const lower = p.name.toLowerCase();
-              let icon = <Folder className="w-3.5 h-3.5" />;
-              if (lower.includes('obrázky') || lower.includes('picture')) icon = <Win11Pictures className="w-3.5 h-3.5" />;
-              else if (lower.includes('plocha') || lower.includes('desktop')) icon = <Win11Desktop className="w-3.5 h-3.5" />;
-              else if (lower.includes('dokumenty') || lower.includes('documents')) icon = <Win11Documents className="w-3.5 h-3.5" />;
-              else if (lower.includes('stažené') || lower.includes('download')) icon = <Win11Downloads className="w-3.5 h-3.5" />;
+              let icon = <Folder className="w-4 h-4" />;
+              if (lower.includes('obrázky') || lower.includes('picture')) icon = <Win11Pictures className="w-4 h-4" />;
+              else if (lower.includes('plocha') || lower.includes('desktop')) icon = <Win11Desktop className="w-4 h-4" />;
+              else if (lower.includes('dokumenty') || lower.includes('documents')) icon = <Win11Documents className="w-4 h-4" />;
+              else if (lower.includes('stažené') || lower.includes('download')) icon = <Win11Downloads className="w-4 h-4" />;
 
               return (
                 <button
@@ -1519,7 +1528,7 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
                     e.stopPropagation();
                     navigatePane(p.path, paneKey);
                   }}
-                  className="p-1 rounded bg-white/[0.03] hover:bg-white/[0.1] text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                  className="p-1.5 rounded bg-white/[0.03] hover:bg-white/[0.1] text-zinc-400 hover:text-white transition-colors cursor-pointer"
                   title={p.name}
                 >
                   {icon}
@@ -1536,14 +1545,14 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
                   if (isLeft) setLeftViewMode('files');
                   else setRightViewMode('files');
                 }}
-                className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium transition-colors cursor-pointer ${
+                className={`flex items-center gap-1 px-2 py-1.5 rounded text-xs font-medium transition-colors cursor-pointer ${
                   viewMode === 'files'
                     ? 'bg-white/15 text-white font-semibold shadow-xs'
                     : 'text-zinc-400 hover:text-white'
                 }`}
                 title="Zobrazit správce souborů"
               >
-                <Folder className="w-3.5 h-3.5 text-[#60cdff]" />
+                <Folder className="w-4 h-4 text-[#60cdff]" />
                 <span className="hidden sm:inline">Soubory</span>
               </button>
               <button
@@ -1553,14 +1562,14 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
                   if (isLeft) setLeftViewMode('notepad');
                   else setRightViewMode('notepad');
                 }}
-                className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium transition-colors cursor-pointer ${
+                className={`flex items-center gap-1 px-2 py-1.5 rounded text-xs font-medium transition-colors cursor-pointer ${
                   viewMode === 'notepad'
                     ? 'bg-amber-500/20 text-amber-300 font-semibold shadow-xs ring-1 ring-amber-500/30'
                     : 'text-zinc-400 hover:text-white'
                 }`}
                 title="Přepnout do zápisníku / poznámkového bloku (F4)"
               >
-                <FileText className="w-3.5 h-3.5 text-amber-400" />
+                <FileText className="w-4 h-4 text-amber-400" />
                 <span>Zápisník</span>
               </button>
               <button
@@ -1575,7 +1584,7 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
                     setRightViewMode('terminal');
                   }
                 }}
-                className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium transition-colors cursor-pointer ${
+                className={`flex items-center gap-1.5 px-2 py-1.5 rounded text-xs font-medium transition-colors cursor-pointer ${
                   viewMode === 'terminal'
                     ? 'bg-emerald-500/20 text-emerald-300 font-semibold shadow-xs ring-1 ring-emerald-500/30'
                     : 'text-zinc-400 hover:text-white'
@@ -1586,7 +1595,7 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
                     : 'Spustit integrovaný terminál v tomto okně'
                 }
               >
-                <Terminal className="w-3.5 h-3.5 text-emerald-400" />
+                <Terminal className="w-4 h-4 text-emerald-400" />
                 <span>Terminál</span>
                 {terminalProcessCount > 0 && viewMode !== 'terminal' && (
                   <span className="flex items-center gap-1 ml-0.5 px-1 py-0.2 bg-emerald-500/25 border border-emerald-500/40 rounded-full text-[10px] text-emerald-300 font-mono font-bold animate-pulse">
@@ -2283,18 +2292,9 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
       ref={containerRef}
       className="flex-1 flex flex-col h-full bg-[#111215] text-zinc-300 font-sans select-none overflow-hidden relative"
     >
-      {/* Top Commander Toolbar: Sync (=), Swap (⇆), Refresh */}
-      <div className="flex items-center justify-between px-4 py-2 bg-[#17181d] border-b border-white/[0.08] shrink-0 text-xs select-none">
-        <div className="flex items-center gap-2.5">
-          <Columns2 className="w-4 h-4 text-[#60cdff]" />
-          <span className="font-semibold text-white tracking-wide">
-            Commender — Dvoupanelový správce souborů
-          </span>
-          <span className="text-[10px] bg-white/[0.06] px-1.5 py-0.5 rounded text-zinc-400 font-mono">
-            Total Commander Mode
-          </span>
-        </div>
-
+      {/* Commander toolbar: Sync (=), Swap (⇆), Refresh — rendered into the TopBar slot */}
+      {commanderToolbarSlot &&
+        createPortal(
         <div className="flex items-center gap-1.5">
           <button
             type="button"
@@ -2325,8 +2325,9 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
             <RotateCw className="w-3.5 h-3.5 text-emerald-400" />
             <span>Obnovit oba</span>
           </button>
-        </div>
-      </div>
+        </div>,
+        commanderToolbarSlot,
+        )}
 
       {/* Dual Panes Container with Resizable Splitter */}
       <div ref={containerRef} className="flex-1 flex overflow-hidden min-h-0 relative p-1.5 gap-1.5">
@@ -2394,8 +2395,9 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
                   </p>
                   <div className="mt-2 max-h-36 overflow-y-auto bg-black/30 border border-white/10 rounded p-2 space-y-1 font-mono text-[11px] text-zinc-400">
                     {operationModal.sourceNames.map((n, i) => (
-                      <div key={i} className="truncate">
-                        • {n}
+                      <div key={i} className="flex items-center gap-1.5 truncate">
+                        {isListedFolder(operationModal.sourcePaths[i]) && <Win11Folder className="w-3.5 h-3.5 shrink-0" />}
+                        <span className="truncate">• {n}</span>
                       </div>
                     ))}
                   </div>
@@ -2437,8 +2439,9 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
                   </p>
                   <div className="mb-2 max-h-24 overflow-y-auto bg-black/30 border border-white/10 rounded p-2 font-mono text-[11px] text-zinc-400">
                     {operationModal.sourceNames.map((n, i) => (
-                      <div key={i} className="truncate">
-                        • {n}
+                      <div key={i} className="flex items-center gap-1.5 truncate">
+                        {isListedFolder(operationModal.sourcePaths[i]) && <Win11Folder className="w-3.5 h-3.5 shrink-0" />}
+                        <span className="truncate">• {n}</span>
                       </div>
                     ))}
                   </div>

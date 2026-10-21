@@ -241,6 +241,12 @@ export const TopBar: React.FC<TopBarProps> = ({
 
         {/* Right: Select All, Clear Selection, and Consolidated Three-Dots Menu (...) */}
         <div className="flex items-center gap-2 shrink-0">
+          {/* Commander toolbar slot (buttons are portaled in by CommanderView) */}
+          <div
+            id="commander-toolbar-slot"
+            className={currentView === 'commander' ? 'flex items-center gap-1.5' : 'hidden'}
+          />
+
           {/* Select all button */}
           {onSelectAll && (
             <button
