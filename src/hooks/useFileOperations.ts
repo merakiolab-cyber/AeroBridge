@@ -13,7 +13,7 @@ import {
   createZipNative,
   extractZipNative,
 } from '../utils/tauriBridge';
-import { copyTextToClipboard } from '../utils/localFileSystem';
+import { copyFilesToClipboard } from '../utils/localFileSystem';
 import { isVisualAsset } from '../utils/adobeThumbnailExtractor';
 import { type ContextMenuPosition, type ContextMenuTarget } from '../components/FileContextMenu';
 
@@ -176,7 +176,7 @@ export function useFileOperations({
       const nextClip = { paths, op: 'copy' as const };
       clipboardRef.current = nextClip;
       setClipboard(nextClip);
-      copyTextToClipboard(paths.join('\r\n'));
+      void copyFilesToClipboard(paths, false);
       addToast('Zkopírováno do schránky', `${paths.length} ${paths.length === 1 ? 'položka' : 'položek'}`);
     },
     [addToast]
@@ -188,7 +188,7 @@ export function useFileOperations({
       const nextClip = { paths, op: 'cut' as const };
       clipboardRef.current = nextClip;
       setClipboard(nextClip);
-      copyTextToClipboard(paths.join('\r\n'));
+      void copyFilesToClipboard(paths, true);
       addToast('Vyjmuté položky', `${paths.length} ${paths.length === 1 ? 'položka' : 'položek'} — připraveno k vložení`, 'info');
     },
     [addToast]

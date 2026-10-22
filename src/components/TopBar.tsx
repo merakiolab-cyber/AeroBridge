@@ -279,18 +279,6 @@ export const TopBar: React.FC<TopBarProps> = ({
             </span>
           )}
 
-          {/* Settings & Cache Management Button */}
-          {onOpenSettings && (
-            <button
-              type="button"
-              onClick={onOpenSettings}
-              className="p-1.5 rounded-full transition-all border bg-white/[0.04] text-zinc-300 hover:text-white hover:bg-white/[0.1] border-white/10 cursor-pointer"
-              title="Nastavení a správa mezipaměti (Ctrl+,)"
-            >
-              <Settings className="w-4 h-4" />
-            </button>
-          )}
-
           {/* Three dots button and dropdown menu */}
           <div className="relative" ref={menuRef}>
             <button
@@ -301,7 +289,7 @@ export const TopBar: React.FC<TopBarProps> = ({
                   ? 'bg-[#e2e4e9] text-[#111215] border-[#e2e4e9]'
                   : 'bg-white/[0.04] text-zinc-300 hover:text-white hover:bg-white/[0.1] border-white/10'
               }`}
-              title="Nabídka akcí (Přejmenovat, ZIP, IPTC, Otevřít složku...)"
+              title="Menu: soubory, výběr, zobrazení, nastavení (Ctrl+,)"
               aria-expanded={menuOpen}
             >
               <MoreHorizontal className="w-4 h-4" />
@@ -311,8 +299,9 @@ export const TopBar: React.FC<TopBarProps> = ({
             {menuOpen && (
               <div className="absolute right-0 top-full mt-2 w-64 bg-[#222429] border border-white/15 shadow-2xl z-50 py-1.5 backdrop-blur-md">
                 <div className="px-3 py-1.5 text-[10px] uppercase font-mono tracking-wider text-zinc-400 border-b border-white/[0.08]">
-                  Akce & Správa souborů
+                  Menu
                 </div>
+              <div className="px-3 pt-2 pb-1 text-[10px] uppercase font-mono tracking-wider text-zinc-500">Soubory</div>
 
               {/* 1. Otevřít složku */}
               <button
@@ -330,6 +319,7 @@ export const TopBar: React.FC<TopBarProps> = ({
                 </div>
               </button>
 
+              <div className="px-3 pt-2 pb-1 text-[10px] uppercase font-mono tracking-wider text-zinc-500">Výběr</div>
               {/* 2. Přejmenovat */}
               <button
                 type="button"
@@ -410,6 +400,7 @@ export const TopBar: React.FC<TopBarProps> = ({
               )}
 
               <div className="my-1 border-t border-white/[0.08]" />
+              <div className="px-3 pt-2 pb-1 text-[10px] uppercase font-mono tracking-wider text-zinc-500">Zobrazení</div>
 
               {/* 4. Toggle file info */}
               {onToggleShowAllInfo && (
@@ -437,6 +428,7 @@ export const TopBar: React.FC<TopBarProps> = ({
               )}
 
               <div className="my-1 border-t border-white/[0.08]" />
+              <div className="px-3 pt-2 pb-1 text-[10px] uppercase font-mono tracking-wider text-zinc-500">Aplikace</div>
 
               {/* 5. Purge Folder Cache (Adobe Bridge style) */}
               {onPurgeFolderCache && (

@@ -317,6 +317,21 @@ export async function cursorOverOtherWindow(): Promise<boolean> {
 }
 
 /**
+ * Puts files on the Windows clipboard as a file list (like Explorer's Ctrl+C), so pasting into Figma, Explorer,
+ * Photoshop… yields the files instead of their paths. Returns false when it is unavailable or failed.
+ */
+export async function copyFilesToClipboardNative(paths: string[], cut = false): Promise<boolean> {
+  if (!isDesktopApp() || paths.length === 0) return false;
+  try {
+    await invoke('copy_files_to_clipboard_native', { paths, cut });
+    return true;
+  } catch (err) {
+    console.warn('[TauriBridge] Native file clipboard failed:', err);
+    return false;
+  }
+}
+
+/**
  * Packs files/folders into a new .zip next to the first item. Returns the created archive path.
  */
 export async function createZipNative(sources: string[]): Promise<string> {
@@ -405,6 +420,34 @@ const TRANSPARENT_1X1_PNG =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
 
 /**
+ * Draws a small visible drag badge ("name" or "N položek"). A fully transparent 1x1 icon is rejected by the
+ * Windows drag image API, so callers without a thumbnail (Commander rows) get this instead.
+ */
+function makeDragBadge(paths: string[]): string {
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = 220;
+    canvas.height = 40;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return TRANSPARENT_1X1_PNG;
+    const first = paths[0].split(/[\\/]/).pop() || paths[0];
+    const label = paths.length > 1 ? `${paths.length} položek` : first;
+    ctx.fillStyle = 'rgba(26,29,39,0.92)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = 'rgba(96,205,255,0.7)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(1, 1, canvas.width - 2, canvas.height - 2);
+    ctx.fillStyle = '#e2e4e9';
+    ctx.font = '600 14px "Plus Jakarta Sans", system-ui, sans-serif';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label.length > 26 ? label.slice(0, 25) + '…' : label, 12, canvas.height / 2);
+    return canvas.toDataURL('image/png');
+  } catch {
+    return TRANSPARENT_1X1_PNG;
+  }
+}
+
+/**
  * Initiates an OS-level native drag-and-drop operation (OLE CF_HDROP on Windows).
  * Allows dragging files seamlessly from AeroBridge into external desktop apps
  * (e.g. Adobe Photoshop, Illustrator, Premiere, Windows Explorer, Blender).
@@ -423,14 +466,14 @@ export async function startNativeFileDrag(paths: string[], icon?: string): Promi
   beginDragSession(validPaths);
   try {
     const dragIcon =
-      icon && icon.startsWith('data:image/png;base64,') ? icon : TRANSPARENT_1X1_PNG;
+      icon && icon.startsWith('data:image/png;base64,') ? icon : makeDragBadge(validPaths);
 
     await startDrag({
       item: validPaths,
       icon: dragIcon,
     });
   } catch (err) {
-    console.warn('[TauriBridge] Native drag failed:', err);
+    console.error('[TauriBridge] Native drag failed:', err);
   } finally {
     endDragSession();
     setTimeout(() => {
@@ -519,6 +562,7 @@ export async function executeShellCommandNative(
 
 /**
  * Spawns an interactive PTY session (PowerShell, CMD, WSL) for embedded terminal.
+ * If a session with this id is still running, it is re-attached and its recent output is returned for replay.
  */
 export async function ptySpawn(
   id: string,
@@ -526,9 +570,9 @@ export async function ptySpawn(
   shell?: 'powershell' | 'cmd' | 'wsl',
   cols = 80,
   rows = 24
-): Promise<void> {
-  if (!isDesktopApp()) return;
-  await invoke('pty_spawn', { id, cwd, shell, cols, rows });
+): Promise<string> {
+  if (!isDesktopApp()) return '';
+  return (await invoke<string | null>('pty_spawn', { id, cwd, shell, cols, rows })) ?? '';
 }
 
 /**

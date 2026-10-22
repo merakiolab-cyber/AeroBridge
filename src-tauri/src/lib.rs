@@ -1563,6 +1563,67 @@ async fn extract_zip_native(zip_path: String, dest_folder: Option<String>) -> Re
         .map_err(|e| e.to_string())?
 }
 
+/// Puts files on the Windows clipboard the way Explorer does (CF_HDROP file list), so Ctrl+V in Figma, Explorer,
+/// Photoshop, mail clients… pastes the files instead of their paths. Images that GDI+ can decode are added as a bitmap too.
+#[tauri::command]
+async fn copy_files_to_clipboard_native(paths: Vec<String>, cut: Option<bool>) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        tauri::async_runtime::spawn_blocking(move || {
+            use std::os::windows::process::CommandExt;
+            use std::process::Stdio;
+            const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+            if paths.is_empty() {
+                return Ok(());
+            }
+            // Paths travel through the environment, not the command line, so quotes and special characters stay intact
+            let joined = paths.join("\n");
+            let script = r#"
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+$list = $env:AB_CLIP_PATHS -split "`n" | Where-Object { $_ }
+$files = New-Object System.Collections.Specialized.StringCollection
+foreach ($p in $list) { [void]$files.Add($p) }
+$data = New-Object System.Windows.Forms.DataObject
+$data.SetFileDropList($files)
+if ($env:AB_CLIP_CUT -eq '1') {
+  $data.SetData('Preferred DropEffect', [System.IO.MemoryStream]::new([byte[]](2,0,0,0)))
+}
+if ($list.Count -eq 1 -and $env:AB_CLIP_CUT -ne '1' -and (Test-Path -LiteralPath $list[0] -PathType Leaf)) {
+  try {
+    $img = [System.Drawing.Image]::FromFile($list[0])
+    $bmp = New-Object System.Drawing.Bitmap($img)
+    $img.Dispose()
+    $data.SetImage($bmp)
+  } catch { }
+}
+[System.Windows.Forms.Clipboard]::SetDataObject($data, $true)
+"#;
+            let output = Command::new("powershell.exe")
+                .args(["-NoProfile", "-NonInteractive", "-STA", "-Command", script])
+                .env("AB_CLIP_PATHS", joined)
+                .env("AB_CLIP_CUT", if cut.unwrap_or(false) { "1" } else { "0" })
+                .stdin(Stdio::null())
+                .creation_flags(CREATE_NO_WINDOW)
+                .output()
+                .map_err(|e| e.to_string())?;
+            if output.status.success() {
+                Ok(())
+            } else {
+                Err(String::from_utf8_lossy(&output.stderr).trim().to_string())
+            }
+        })
+        .await
+        .map_err(|e| e.to_string())?
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = (paths, cut);
+        Err("Kopírování souborů do schránky je dostupné jen ve Windows".to_string())
+    }
+}
+
 /// True when the cursor is above a window that is not this app (e.g. a browser lying over AeroBridge).
 /// In-app drags use it to hand over to the OS drag even though the pointer never crossed our own window edge.
 #[tauri::command]
@@ -1934,8 +1995,14 @@ pub fn run() {
             pty_spawn,
             pty_write,
             pty_resize,
-            pty_kill
+            pty_kill,
+            copy_files_to_clipboard_native
         ])
-        .run(tauri::generate_context!())
-        .expect("error while building tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            if let tauri::RunEvent::Exit = event {
+                app.state::<PtyManager>().kill_all();
+            }
+        });
 }

@@ -15,7 +15,7 @@ import {
   Layers,
   ArrowRightLeft,
 } from 'lucide-react';
-import { openTerminalNative } from '../utils/tauriBridge';
+import { openTerminalNative, ptyKill } from '../utils/tauriBridge';
 import { TerminalSession, TerminalSessionHandle } from './TerminalSession';
 
 export interface TerminalTabItem {
@@ -39,6 +39,23 @@ export interface CommanderTerminalProps {
   onNotify?: (title: string, message?: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
 }
 
+const tabsStorageKey = (paneKey: string) => `aerobridge-terminal-tabs-${paneKey}`;
+
+/** Tabs survive a webview reload (the Rust side keeps the shells alive), so they are restored on mount. */
+function loadStoredTabs(paneKey: string): { tabs: TerminalTabItem[]; activeId: string } | null {
+  try {
+    const raw = sessionStorage.getItem(tabsStorageKey(paneKey));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { tabs?: TerminalTabItem[]; activeId?: string };
+    if (!Array.isArray(parsed.tabs) || parsed.tabs.length === 0) return null;
+    const tabs = parsed.tabs.filter((t) => t && typeof t.id === 'string' && typeof t.cwd === 'string');
+    if (tabs.length === 0) return null;
+    return { tabs, activeId: tabs.some((t) => t.id === parsed.activeId) ? parsed.activeId! : tabs[0].id };
+  } catch {
+    return null;
+  }
+}
+
 function getBaseName(pathStr: string): string {
   if (!pathStr) return 'Terminál';
   const clean = pathStr.replace(/[/\\]+$/, '');
@@ -60,7 +77,9 @@ export const CommanderTerminal: React.FC<CommanderTerminalProps> = ({
   const sessionHandlesRef = useRef<Record<string, TerminalSessionHandle | null>>({});
 
   // Initialize tabs state
+  const storedRef = useRef(loadStoredTabs(paneKey));
   const [tabs, setTabs] = useState<TerminalTabItem[]>(() => {
+    if (storedRef.current) return storedRef.current.tabs;
     const initialId = `pty-${paneKey}-${Date.now()}`;
     return [
       {
@@ -74,7 +93,15 @@ export const CommanderTerminal: React.FC<CommanderTerminalProps> = ({
     ];
   });
 
-  const [activeTabId, setActiveTabId] = useState<string>(tabs[0]?.id || '');
+  const [activeTabId, setActiveTabId] = useState<string>(storedRef.current?.activeId || tabs[0]?.id || '');
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(tabsStorageKey(paneKey), JSON.stringify({ tabs, activeId: activeTabId }));
+    } catch {
+      // storage unavailable: tabs just will not be restored after a reload
+    }
+  }, [tabs, activeTabId, paneKey]);
 
   // Report active background processes count
   const activeCount = useMemo(() => {
@@ -134,6 +161,7 @@ export const CommanderTerminal: React.FC<CommanderTerminalProps> = ({
   const handleCloseTab = useCallback(
     (idToClose: string, e?: React.MouseEvent) => {
       e?.stopPropagation();
+      void ptyKill(idToClose);
       setTabs((prev) => {
         const remaining = prev.filter((t) => t.id !== idToClose);
         delete sessionHandlesRef.current[idToClose];
@@ -165,6 +193,7 @@ export const CommanderTerminal: React.FC<CommanderTerminalProps> = ({
         return;
       }
       // Re-spawn with new shell by creating fresh ID for this tab
+      void ptyKill(activeTabId);
       const newId = `pty-${paneKey}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
       setTabs((prev) =>
         prev.map((t) =>
@@ -181,6 +210,7 @@ export const CommanderTerminal: React.FC<CommanderTerminalProps> = ({
   // Restart active tab
   const handleRestartActive = useCallback(() => {
     if (!activeTab) return;
+    void ptyKill(activeTabId);
     const newId = `pty-${paneKey}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     setTabs((prev) =>
       prev.map((t) =>

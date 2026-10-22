@@ -9,7 +9,12 @@ pub struct PtySession {
     master: Box<dyn MasterPty + Send>,
     writer: Box<dyn Write + Send>,
     child: Box<dyn Child + Send + Sync>,
+    /// Recent output, replayed when the frontend re-attaches to a still-running session.
+    scrollback: Arc<Mutex<Vec<u8>>>,
 }
+
+/// Keep roughly the last 512 KiB of output per session.
+const SCROLLBACK_LIMIT: usize = 512 * 1024;
 
 pub struct PtyManager {
     sessions: Arc<Mutex<HashMap<String, PtySession>>>,
@@ -19,6 +24,15 @@ impl PtyManager {
     pub fn new() -> Self {
         Self {
             sessions: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+
+    /// Terminates every running shell (called when the app exits).
+    pub fn kill_all(&self) {
+        if let Ok(mut map) = self.sessions.lock() {
+            for (_, mut session) in map.drain() {
+                let _ = session.child.kill();
+            }
         }
     }
 }
@@ -42,7 +56,17 @@ pub fn pty_spawn(
     cols: Option<u16>,
     rows: Option<u16>,
     manager: State<'_, PtyManager>,
-) -> Result<(), String> {
+) -> Result<String, String> {
+    // A session with this id is already running (e.g. the webview was reloaded): re-attach and replay its output
+    // instead of spawning a second shell.
+    {
+        let map = manager.sessions.lock().unwrap();
+        if let Some(existing) = map.get(&id) {
+            let buf = existing.scrollback.lock().unwrap();
+            return Ok(String::from_utf8_lossy(&buf).to_string());
+        }
+    }
+
     let pty_system = native_pty_system();
     let pty_size = PtySize {
         rows: rows.unwrap_or(24),
@@ -94,10 +118,12 @@ pub fn pty_spawn(
         .take_writer()
         .map_err(|e| format!("Nepodařilo se získat PTY writer: {}", e))?;
 
+    let scrollback: Arc<Mutex<Vec<u8>>> = Arc::new(Mutex::new(Vec::new()));
     let session = PtySession {
         master: pair.master,
         writer,
         child,
+        scrollback: Arc::clone(&scrollback),
     };
 
     {
@@ -109,6 +135,7 @@ pub fn pty_spawn(
     let app_clone = app.clone();
     let session_id = id.clone();
     let sessions_ref = Arc::clone(&manager.sessions);
+    let scrollback_ref = Arc::clone(&scrollback);
 
     std::thread::spawn(move || {
         let mut buf = [0u8; 8192];
@@ -123,7 +150,15 @@ pub fn pty_spawn(
                 }
                 Ok(n) => {
                     let text = String::from_utf8_lossy(&buf[..n]).to_string();
-                    let _ = app_clone.emit(&event_data_name, PtyOutputPayload { data: text });
+                    // Append and emit under one lock so a re-attaching snapshot never misses a chunk
+                    if let Ok(mut sb) = scrollback_ref.lock() {
+                        sb.extend_from_slice(&buf[..n]);
+                        if sb.len() > SCROLLBACK_LIMIT {
+                            let excess = sb.len() - SCROLLBACK_LIMIT;
+                            sb.drain(..excess);
+                        }
+                        let _ = app_clone.emit(&event_data_name, PtyOutputPayload { data: text });
+                    }
                 }
                 Err(_) => {
                     // Read error (e.g. broken pipe when child exits)
@@ -149,7 +184,7 @@ pub fn pty_spawn(
         let _ = app_clone.emit(&event_exit_name, PtyExitPayload { exit_code });
     });
 
-    Ok(())
+    Ok(String::new())
 }
 
 #[tauri::command]

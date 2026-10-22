@@ -44,7 +44,7 @@ import {
   type NativeFileEntry,
   type NativePlace,
 } from '../utils/tauriBridge';
-import { copyTextToClipboard } from '../utils/localFileSystem';
+import { copyTextToClipboard, copyFilesToClipboard } from '../utils/localFileSystem';
 import {
   FileContextMenu,
   type ContextMenuPosition,
@@ -835,7 +835,7 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
       }
       clipboardRef.current = { paths, op: 'copy' };
       setClipboard({ paths, op: 'copy' });
-      void copyTextToClipboard(paths.join('\r\n'));
+      void copyFilesToClipboard(paths, false);
       onNotify?.(
         'Zkopírováno do schránky (Ctrl+C)',
         `${paths.length} ${paths.length === 1 ? 'položka zkopírována' : 'položek zkopírováno'} (vložte pomocí Ctrl+V)`,
@@ -855,7 +855,7 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
       }
       clipboardRef.current = { paths, op: 'cut' };
       setClipboard({ paths, op: 'cut' });
-      void copyTextToClipboard(paths.join('\r\n'));
+      void copyFilesToClipboard(paths, true);
       onNotify?.(
         'Vyjmuté položky (Ctrl+X)',
         `${paths.length} ${paths.length === 1 ? 'položka připravena k přesunu' : 'položek připraveno k přesunu'} (vložte pomocí Ctrl+V)`,
@@ -1482,10 +1482,12 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
             e.preventDefault();
             void handleDropOnPane(e, pane.currentPath, paneKey);
           }}
-          className="flex items-center justify-between px-2 py-2.5 bg-[#171920] border-b border-white/[0.06] text-xs shrink-0 select-none overflow-x-auto"
+          className="flex items-center px-2 py-2.5 bg-[#171920] border-b border-white/[0.06] text-xs shrink-0 select-none overflow-x-auto"
         >
+          {/* Pane View Mode Toggle sits first; drives and quick places only show next to it in Files mode */}
           {/* Drive selector pills */}
-          <div className="flex items-center gap-1">
+          {viewMode === 'files' && (
+          <div className="flex items-center gap-1 order-2 ml-3">
             {drives.map((d) => {
               const isCurrentDrive = pane.currentPath.toLowerCase().startsWith(d.path.toLowerCase().replace(/\\$/, ''));
               return (
@@ -1509,9 +1511,12 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
               );
             })}
           </div>
+          )}
 
           {/* Quick places shortcuts & Mode Switcher */}
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="contents">
+            {viewMode === 'files' && (
+            <div className="flex items-center gap-1 shrink-0 order-3 ml-auto">
             {places.map((p) => {
               const lower = p.name.toLowerCase();
               let icon = <Folder className="w-4 h-4" />;
@@ -1535,26 +1540,11 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
                 </button>
               );
             })}
+            </div>
+            )}
 
             {/* Pane View Mode Toggle: Soubory / Zápisník / Terminál */}
-            <div className="flex items-center bg-black/40 p-0.5 rounded border border-white/10 shrink-0 ml-1.5">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (isLeft) setLeftViewMode('files');
-                  else setRightViewMode('files');
-                }}
-                className={`flex items-center gap-1 px-2 py-1.5 rounded text-xs font-medium transition-colors cursor-pointer ${
-                  viewMode === 'files'
-                    ? 'bg-white/15 text-white font-semibold shadow-xs'
-                    : 'text-zinc-400 hover:text-white'
-                }`}
-                title="Zobrazit správce souborů"
-              >
-                <Folder className="w-4 h-4 text-[#60cdff]" />
-                <span className="hidden sm:inline">Soubory</span>
-              </button>
+            <div className="flex items-center bg-black/40 p-0.5 rounded border border-white/10 shrink-0 order-1">
               <button
                 type="button"
                 onClick={(e) => {
@@ -1603,6 +1593,23 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
                     {terminalProcessCount}
                   </span>
                 )}
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (isLeft) setLeftViewMode('files');
+                  else setRightViewMode('files');
+                }}
+                className={`flex items-center gap-1 px-2 py-1.5 rounded text-xs font-medium transition-colors cursor-pointer ${
+                  viewMode === 'files'
+                    ? 'bg-white/15 text-white font-semibold shadow-xs'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+                title="Zobrazit správce souborů"
+              >
+                <Folder className="w-4 h-4 text-[#60cdff]" />
+                <span className="hidden sm:inline">Soubory</span>
               </button>
             </div>
           </div>

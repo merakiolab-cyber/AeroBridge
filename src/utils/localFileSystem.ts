@@ -19,7 +19,7 @@ import {
   getAdobeFileType,
   getImageDimensions,
 } from './adobeThumbnailExtractor';
-import { toDesktopAssetUrl, getCachedNativeFileIcon, type NativeFileEntry } from './tauriBridge';
+import { toDesktopAssetUrl, getCachedNativeFileIcon, copyFilesToClipboardNative, type NativeFileEntry } from './tauriBridge';
 
 /**
  * Format raw bytes into human-readable representation (e.g. 4.2 MB)
@@ -333,9 +333,19 @@ export async function copyTextToClipboard(text: string): Promise<boolean> {
 }
 
 /**
+ * Copies files to the clipboard so other apps paste the files themselves (desktop), falling back to their paths as text.
+ */
+export async function copyFilesToClipboard(paths: string[], cut = false): Promise<boolean> {
+  if (await copyFilesToClipboardNative(paths, cut)) return true;
+  return copyTextToClipboard(paths.join('\r\n'));
+}
+
+/**
  * Copies image data directly to system clipboard as bitmap
  */
 export async function copyImageToClipboard(asset: AssetItem): Promise<boolean> {
+  // Desktop: file list + bitmap in one clipboard entry, works for PSD/RAW/etc. too and never degrades to a path
+  if (asset.fullPath && (await copyFilesToClipboardNative([asset.fullPath]))) return true;
   try {
     if (asset.blob) {
       if (asset.blob.type === 'image/png') {
@@ -373,7 +383,8 @@ export async function copyImageToClipboard(asset: AssetItem): Promise<boolean> {
     return true;
   } catch (err) {
     console.warn('Clipboard image copy failed, falling back to path copy:', err);
-    return copyTextToClipboard(asset.fullPath || asset.name);
+    if (asset.fullPath) return copyFilesToClipboard([asset.fullPath]);
+    return copyTextToClipboard(asset.name);
   }
 }
 

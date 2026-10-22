@@ -290,7 +290,9 @@ export const TerminalSession = forwardRef<TerminalSessionHandle, TerminalSession
             }
           });
 
-          await ptySpawn(sessionId, cwd, shellType, cols, rows);
+          // Re-attaching to a session that survived a remount/reload returns its recent output
+          const replay = await ptySpawn(sessionId, cwd, shellType, cols, rows);
+          if (replay && !isCleanedUp) term.write(replay);
           onProcessStateChange?.(true);
 
           setTimeout(() => {
@@ -331,7 +333,8 @@ export const TerminalSession = forwardRef<TerminalSessionHandle, TerminalSession
         onDataDisposable.dispose();
         if (unlistenData) unlistenData();
         if (unlistenExit) unlistenExit();
-        void ptyKill(sessionId);
+        // The PTY is intentionally NOT killed here: a remount must never end a running shell.
+        // Tabs are terminated explicitly (close / restart / shell switch) via ptyKill in CommanderTerminal.
         term.dispose();
         xtermRef.current = null;
         fitAddonRef.current = null;
