@@ -3,6 +3,22 @@
 ## Changelog
 
 ### Nevydáno (ZIP, spouštění souborů, trvalý terminál)
+- **Vícezložkový systém pro Soubory v Commanderu ([CommanderView.tsx](src/components/CommanderView.tsx)):**
+  - V obou panelech Commanderu (levý i pravý) v režimu „Soubory“ lze nyní otevírat libovolné množství nezávislých složkových záložek.
+  - Tlačítko `+` v liště záložek a standardní zkratka <kbd>Ctrl+T</kbd> pro otevření nové záložky.
+  - Zavření záložky křížkem `✕`, středním kliknutím myši nebo zkratkou <kbd>Ctrl+W</kbd>.
+  - Přepínání mezi záložkami kliknutím nebo klávesami <kbd>Ctrl+Tab</kbd> / <kbd>Ctrl+Shift+Tab</kbd>.
+  - Otevření podsložky přímo do nové záložky přes <kbd>Ctrl</kbd> + dvojklik nebo <kbd>Ctrl+Enter</kbd>.
+  - Kontextové menu záložky po kliknutí pravým tlačítkem (Nová záložka, Duplikovat, Zavřít, Zavřít ostatní).
+  - Podpora přetahování souborů přímo na záložky (drag & drop do jiné otevřené složky).
+  - Automatické ukládání a obnova všech otevřených záložek z `localStorage`.
+- **Oprava: nespolehlivý návrat do nadřazené složky přes [ .. ] v Commanderu ([CommanderView.tsx](src/components/CommanderView.tsx)):**
+  - Řádek `[ .. ]` dříve vyžadoval striktní dvojklik (`onDoubleClick`), zatímco jednoduché kliknutí (`onClick`) pouze nastavovalo fokus. Pokud uživatel kliknul jednou nebo klikl s prodlevou delší než systémový interval dvojkliku, navigace se nespustila a uživatel musel klikat opakovaně.
+  - Nově se návrat o úroveň výš spouští okamžitě na první kliknutí (`onClick`), s bezpečným debounce limitem (300 ms), který brání nechtěnému dvojitému skoku při rychlém dvojkliku.
+- **Oprava: přetažení souboru přes Alt+Tab do jiné aplikace a zablokovaný kurzor ([pointerDrag.ts](src/utils/pointerDrag.ts)):**
+  - Při tažení souboru myší a následném stisku <kbd>Alt+Tab</kbd> se drag nepředal systému (zůstával v interním DOM režimu), cílová aplikace soubor nepřijala a po návratu do AeroBridge zůstával štítek tažení trvale „přilepený“ ke kurzoru.
+  - Nově se při stisku klávesy `Alt` či ztrátě fokusu okna (`blur`, `lostpointercapture`) interní pointer drag okamžitě a bezpečně předá nativnímu Windows OLE dragu (`startNativeFileDrag` / `DoDragDrop`).
+  - Doplněna detekce uvolněného tlačítka myši (`(ev.buttons & 1) === 0`), bezpečnostní úklid při návratu do okna (`focus`) a ochrana proti vícenásobnému volání `startNativeFileDrag` v [tauriBridge.ts](src/utils/tauriBridge.ts).
 - **Oprava: Ctrl+C na souboru vložil do Figmy jen cestu:** kopírování v Prohlížeči i Commanderu teď dává do schránky seznam souborů (CF_HDROP) jako Průzkumník, u jednoho obrázku i bitmapu. Nový Rust příkaz `copy_files_to_clipboard_native` ([lib.rs](src-tauri/src/lib.rs)), bridge `copyFilesToClipboardNative`, helper `copyFilesToClipboard`. Vyjmout (Ctrl+X) nastaví `Preferred DropEffect`. Ctrl+Shift+C dál kopíruje jen cesty jako text; bez desktopu zůstává záloha textem.
 - **Oprava: přetažení souboru z Commanderu mimo AeroBridge:** `startNativeFileDrag` bez náhledu (řádky Commanderu) předával 1×1 průhledné PNG, které Windows jako ikonu tažení odmítá. Nově se kreslí viditelný štítek s názvem / počtem položek; chyba tažení se loguje přes `console.error`.
 - **Oprava: terminál se ukončil po přepnutí jinam a zpět:** PTY se už nezabíjí při unmountu `TerminalSession`, ale jen při explicitním zavření záložky, restartu nebo změně shellu. Rust drží posledních 512 KiB výstupu a `pty_spawn` se na běžící relaci se stejným id znovu připojí a výstup přehraje; záložky se obnovují ze `sessionStorage`. Shelly se ukončí při zavření aplikace (`RunEvent::Exit`).

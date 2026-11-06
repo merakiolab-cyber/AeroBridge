@@ -172,6 +172,16 @@
 - [x] **Vícezložkový Zápisník / Editor s Markdown & JSON náhledem:**
   - [x] Současná práce s více textovými soubory v záložkách s indikátorem neuložených změn
   - [x] Režimy Editor, Rozdělený náhled (Split) a Čistý náhled (Preview) s formátováním Markdown a barevnou syntaxí JSON
+- [x] **Složkové záložky (Folder Tabs) ve správci Soubory:**
+  - [x] Nezávislé složkové záložky v levém i pravém panelu s Win11 Fluent designem a názvem aktuální složky
+  - [x] Klávesové zkratky: <kbd>Ctrl+T</kbd> (nová záložka), <kbd>Ctrl+W</kbd> (zavřít), <kbd>Ctrl+Tab</kbd> / <kbd>Ctrl+Shift+Tab</kbd> (přepínání)
+  - [x] Otevření podsložky do nové záložky přes <kbd>Ctrl</kbd> + dvojklik nebo <kbd>Ctrl+Enter</kbd>
+  - [x] Přetahování souborů (drag & drop) přímo na záložky pro okamžitý přesun/kopírování mezi složkami
+  - [x] Kontextové menu na záložce (Duplikovat, Zavřít, Zavřít ostatní) a zavírání středním kliknutím myši
+  - [x] Automatické ukládání a obnova všech otevřených záložek v `localStorage`
+- [x] **Opravy stability systémového tažení a navigace:**
+  - [x] Plynulé předání interního tažení souborů do systémového Windows OLE dragu (`DoDragDrop`) při <kbd>Alt+Tab</kbd>, ztrátě fokusu i pohybu k okraji okna s detekcí uvolnění tlačítka a úklidem duchů
+  - [x] Okamžitý návrat do nadřazené složky přes `[ .. ]` na jedno kliknutí s 300ms debounce ochranou
 
 ---
 
@@ -182,7 +192,7 @@
     - [ ] Nástroj pro rychlou jednosměrnou i obousměrnou synchronizaci
   - [ ] **Rychlé filtry a Quick Search v panelech Commanderu:**
     - [ ] Okamžité filtrování podle typu (`*.psd`, `*.png`, `*.blend`, podle velikosti či data) psaním přímo v panelu
-  - [ ] **Dávkové přejmenování přímo v Commanderu (<kbd>Ctrl+T</kbd> / Multi-Rename Tool):**
+  - [ ] **Dávkové přejmenování přímo v Commanderu (<kbd>Ctrl+M</kbd> / Multi-Rename Tool):**
     - [ ] Integrace pokročilého batch renameru pro označené soubory v panelech Commanderu s živým náhledem
   - [ ] **Kalkulace velikosti složek na pozadí:**
     - [ ] Stisk <kbd>Space</kbd> na složce spočítá její skutečnou velikost na disku a počet položek (asynchronně bez blokování UI)

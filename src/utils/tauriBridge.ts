@@ -447,6 +447,8 @@ function makeDragBadge(paths: string[]): string {
   }
 }
 
+let isNativeDragActive = false;
+
 /**
  * Initiates an OS-level native drag-and-drop operation (OLE CF_HDROP on Windows).
  * Allows dragging files seamlessly from AeroBridge into external desktop apps
@@ -454,12 +456,17 @@ function makeDragBadge(paths: string[]): string {
  */
 export async function startNativeFileDrag(paths: string[], icon?: string): Promise<void> {
   if (!isDesktopApp() || !paths || paths.length === 0) return;
+  if (isNativeDragActive) return;
+  isNativeDragActive = true;
 
   const validPaths = paths
     .filter((p) => typeof p === 'string' && p.trim().length > 0)
     .map((p) => p.replace(/\//g, '\\'));
 
-  if (validPaths.length === 0) return;
+  if (validPaths.length === 0) {
+    isNativeDragActive = false;
+    return;
+  }
 
   (window as any).__isInternalDragging = true;
   // In-app drop targets cannot read the DataTransfer of an OS-level drag, so remember what is being dragged
@@ -475,6 +482,7 @@ export async function startNativeFileDrag(paths: string[], icon?: string): Promi
   } catch (err) {
     console.error('[TauriBridge] Native drag failed:', err);
   } finally {
+    isNativeDragActive = false;
     endDragSession();
     setTimeout(() => {
       (window as any).__isInternalDragging = false;

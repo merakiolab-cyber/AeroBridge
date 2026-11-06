@@ -7,6 +7,7 @@ import {
   RotateCw,
   Search,
   X,
+  Plus,
   Check,
   FolderPlus,
   Copy,
@@ -90,6 +91,54 @@ interface PaneState {
   historyIndex: number;
   inputPath: string;
   isEditingPath: boolean;
+}
+
+export interface FolderTabItem {
+  id: string;
+  path: string;
+  title: string;
+}
+
+function getFolderTabTitle(p: string): string {
+  if (!p) return 'Složka';
+  const clean = p.replace(/[\\/]+$/, '');
+  if (!clean) return p;
+  if (clean.length === 2 && clean[1] === ':') {
+    return clean;
+  }
+  const parts = clean.split(/[\\/]/);
+  return parts.pop() || clean;
+}
+
+function loadStoredFolderTabs(paneKey: 'left' | 'right', fallbackPath: string): { tabs: FolderTabItem[]; activeId: string } {
+  try {
+    const raw = localStorage.getItem(`aerobridge_commander_${paneKey}_folder_tabs`);
+    const activeSaved = localStorage.getItem(`aerobridge_commander_${paneKey}_folder_active_tab`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const validTabs: FolderTabItem[] = parsed
+          .filter((t) => t && typeof t.id === 'string' && typeof t.path === 'string')
+          .map((t) => ({
+            id: t.id,
+            path: t.path,
+            title: t.title || getFolderTabTitle(t.path),
+          }));
+        if (validTabs.length > 0) {
+          const activeId = validTabs.some((t) => t.id === activeSaved) ? activeSaved! : validTabs[0].id;
+          return { tabs: validTabs, activeId };
+        }
+      }
+    }
+  } catch (err) {
+    console.warn(`[CommanderView] Error loading ${paneKey} folder tabs:`, err);
+  }
+  const defaultTab: FolderTabItem = {
+    id: `ftab_${paneKey}_1`,
+    path: fallbackPath,
+    title: getFolderTabTitle(fallbackPath),
+  };
+  return { tabs: [defaultTab], activeId: defaultTab.id };
 }
 
 const norm = (p: string) => p.replace(/\//g, '\\').replace(/\\+$/, '').toLowerCase();
@@ -188,8 +237,34 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
   const [activePane, setActivePane] = useState<'left' | 'right'>('left');
 
   // Initial path resolution (defaults to Working drive F:\ instead of C:\ System)
-  const initialLeft = getInitialPanePath(initialLeftPath, 'aerobridge_commander_left_path');
-  const initialRight = getInitialPanePath(initialRightPath, 'aerobridge_commander_right_path');
+  const initialLeftRaw = getInitialPanePath(initialLeftPath, 'aerobridge_commander_left_path');
+  const initialRightRaw = getInitialPanePath(initialRightPath, 'aerobridge_commander_right_path');
+
+  // Multi-tab folder management for both panes
+  const storedLeftTabsData = useMemo(() => loadStoredFolderTabs('left', initialLeftRaw), [initialLeftRaw]);
+  const storedRightTabsData = useMemo(() => loadStoredFolderTabs('right', initialRightRaw), [initialRightRaw]);
+
+  const [leftTabs, setLeftTabs] = useState<FolderTabItem[]>(storedLeftTabsData.tabs);
+  const [leftActiveTabId, setLeftActiveTabId] = useState<string>(storedLeftTabsData.activeId);
+
+  const [rightTabs, setRightTabs] = useState<FolderTabItem[]>(storedRightTabsData.tabs);
+  const [rightActiveTabId, setRightActiveTabId] = useState<string>(storedRightTabsData.activeId);
+
+  const leftActiveTabIdRef = useRef(leftActiveTabId);
+  leftActiveTabIdRef.current = leftActiveTabId;
+  const rightActiveTabIdRef = useRef(rightActiveTabId);
+  rightActiveTabIdRef.current = rightActiveTabId;
+
+  const initialLeft = storedLeftTabsData.tabs.find((t) => t.id === storedLeftTabsData.activeId)?.path || initialLeftRaw;
+  const initialRight = storedRightTabsData.tabs.find((t) => t.id === storedRightTabsData.activeId)?.path || initialRightRaw;
+
+  // Tab right-click context menu state
+  const [tabContextMenu, setTabContextMenu] = useState<{
+    x: number;
+    y: number;
+    paneKey: 'left' | 'right';
+    tabId: string;
+  } | null>(null);
 
   // Left Pane State
   const [left, setLeft] = useState<PaneState>({
@@ -290,6 +365,21 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
   });
 
 
+  // Save folder tabs to localStorage whenever they change
+  useEffect(() => {
+    try {
+      localStorage.setItem('aerobridge_commander_left_folder_tabs', JSON.stringify(leftTabs));
+      localStorage.setItem('aerobridge_commander_left_folder_active_tab', leftActiveTabId);
+    } catch {}
+  }, [leftTabs, leftActiveTabId]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('aerobridge_commander_right_folder_tabs', JSON.stringify(rightTabs));
+      localStorage.setItem('aerobridge_commander_right_folder_active_tab', rightActiveTabId);
+    } catch {}
+  }, [rightTabs, rightActiveTabId]);
+
   // Fetch directory listing for a pane
   const fetchDirectory = useCallback(async (targetPath: string, paneKey: 'left' | 'right') => {
     if (!targetPath) return;
@@ -316,6 +406,13 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
           selectedPaths: defaultSel,
           focusedIndex: defaultFocus,
         }));
+        setLeftTabs((prev) =>
+          prev.map((t) =>
+            t.id === leftActiveTabIdRef.current
+              ? { ...t, path: targetPath, title: getFolderTabTitle(targetPath) }
+              : t
+          )
+        );
         try {
           localStorage.setItem('aerobridge_commander_left_path', targetPath);
         } catch {}
@@ -329,6 +426,13 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
           selectedPaths: defaultSel,
           focusedIndex: defaultFocus,
         }));
+        setRightTabs((prev) =>
+          prev.map((t) =>
+            t.id === rightActiveTabIdRef.current
+              ? { ...t, path: targetPath, title: getFolderTabTitle(targetPath) }
+              : t
+          )
+        );
         try {
           localStorage.setItem('aerobridge_commander_right_path', targetPath);
         } catch {}
@@ -414,9 +518,14 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
     [left, right, fetchDirectory]
   );
 
-  // Navigate Up (..)
+  // Navigate Up (..) with debounce to allow instant single-click while preventing accidental double-jumps
+  const lastNavigateUpRef = useRef<number>(0);
   const handleNavigateUp = useCallback(
     (paneKey: 'left' | 'right') => {
+      const now = Date.now();
+      if (now - lastNavigateUpRef.current < 300) return;
+      lastNavigateUpRef.current = now;
+
       const p = paneKey === 'left' ? left : right;
       const parent = getParentDir(p.currentPath);
       if (parent) {
@@ -449,6 +558,112 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
     void fetchDirectory(right.currentPath, 'right');
     onNotify?.('Oba panely aktualizovány', undefined, 'info');
   }, [fetchDirectory, left.currentPath, right.currentPath, onNotify]);
+
+  // Folder tab operations
+  const handleSelectFolderTab = useCallback((paneKey: 'left' | 'right', tabId: string) => {
+    const tabs = paneKey === 'left' ? leftTabs : rightTabs;
+    const target = tabs.find((t) => t.id === tabId);
+    if (!target) return;
+    if (paneKey === 'left') {
+      setLeftActiveTabId(tabId);
+    } else {
+      setRightActiveTabId(tabId);
+    }
+    setActivePane(paneKey);
+    navigatePane(target.path, paneKey);
+  }, [leftTabs, rightTabs, navigatePane]);
+
+  const handleAddFolderTab = useCallback((paneKey: 'left' | 'right', customPath?: string) => {
+    const p = paneKey === 'left' ? left : right;
+    const targetPath = customPath || p.currentPath;
+    const newId = `ftab_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const newTab: FolderTabItem = {
+      id: newId,
+      path: targetPath,
+      title: getFolderTabTitle(targetPath),
+    };
+
+    if (paneKey === 'left') {
+      setLeftTabs((prev) => [...prev, newTab]);
+      setLeftActiveTabId(newId);
+    } else {
+      setRightTabs((prev) => [...prev, newTab]);
+      setRightActiveTabId(newId);
+    }
+    setActivePane(paneKey);
+    navigatePane(targetPath, paneKey);
+    onNotify?.('Nová záložka', getFolderTabTitle(targetPath), 'info');
+  }, [left, right, navigatePane, onNotify]);
+
+  const handleCloseFolderTab = useCallback((paneKey: 'left' | 'right', tabId: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    const tabs = paneKey === 'left' ? leftTabs : rightTabs;
+    const activeId = paneKey === 'left' ? leftActiveTabId : rightActiveTabId;
+    if (tabs.length <= 1) {
+      onNotify?.('Záložka', 'Nelze zavřít poslední otevřenou záložku', 'info');
+      return;
+    }
+
+    const idx = tabs.findIndex((t) => t.id === tabId);
+    const remaining = tabs.filter((t) => t.id !== tabId);
+    let nextActiveId = activeId;
+    if (tabId === activeId) {
+      const nextIdx = Math.max(0, idx - 1);
+      nextActiveId = remaining[nextIdx].id;
+    }
+
+    if (paneKey === 'left') {
+      setLeftTabs(remaining);
+      setLeftActiveTabId(nextActiveId);
+    } else {
+      setRightTabs(remaining);
+      setRightActiveTabId(nextActiveId);
+    }
+
+    if (tabId === activeId) {
+      const targetTab = remaining.find((t) => t.id === nextActiveId);
+      if (targetTab) {
+        navigatePane(targetTab.path, paneKey);
+      }
+    }
+  }, [leftTabs, rightTabs, leftActiveTabId, rightActiveTabId, navigatePane, onNotify]);
+
+  const handleCloseOtherFolderTabs = useCallback((paneKey: 'left' | 'right', tabId: string) => {
+    const tabs = paneKey === 'left' ? leftTabs : rightTabs;
+    const target = tabs.find((t) => t.id === tabId);
+    if (!target) return;
+    if (paneKey === 'left') {
+      setLeftTabs([target]);
+      setLeftActiveTabId(target.id);
+    } else {
+      setRightTabs([target]);
+      setRightActiveTabId(target.id);
+    }
+    navigatePane(target.path, paneKey);
+    onNotify?.('Záložky', 'Ostatní záložky byly zavřeny', 'info');
+  }, [leftTabs, rightTabs, navigatePane, onNotify]);
+
+  const handleDuplicateFolderTab = useCallback((paneKey: 'left' | 'right', tabId: string) => {
+    const tabs = paneKey === 'left' ? leftTabs : rightTabs;
+    const target = tabs.find((t) => t.id === tabId);
+    if (!target) return;
+    handleAddFolderTab(paneKey, target.path);
+  }, [leftTabs, rightTabs, handleAddFolderTab]);
+
+  const handleCycleFolderTab = useCallback((paneKey: 'left' | 'right', direction: 'next' | 'prev') => {
+    const tabs = paneKey === 'left' ? leftTabs : rightTabs;
+    const activeId = paneKey === 'left' ? leftActiveTabId : rightActiveTabId;
+    if (tabs.length <= 1) return;
+    const idx = tabs.findIndex((t) => t.id === activeId);
+    if (idx === -1) return;
+    const nextIdx = direction === 'next'
+      ? (idx + 1) % tabs.length
+      : (idx - 1 + tabs.length) % tabs.length;
+    handleSelectFolderTab(paneKey, tabs[nextIdx].id);
+  }, [leftTabs, rightTabs, leftActiveTabId, rightActiveTabId, handleSelectFolderTab]);
 
   // Splitter mouse drag
   const handleSplitterMouseDown = useCallback(() => {
@@ -555,6 +770,10 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
     activePane,
     left,
     right,
+    leftTabs,
+    rightTabs,
+    leftActiveTabId,
+    rightActiveTabId,
     leftDisplayItems,
     rightDisplayItems,
     leftViewMode,
@@ -569,6 +788,10 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
     activePane,
     left,
     right,
+    leftTabs,
+    rightTabs,
+    leftActiveTabId,
+    rightActiveTabId,
     leftDisplayItems,
     rightDisplayItems,
     leftViewMode,
@@ -1154,8 +1377,33 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
         return;
       }
 
-      // Tab: Switch active pane
-      if (e.key === 'Tab') {
+      // Ctrl + T: New folder tab in active pane
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key.toLowerCase() === 't' || e.code === 'KeyT')) {
+        e.preventDefault();
+        e.stopPropagation();
+        handleAddFolderTab(s.activePane);
+        return;
+      }
+
+      // Ctrl + W: Close current folder tab in active pane
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key.toLowerCase() === 'w' || e.code === 'KeyW')) {
+        e.preventDefault();
+        e.stopPropagation();
+        const activeTabId = s.activePane === 'left' ? leftActiveTabIdRef.current : rightActiveTabIdRef.current;
+        handleCloseFolderTab(s.activePane, activeTabId);
+        return;
+      }
+
+      // Ctrl + Tab / Ctrl + Shift + Tab: Cycle folder tabs in active pane
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'Tab' || e.code === 'Tab')) {
+        e.preventDefault();
+        e.stopPropagation();
+        handleCycleFolderTab(s.activePane, e.shiftKey ? 'prev' : 'next');
+        return;
+      }
+
+      // Tab: Switch active pane (only when Ctrl is not held)
+      if (e.key === 'Tab' && !e.ctrlKey && !e.metaKey) {
         e.preventDefault();
         const nextPane = s.activePane === 'left' ? 'right' : 'left';
         setActivePane(nextPane);
@@ -1292,7 +1540,13 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
 
         const adjustedIdx = parent ? pane.focusedIndex - 1 : pane.focusedIndex;
         const it = list[adjustedIdx];
-        if (it) void handleOpenItem(it, s.activePane);
+        if (it) {
+          if (it.is_dir && (e.ctrlKey || e.metaKey)) {
+            handleAddFolderTab(s.activePane, it.path);
+            return;
+          }
+          void handleOpenItem(it, s.activePane);
+        }
         return;
       }
 
@@ -1389,6 +1643,9 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
     handleOpenItem,
     handleSwapPanes,
     handleNavigateUp,
+    handleAddFolderTab,
+    handleCloseFolderTab,
+    handleCycleFolderTab,
     fetchDirectory,
     getActiveSelectedItems,
     onNotify,
@@ -1405,6 +1662,8 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
     const items = isLeft ? leftDisplayItems : rightDisplayItems;
     const isActive = activePane === paneKey;
     const parentDir = getParentDir(pane.currentPath);
+    const folderTabs = isLeft ? leftTabs : rightTabs;
+    const activeFolderTabId = isLeft ? leftActiveTabId : rightActiveTabId;
 
     const isPaneDropTarget = dragTargetPane === paneKey && !dragTargetFolder;
 
@@ -1669,6 +1928,83 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
           }`}
           style={{ display: viewMode === 'files' ? 'flex' : 'none' }}
         >
+          {/* Folder Tabs Bar */}
+          <div
+            className="flex items-center px-1.5 pt-1 bg-[#13151b] border-b border-white/[0.06] text-xs shrink-0 select-none overflow-x-auto min-h-[30px] gap-1"
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setTabContextMenu({
+                x: e.clientX,
+                y: e.clientY,
+                paneKey,
+                tabId: activeFolderTabId,
+              });
+            }}
+          >
+            <div className="flex items-center gap-1 overflow-x-auto min-w-0 flex-1 py-0.5">
+              {folderTabs.map((tab) => {
+                const isTabActive = tab.id === activeFolderTabId;
+                return (
+                  <div
+                    key={tab.id}
+                    data-drop-path={tab.path}
+                    onClick={() => handleSelectFolderTab(paneKey, tab.id)}
+                    onAuxClick={(e) => {
+                      if (e.button === 1) handleCloseFolderTab(paneKey, tab.id, e);
+                    }}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setTabContextMenu({
+                        x: e.clientX,
+                        y: e.clientY,
+                        paneKey,
+                        tabId: tab.id,
+                      });
+                    }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = e.ctrlKey ? 'copy' : 'move';
+                      setDragTargetFolder({ pane: paneKey, path: tab.path });
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      void handleDropOnPane(e, tab.path, paneKey);
+                    }}
+                    className={`group flex items-center gap-1.5 px-2.5 py-1 rounded-t-md text-xs font-medium transition-all duration-120 cursor-pointer shrink-0 max-w-[170px] border-b-2 select-none ${
+                      isTabActive
+                        ? 'bg-[#1e222e] text-white border-b-[#60cdff] shadow-xs'
+                        : 'bg-white/[0.02] text-zinc-400 hover:text-white hover:bg-white/[0.05] border-b-transparent'
+                    }`}
+                    title={`${tab.title}\n${tab.path}\n\nStřední klik nebo Ctrl+W: Zavřít záložku`}
+                  >
+                    <Folder className={`w-3.5 h-3.5 shrink-0 ${isTabActive ? 'text-[#60cdff]' : 'text-zinc-500'}`} />
+                    <span className="truncate">{tab.title}</span>
+                    {folderTabs.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={(e) => handleCloseFolderTab(paneKey, tab.id, e)}
+                        className="p-0.5 ml-0.5 rounded text-zinc-500 hover:text-white hover:bg-white/10 opacity-50 group-hover:opacity-100 transition-opacity cursor-pointer shrink-0"
+                        title="Zavřít záložku (Ctrl+W)"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* New Tab Button */}
+              <button
+                type="button"
+                onClick={() => handleAddFolderTab(paneKey)}
+                className="flex items-center justify-center p-1 rounded hover:bg-white/10 text-zinc-400 hover:text-white transition-colors cursor-pointer shrink-0"
+                title="Nová záložka v tomto panelu (Ctrl+T)"
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
             {/* Path Bar & Quick Filter */}
             <div
               onDragOver={(e) => {
@@ -1945,6 +2281,7 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
                 }
                 const setter = isLeft ? setLeft : setRight;
                 setter((prev) => ({ ...prev, focusedIndex: 0 }));
+                handleNavigateUp(paneKey);
               }}
               onDoubleClick={() => handleNavigateUp(paneKey)}
               onContextMenu={(e) => {
@@ -2177,7 +2514,13 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
                     }));
                   }
                 }}
-                onDoubleClick={() => void handleOpenItem(it, paneKey)}
+                onDoubleClick={(e) => {
+                  if (it.is_dir && (e.ctrlKey || e.metaKey)) {
+                    handleAddFolderTab(paneKey, it.path);
+                  } else {
+                    void handleOpenItem(it, paneKey);
+                  }
+                }}
                 className={`grid grid-cols-[1fr_80px_100px_130px] px-2 py-1 items-center transition-colors cursor-pointer select-none ${
                   isCut ? 'opacity-40 italic ring-1 ring-amber-400/40' : ''
                 } ${
@@ -2620,6 +2963,82 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
           void showFilePropertiesNative(path);
         }}
       />
+
+      {/* Folder Tab Context Menu */}
+      {tabContextMenu && (
+        <div
+          className="fixed inset-0 z-50 select-none"
+          onClick={() => setTabContextMenu(null)}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            setTabContextMenu(null);
+          }}
+        >
+          <div
+            className="fixed bg-[#1c1f28]/95 backdrop-blur-md border border-white/10 rounded-lg shadow-2xl py-1 text-xs text-zinc-300 min-w-[170px] animate-in fade-in zoom-in-95 duration-100 z-50 font-sans"
+            style={{ left: `${tabContextMenu.x}px`, top: `${tabContextMenu.y}px` }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                const pane = tabContextMenu.paneKey;
+                setTabContextMenu(null);
+                handleAddFolderTab(pane);
+              }}
+              className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-[#60cdff]/20 hover:text-white transition-colors cursor-pointer text-left"
+            >
+              <div className="flex items-center gap-2">
+                <Plus className="w-3.5 h-3.5 text-[#60cdff]" />
+                <span>Nová záložka</span>
+              </div>
+              <span className="text-[10px] text-zinc-500 font-mono">Ctrl+T</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const { paneKey, tabId } = tabContextMenu;
+                setTabContextMenu(null);
+                handleDuplicateFolderTab(paneKey, tabId);
+              }}
+              className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-[#60cdff]/20 hover:text-white transition-colors cursor-pointer text-left"
+            >
+              <Copy className="w-3.5 h-3.5 text-zinc-400" />
+              <span>Duplikovat záložku</span>
+            </button>
+            <div className="my-1 border-t border-white/[0.08]" />
+            <button
+              type="button"
+              disabled={(tabContextMenu.paneKey === 'left' ? leftTabs : rightTabs).length <= 1}
+              onClick={() => {
+                const { paneKey, tabId } = tabContextMenu;
+                setTabContextMenu(null);
+                handleCloseFolderTab(paneKey, tabId);
+              }}
+              className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-rose-500/20 hover:text-rose-300 transition-colors cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <div className="flex items-center gap-2">
+                <X className="w-3.5 h-3.5 text-rose-400" />
+                <span>Zavřít záložku</span>
+              </div>
+              <span className="text-[10px] text-zinc-500 font-mono">Ctrl+W</span>
+            </button>
+            <button
+              type="button"
+              disabled={(tabContextMenu.paneKey === 'left' ? leftTabs : rightTabs).length <= 1}
+              onClick={() => {
+                const { paneKey, tabId } = tabContextMenu;
+                setTabContextMenu(null);
+                handleCloseOtherFolderTabs(paneKey, tabId);
+              }}
+              className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-white/10 hover:text-white transition-colors cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-zinc-400" />
+              <span>Zavřít ostatní záložky</span>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
