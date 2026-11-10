@@ -2,12 +2,14 @@
 
 <div align="center">
 
-**Ultra-rychlý moderní digitální asset manažer (DAM) a organizér médií — lehká, blesková a bezplatná alternativa k Adobe Bridge s nativní podporou čtení Adobe (PSD, AI, INDD, AEP) a Camera RAW souborů.**
+**All-in-One Windows 11 Workspace pro Designéry, Vývojáře a práci s AI**  
+*Spojení dvoupanelového Commanderu se záložkami, plnohodnotného ConPTY terminálu pro Claude Code a AI agenty, multi-tab Markdown zápisníku a bleskového náhledového enginu pro 3D (Blender, ZBrush), Adobe a RAW.*
 
 [![React](https://img.shields.io/badge/React-19.0-61DAFB?logo=react&logoColor=black)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Tauri v2](https://img.shields.io/badge/Tauri_v2-Windows_11-FFC131?logo=tauri&logoColor=black)](https://tauri.app/)
-[![Adobe Formats](https://img.shields.io/badge/Adobe-PSD_%7C_AI_%7C_INDD_%7C_AEP-FF0000?logo=adobe&logoColor=white)](https://adobe.com)
+[![AI Ready](https://img.shields.io/badge/AI_Ready-Claude_Code_%7C_ConPTY-8B5CF6?logo=anthropic&logoColor=white)](https://claude.ai)
+[![3D & Design](https://img.shields.io/badge/3D_%26_Design-Blender_%7C_ZBrush_%7C_Adobe-EA580C)](https://blender.org)
 [![RAW Support](https://img.shields.io/badge/RAW-CR2_%7C_CR3_%7C_NEF_%7C_ARW_%7C_DNG-blue)](https://adobe.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
@@ -19,72 +21,95 @@
 
 ---
 
-## 📸 O projektu
+## 💡 Hlavní vize: Jediné okno místo desítek roztříštěných ploch
 
-**AeroBridge Studio** vznikl jako odpověď na těžkopádnost, pomalé načítání a licenční poplatky Adobe Bridge. Nabízí tvůrcům, fotografům, grafikům a DTP operátorům okamžitou odezvu, čistý Bauhaus vizuální design a pokročilé nástroje pro organizaci souborů.
+Běžná práce moderního digitálního tvůrce a programátora ve Windows 11 znamená neustálý chaos: otevřený Průzkumník se soubory, externí okno terminálu s běžícím **Claude Code / AI agentem**, poznámkový blok s prompty a úkoly, Adobe Bridge nebo Průzkumník pro hledání assetů a samotné grafické a kódovací editory.
 
-Klíčovou předností je **schopnost nativně číst a otevírat náhledy grafických projektů Adobe Creative Cloud (Photoshop, InDesign, Illustrator, After Effects) i surových Camera RAW snímků přímo z disku** — bez nutnosti mít spuštěné nebo předplacené aplikace od Adobe.
+**AeroBridge Studio tento chaos maže a nahrazuje roztříštěné pracovní plochy Windows 11 jedním uceleným studiem:**
+Máte na dosah ruky v jediném okně:
+1. **Dvoupanelového správce souborů (Commander)** s neomezenými taby pro bleskovou organizaci projektů.
+2. **Integrovaný ConPTY terminál** optimalizovaný pro AI asistenty (Claude Code, Aider, Git, systémové CLI).
+3. **Multi-tab Poznámkový blok** s okamžitým živým Markdown a formátovaným JSON náhledem.
+4. **Okamžité náhledy 3D a grafických formátů** (**Blender**, **ZBrush**, Photoshop, Illustrator, InDesign, RAW) bez spouštění těžkých programů.
 
-Aplikace funguje **100% offline**, uchovává přístup k lokálním složkám a diskům v systému Windows 11 a ukládá relace do **IndexedDB**.
+> Vše je synchronizované, bleskově ovladatelné z klávesnice a zaměřené na maximální flow při kódování, práci s AI a správě designových a 3D projektů.
 
 ---
 
-## ✨ Klíčové funkce
+## ⚡ 1. Commander: Centrum pro kódování, AI a správu projektů
 
-### 1. 🗂️ Nativní čtení & náhledy Adobe ekosystému a RAW formátů
-AeroBridge obsahuje vlastní binární parsery vyvinuté pro okamžité dekódování profesionálních grafických a DTP formátů:
-- **Adobe Photoshop (`.psd`, `.psb`):** Extrakce kompozitních miniatur ve vysokém rozlišení přímo z binárních hlaviček Photoshop Image Resources (`0x040C` / `0x0414`) bez nutnosti re-renderingu.
-- **Adobe InDesign (`.indd`, `.idml`):** Nativní extrakce náhledů tiskových publikací z XMP packetů (`<xmpGImg:image>` base64 JPEG) a binárních streamů jednotlivých stran.
-- **Adobe Illustrator & Vektory (`.ai`, `.eps`, `.svg`):** Rychlé načtení vložených PDF kompatibilních náhledů i vektorových dat.
-- **Adobe After Effects (`.aep`):** Automatická detekce video kompozic a projektů s dedikovanou Bauhaus kartou a barevným kódováním.
-- **Camera RAW formáty zrcadlovek a bezzrcadlovek:** Blesková O(1) extrakce náhledů pro **Canon** (`.cr2`, `.cr3`), **Nikon** (`.nef`), **Sony** (`.arw`), **Adobe** (`.dng`), **Fujifilm** (`.raf`), **Olympus** (`.orf`) a **Panasonic** (`.rw2`) přes TIFF IFD tagy (`0x0201` / `0x0202`).
-- **Okamžité otevření v systému:** Tlačítko **Složka / Průzkumník** v inspekčním panelu vyvolá Průzkumník Windows a daný soubor přímo označí pro otevření ve vaší výchozí aplikaci.
+Režim **Commander** přináší moderní evoluci dvoupanelové správy souborů a přímo v rozhraní integruje klíčové nástroje pro každodenní vývoj:
 
-### 2. 🎛️ 4 pracovní režimy (Workspaces)
-- **Essentials (Mřížka):** Klasické studio s virtualizovanou mřížkou náhledů a podrobným pravým inspektorem.
-- **Filmstrip (Filmový pás):** Velký náhled vybraného snímku nahoře s plynulým posuvným filmovým pásem dole (ideální pro culling a výběr nejlepších záběrů).
-- **Compare (Porovnání):** Srovnání dvou i více snímků vedle sebe pro kontrolu ostrosti a barevného tónu.
-- **Metadata Table (Seznam):** Přehledná tabulka s technickými specifikacemi (rozměry, velikost, formát, datum, EXIF) s možností okamžitého řazení.
+<p align="center">
+  <img src="docs/screenshots/06-commander-terminal.jpg" alt="AeroBridge Studio – Commander s integrovaným terminálem" width="445">
+  <img src="docs/screenshots/07-commander-notepad.jpg" alt="AeroBridge Studio – Commander s multi-tab zápisníkem a Markdownem" width="445">
+</p>
+
+- **Dvoupanelové zobrazení se záložkami (Folder Tabs):**
+  - Otevírejte neomezené množství záložek v levém i pravém panelu (`Ctrl+T`, `Ctrl+W`, drag & drop složek do tabů).
+  - Přirozené ovládání známé z Windows Exploreru: **dvojklik otevírá** soubory a složky, klávesa **`F2`** nebo pomalý klik spouští in-line přejmenování.
+  - Plná podpora **Undo / Redo** (`Ctrl+Z` / `Ctrl+Y`) pro bezpečné vracení a opakování souborových operací (přejmenování, přesun, kopírování, nové složky).
+  - Tradiční klávesové zkratky: `F5` (Kopírovat), `F6` (Přesunout), `F7` (Nová složka), `F8 / Delete` (Koš), `=` (Sjednocení složek), `Ctrl+U` (Prohození panelů).
+
+- **Integrovaný ConPTY Terminál (optimalizovaný pro Claude Code a AI):**
+  - Plnohodnotná Windows konzole (PowerShell / CMD) integrovaná přímo do panelu (`F4` nebo přepínač v hlavičce).
+  - Vytvořeno pro nepřetržitý běh CLI nástrojů a **AI agentů (Claude Code, Aider, Git)**.
+  - **Trvalý viditelný scrollbar** pro pohodlnou navigaci v dlouhých konverzacích a obsáhlých výstupech.
+  - **Barevné odlišení**: Vaše zadání a prompty jsou vizuálně jasně odlišené od odpovědí a systémových výpisů AI.
+  - Perzistence relací — terminál běží dál na pozadí i při přepínání zobrazení.
+
+- **Multi-Tab Zápisník (Notepad) s Markdown & JSON preview:**
+  - Otevřete libovolný počet textových souborů, `.md` dokumentace, promptů nebo JSON konfigurací v záložkách.
+  - Živý render **Markdownu** a formátovaný **JSON viewer** pro okamžitou kontrolu bez externích editorů.
+
+---
+
+## 🎨 2. Nativní čtení 3D formátů a kreativního ekosystému
+
+Zatímco běžné správce souborů zobrazují u 3D a grafických souborů jen slepé generické ikony, AeroBridge Studio obsahuje vlastní binární parsery:
+
+- **Blender 3D (`.blend`):**
+  - Okamžitá extrakce a zobrazení kompozitních miniatur 3D scén a renderů přímo z binárních bloků `.blend` souboru bez nutnosti spouštět Blender.
+- **Pixologic ZBrush (`.zpr`, `.ztl`):**
+  - Nativní čtení vestavěných náhledů sochařských projektů a modelů ZBrush pro okamžitý vizuální přehled v rozpracovaných 3D sculptech.
+- **Adobe Creative Cloud:**
+  - **Photoshop (`.psd`, `.psb`):** Extrakce kompozitních náhledů ve vysokém rozlišení z Image Resource bloků (`0x040C` / `0x0414`).
+  - **Illustrator & Vektory (`.ai`, `.eps`, `.svg`):** Rychlé načtení vektorů a PDF kompatibilních streamů.
+  - **InDesign (`.indd`, `.idml`):** Extrakce náhledů publikací a stran z XMP packetů.
+  - **After Effects (`.aep`):** Detekce video projektů a kompozic.
+- **Figma & Krita (`.fig`, `.kra`):**
+  - Přímé zobrazení náhledů vektorových a digitálních maleb.
+- **Camera RAW formáty zrcadlovek a bezzrcadlovek:**
+  - Blesková O(1) extrakce pro **Canon** (`.cr2`, `.cr3`), **Nikon** (`.nef`), **Sony** (`.arw`), **Adobe** (`.dng`), **Fujifilm** (`.raf`), **Olympus** (`.orf`) a **Panasonic** (`.rw2`) přes TIFF IFD tagy.
+- **Okamžité otevření v systému:** Dvojklik položku otevře ve vaší přiřazené výchozí aplikaci (nebo spustí QuickLook).
+
+---
+
+## 🎛️ 3. Doplňkové nástroje pro fotografy, produkci a culling
+
+Kromě vývojářského Commanderu máte k dispozici specializované studiové režimy:
 
 <p align="center">
   <img src="docs/screenshots/03-filmstrip.jpg" alt="AeroBridge Studio – režim Filmstrip" width="445">
-  <img src="docs/screenshots/04-compare.jpg" alt="AeroBridge Studio – porovnání InDesign a Illustrator souboru" width="445">
-</p>
-<p align="center">
-  <img src="docs/screenshots/06-commander-terminal.jpg" alt="AeroBridge Studio – Commander s terminálem" width="445">
-  <img src="docs/screenshots/07-commander-notepad.jpg" alt="AeroBridge Studio – Commander se zápisníkem" width="445">
+  <img src="docs/screenshots/04-compare.jpg" alt="AeroBridge Studio – porovnání souborů" width="445">
 </p>
 
-<sub>Snímky ukazují fiktivní projekt NOVA EXODUS z ukázkového režimu (viz níže). Ilustrace vytvořeny v Midjourney.</sub>
+- **Prohlížeč (Essentials):** Virtualizovaná mřížka schopná bleskově procházet desetitisíce souborů na lokálních i síťových discích bez lagů a bez paměťových úniků.
+- **Filmový pás (Filmstrip):** Velký náhled vybraného snímku nahoře s plynulým filmovým pásem dole pro rychlý výběr (culling) nejlepších záběrů.
+- **Porovnání (Compare):** Srovnání dvou i více souborů vedle sebe pro kontrolu ostrosti a detailů.
+- **Metadata Table:** Přehledná tabulka s technickými specifikacemi (rozměry, velikost, formát, datum, EXIF) s možností okamžitého řazení.
+- **Dávkové nástroje:**
+  - **Batch Rename:** Flexibilní šablony (prefix, číselné řady, datum, find & replace, změna velikosti přípon).
+  - **Batch IPTC Editor:** Hromadný zápis titulků, autorů, copyrightu a klíčových slov přímo do souborů se zachováním EXIF metadat.
+  - **Batch Export:** Klientský převod do WebP, JPEG nebo PNG s volitelným copyright vodoznakem v ZIP balíčku.
 
-### 3. ⚡ Bleskový výkon pro Windows 11 (Tauri v2 + Rust)
-- **Virtualizované procházení:** Zvládá složky s 10 000+ soubory bez jakéhokoliv zasekávání rozhraní a bez paměťových úniků.
-- **Nativní přístup k diskům:** Žádná vyskakovací bezpečnostní okna prohlížeče — přímý přístup k interním SSD, externím diskům i síťovým úložištím (NAS).
+---
 
+## ⚡ 4. Bleskový výkon a design pro Windows 11
 
-### 4. 🏷️ Dávkové nástroje pro profesionály
-- **Dávkové přejmenování (Batch Rename):**
-  - Flexibilní šablony: Prefix, volitelné datum (YYYYMMDD / YYYY-MM-DD), automatická číselná řada s volitelným počtem cifer, suffix.
-  - Hledání a nahrazování textu v názvech (`Find & Replace`).
-  - Úprava velikosti písmen přípony (malá / velká písmena).
-  - Živý náhled změn před aplikací.
-- **Dávková úprava IPTC metadat (Batch IPTC Editor):**
-  - Hromadný zápis: Titulek, Popis / Anotace (režim přepsat nebo připojit), Autor, Copyright, Místo / Lokalita.
-  - Klíčová slova s volbou: připojit, nahradit nebo odebrat existující štítky.
-  - Rychlé předpřipravené šablony pro ateliéry a fotografy.
-  - **Přímý zápis na disk:** Volitelný přímý binární zápis Adobe XMP packetů zpět do souborů se 100% zachováním EXIF metadat fotoaparátu.
-- **Export do ZIP s klientským převodem (Batch Export):**
-  - Převod do formátů WebP, JPEG nebo PNG s nastavitelnou kompresí / kvalitou.
-  - Automatická změna velikosti (zachování poměru, max šířka, max výška).
-  - Vložení decentního copyright vodoznaku přímo do obrazových dat.
-  - Stažení celého balíčku v ZIP archivu bez odesílání dat na externí servery.
-
-### 5. 🎨 Bauhaus & Flowty Design
-- Tmavý profesionální motiv s barvou pozadí `#14161e`.
-- Čisté rectilinear rozvržení s jemnými oddělovači (`border-white/10`).
-- Vizuální styl: Písmo **JetBrains Mono** pro technická data a EXIF, **Plus Jakarta Sans** pro UI prvky.
-- Resizovatelný postranní panel s ukládáním šířky do paměti.
-- Žádný rušivý vizuální balast – decentní bílý 10% závoj pro označené soubory.
+- **Tauri v2 + Rust jádro:** Nativní rychlost, minimální paměťová stopa a přímý přístup k diskům bez vyskakovacích oken prohlížeče.
+- **Bauhaus & Fluent Dark Mode:** Tmavý profesionální motiv (`#14161e`) s písmy **JetBrains Mono** a **Plus Jakarta Sans**.
+- **100% Offline & Bezpečné:** Veškerá data zůstávají na vašem počítači, žádná telemetrie ani odesílání souborů na externí servery.
 
 ---
 
@@ -93,13 +118,18 @@ AeroBridge obsahuje vlastní binární parsery vyvinuté pro okamžité dekódov
 | Klávesa | Akce |
 |---|---|
 | `Mezerník` | **QuickLook** — okamžitý velký náhled s pan & zoomem |
+| `Ctrl + Z` | **Undo (Zpět)** — vrácení poslední souborové operace |
+| `Ctrl + Y` / `Ctrl + Shift + Z` | **Redo (Znovu)** — opakování vrácené operace |
+| `F2` | **Přejmenovat** označený soubor či složku (nebo pomalý klik na název) |
+| `F4` | Přepnout panel Commanderu do **Terminálu / Zápisníku** |
+| `F5` / `F6` | **Kopírovat / Přesunout** do protějšího panelu Commanderu |
+| `F7` | **Nová složka** v aktivním panelu |
+| `F8` / `Delete` | Přesunout označené položky do **Koše** |
+| `Ctrl + T` / `Ctrl + W` | Nová záložka / Zavřít záložku složky |
+| `Ctrl + U` / `=` | Prohodit panely / Sjednotit složky Commanderu |
 | `Ctrl + M` | Otevřít dialog **Dávková úprava IPTC** |
-| `Ctrl + I` | Přepnout trvalé zobrazení informací na kartách |
-| `Ctrl + A` | Vybrat všechny položky v aktuální složce |
-| `F2` | Přejmenovat označený soubor |
-| `Delete` | Bezpečné smazání / odebrání souboru |
-| `Esc` | Zavřít aktivní modální okno / zrušit výběr |
-| `Šipky (← → ↑ ↓)` | Pohyb mezi soubory |
+| `Ctrl + A` / `Ctrl + D` | Vybrat vše / Zrušit výběr |
+| `Šipky (← → ↑ ↓)` | Plynulý pohyb a označování souborů |
 
 ---
 
@@ -108,7 +138,6 @@ AeroBridge obsahuje vlastní binární parsery vyvinuté pro okamžité dekódov
 ### Požadavky
 - [Node.js](https://nodejs.org/) v18+ (doporučeno v22+)
 - [Rust](https://rustup.rs/) (pro nativní Windows desktop build přes Tauri v2)
-- npm nebo bun
 
 ### Instalace a spuštění
 
@@ -120,63 +149,37 @@ cd AeroBridge
 # 2. Instalace závislostí
 npm install
 
-# 3a. Spuštění ve vývojovém režimu (s hot-reloadem změn)
+# 3. Spuštění v desktopovém vývojovém režimu (Tauri v2 + hot reload)
 npm run desktop:dev
 
-# 3b. Nebo spuštění ve webovém prohlížeči
+# Nebo spuštění ve webovém prohlížeči
 npm run dev
 ```
 
-### Sestavení a spuštění finálního balíčku (.exe)
+### Sestavení release aplikace pro Windows 11 (.exe)
 
 ```bash
-# 1. Pouhé sestavení standalone instalátoru a release .exe (skončí po sestavení bez spuštění)
+# Sestavení release balíčku
 npm run desktop:build
 
-# 2. Spuštění již sestavené release .exe aplikace
+# Spuštění zkompilované release aplikace
 npm run desktop:preview
-
-# 3. Sestavení a okamžité spuštění release verze
-npm run desktop:start
 ```
-
-### Sestavení pro produkční web
-
-```bash
-npm run build
-npm run preview
-```
-
-### Ukázkový režim (prezentace a screenshoty)
-
-Webová verze umí simulovat desktopový backend s fiktivními disky, Commanderem, terminálem a zápisníkem.
-Ukázkové soubory (`demo/fs/`) jsou skutečné PSD, AI, INDD, FIG, BLEND, KRA, PDF a HTML soubory,
-takže všechny náhledy generují parsery aplikace – simulovaná je jen vrstva operačního systému.
-
-```bash
-npm run demo:fs      # vygeneruje demo/fs z ilustrací v demo/art (Python + Pillow + PyMuPDF)
-npm run dev          # pak otevřete http://localhost:3000/?demo
-```
-
-Volitelné parametry: `dir=` (složka prohlížeče), `left=` / `right=` (panely Commanderu).
-Demo režim existuje jen ve vývojovém serveru, produkční build ho neobsahuje.
-
-Landing page projektu je ve složce [`landing/`](landing/index.html) (statická stránka bez build kroku).
 
 ---
 
 ## 🔒 Bezpečnost & Soukromí
 
-- **100% Client-Side:** Vaše fotografie a videa nikdy neopouštějí váš počítač. Veškeré zpracování (IPTC, přejmenování, konverze, náhledy) probíhá lokálně v paměti vašeho prohlížeče.
-- **Žádné sledovací prvky:** Aplikace neobsahuje žádné skryté analytické skripty ani telemetrii.
-- **Bezpečné zacházení s disky:** Oprávnění k zápisu a čtení ze složek je plně pod kontrolou uživatele prostřednictvím standardních bezpečnostních dialogů systému Windows.
+- **100% Client-Side:** Vaše data, modely a fotografie nikdy neopouštějí váš počítač.
+- **Bez telemetrie:** Žádné skryté analytické skripty ani sledování.
+- **Plná kontrola nad disky:** Standardní přístup k souborovému systému pod vaším uživatelským účtem bez zbytečných elevací práv.
 
 ---
 
 ## 🗺️ Roadmapa vývoje
 
-Podrobný plán dalšího vývoje a jednotlivých fází naleznete v souboru [ROADMAP.md](ROADMAP.md).
-Záznam jednotlivých verzí a změn naleznete v [CHANGELOG.md](CHANGELOG.md).
+Podrobný plán dalšího vývoje a jednotlivých fází naleznete v souboru [ROADMAP.md](ROADMAP.md).  
+Záznam jednotlivých verzí a změn naleznete v [CHANGELOG.md](CHANGELOG.md).  
 Pravidla a instrukce pro Claude Code / AI asistenty jsou v [CLAUDE.md](CLAUDE.md).
 
 ---
