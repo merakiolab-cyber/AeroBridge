@@ -12,47 +12,44 @@ interface IconProps {
 
 /** Windows 11 Yellow Fluent Folder (Closed & Open) */
 export const Win11Folder: React.FC<IconProps> = ({ className = 'w-4 h-4', isOpen = false }) => {
+  const uid = React.useId().replace(/:/g, '_');
+
   if (isOpen) {
     return (
-      <svg className={`${className} shrink-0`} viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <svg className={`${className} shrink-0 drop-shadow-xs`} viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
         <defs>
-          <linearGradient id="w11_f_tab" x1="0" y1="0" x2="0" y2="1">
+          <linearGradient id={`w11_f_tab_${uid}`} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#df941a" />
             <stop offset="100%" stopColor="#b67107" />
           </linearGradient>
-          <linearGradient id="w11_f_back" x1="0" y1="0" x2="0" y2="1">
+          <linearGradient id={`w11_f_back_${uid}`} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#f3a925" />
             <stop offset="100%" stopColor="#cb7804" />
           </linearGradient>
-          <linearGradient id="w11_f_front" x1="0" y1="0" x2="0" y2="1">
+          <linearGradient id={`w11_f_front_${uid}`} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#ffd95b" />
             <stop offset="100%" stopColor="#e59812" />
           </linearGradient>
-          <linearGradient id="w11_f_paper" x1="0" y1="0" x2="0" y2="1">
+          <linearGradient id={`w11_f_paper_${uid}`} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#ffffff" />
             <stop offset="100%" stopColor="#e2e8f0" />
           </linearGradient>
-          <filter id="w11_f_shadow" x="0.5" y="6" width="19" height="12" filterUnits="userSpaceOnUse">
-            <feDropShadow dx="0" dy="1" stdDeviation="0.6" floodOpacity="0.3" />
-          </filter>
         </defs>
         {/* Back folder body */}
         <path
           d="M2.5 4.5C2.5 3.67 3.17 3 4 3H7.8C8.3 3 8.78 3.25 9.07 3.66L9.85 4.75C10.05 5.03 10.37 5.2 10.71 5.2H16C16.83 5.2 17.5 5.87 17.5 6.7V14C17.5 14.83 16.83 15.5 16 15.5H4C3.17 15.5 2.5 14.83 2.5 14V4.5Z"
-          fill="url(#w11_f_back)"
+          fill={`url(#w11_f_back_${uid})`}
         />
         {/* White document inside peeking out */}
-        <rect x="4.5" y="4" width="11" height="9.5" rx="1" fill="url(#w11_f_paper)" />
+        <rect x="4.5" y="4" width="11" height="9.5" rx="1" fill={`url(#w11_f_paper_${uid})`} />
         <rect x="6" y="6.2" width="5" height="1" rx="0.5" fill="#3b82f6" opacity="0.8" />
         <rect x="6" y="8.2" width="8" height="0.8" rx="0.4" fill="#64748b" opacity="0.6" />
         <rect x="6" y="9.8" width="6.5" height="0.8" rx="0.4" fill="#94a3b8" opacity="0.6" />
         {/* Front flap open angled */}
-        <g filter="url(#w11_f_shadow)">
-          <path
-            d="M1.5 8.2C1.5 7.6 1.95 7.1 2.55 7.05L16.2 6.05C16.85 6 17.45 6.45 17.5 7.1L18.5 14.2C18.55 14.9 18 15.5 17.3 15.5H2.7C2.04 15.5 1.5 14.96 1.5 14.3V8.2Z"
-            fill="url(#w11_f_front)"
-          />
-        </g>
+        <path
+          d="M1.5 8.2C1.5 7.6 1.95 7.1 2.55 7.05L16.2 6.05C16.85 6 17.45 6.45 17.5 7.1L18.5 14.2C18.55 14.9 18 15.5 17.3 15.5H2.7C2.04 15.5 1.5 14.96 1.5 14.3V8.2Z"
+          fill={`url(#w11_f_front_${uid})`}
+        />
         {/* Subtle highlight rim */}
         <path d="M2.55 7.05L16.2 6.05" stroke="rgba(255,255,255,0.7)" strokeWidth="0.8" strokeLinecap="round" />
       </svg>
@@ -60,30 +57,27 @@ export const Win11Folder: React.FC<IconProps> = ({ className = 'w-4 h-4', isOpen
   }
 
   return (
-    <svg className={`${className} shrink-0`} viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg className={`${className} shrink-0 drop-shadow-xs`} viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <linearGradient id="w11_c_tab" x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id={`w11_c_tab_${uid}`} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="#e39a1d" />
           <stop offset="100%" stopColor="#b56f08" />
         </linearGradient>
-        <linearGradient id="w11_c_body" x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id={`w11_c_body_${uid}`} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="#ffda62" />
           <stop offset="50%" stopColor="#f7b726" />
           <stop offset="100%" stopColor="#e8950d" />
         </linearGradient>
-        <filter id="w11_c_shadow" x="1" y="5.5" width="18" height="12.5" filterUnits="userSpaceOnUse">
-          <feDropShadow dx="0" dy="0.8" stdDeviation="0.5" floodOpacity="0.25" />
-        </filter>
       </defs>
       {/* Back tab */}
       <path
         d="M2.5 4.5C2.5 3.67 3.17 3 4 3H7.8C8.3 3 8.78 3.25 9.07 3.66L9.85 4.75C10.05 5.03 10.37 5.2 10.71 5.2H16C16.83 5.2 17.5 5.87 17.5 6.7V9H2.5V4.5Z"
-        fill="url(#w11_c_tab)"
+        fill={`url(#w11_c_tab_${uid})`}
       />
+      {/* Under-body subtle shadow depth */}
+      <rect x="2" y="6.6" width="16" height="9.4" rx="2" fill="#92400e" opacity="0.3" />
       {/* Front folder body */}
-      <g filter="url(#w11_c_shadow)">
-        <rect x="2" y="6" width="16" height="9.8" rx="2" fill="url(#w11_c_body)" />
-      </g>
+      <rect x="2" y="6" width="16" height="9.8" rx="2" fill={`url(#w11_c_body_${uid})`} />
       {/* Top glossy rim highlight */}
       <path d="M3.5 6.5H16.5" stroke="rgba(255,255,255,0.75)" strokeWidth="0.75" strokeLinecap="round" />
     </svg>

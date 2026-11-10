@@ -47,6 +47,8 @@ export interface UseKeyboardShortcutsProps {
   settingsOpen?: boolean;
   setSettingsOpen?: (open: boolean) => void;
   handlePurgeFolderCache?: () => void;
+  handleUndo?: () => Promise<void>;
+  handleRedo?: () => Promise<void>;
   addToast: (title: string, desc: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
 }
 
@@ -367,6 +369,25 @@ export function useKeyboardShortcuts(props: UseKeyboardShortcutsProps) {
         } else {
           p.addToast('Nelze vložit', 'Není otevřena žádná disková složka', 'warning');
         }
+        return;
+      }
+
+      // Cmd/Ctrl + Z: Undo file operation
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && (e.key.toLowerCase() === 'z' || e.code === 'KeyZ')) {
+        e.preventDefault();
+        e.stopPropagation();
+        void p.handleUndo?.();
+        return;
+      }
+
+      // Cmd/Ctrl + Y or Cmd/Ctrl + Shift + Z: Redo file operation
+      if (
+        ((e.metaKey || e.ctrlKey) && (e.key.toLowerCase() === 'y' || e.code === 'KeyY')) ||
+        ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key.toLowerCase() === 'z' || e.code === 'KeyZ'))
+      ) {
+        e.preventDefault();
+        e.stopPropagation();
+        void p.handleRedo?.();
         return;
       }
 

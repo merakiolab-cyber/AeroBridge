@@ -253,13 +253,12 @@ const ThumbnailCardComponent: React.FC<ThumbnailCardProps> = ({
                   const now = Date.now();
                   const prev = lastNameClickTimeRef.current;
                   lastNameClickTimeRef.current = now;
-                  if (isSelected && now - prev >= 450 && now - prev <= 2200) {
+                  if (isSelected && now - prev >= 500 && now - prev <= 2500) {
                     startInlineRename(e);
                   }
                 }}
-                onDoubleClick={(e) => startInlineRename(e)}
-                className="text-xs font-medium text-zinc-200 truncate max-w-full px-1.5 py-0.5 rounded hover:bg-white/[0.08] hover:text-white cursor-text"
-                title={`${asset.name} (Dvojklik na název složky pro přejmenování)`}
+                className="text-xs font-medium text-zinc-200 truncate max-w-full px-1.5 py-0.5 rounded hover:bg-white/[0.08] hover:text-white cursor-pointer"
+                title={`${asset.name} (Dvojklik: Otevřít složku | F2: Přejmenovat)`}
               >
                 {asset.name}
               </span>
@@ -449,13 +448,12 @@ const ThumbnailCardComponent: React.FC<ThumbnailCardProps> = ({
               const now = Date.now();
               const prev = lastNameClickTimeRef.current;
               lastNameClickTimeRef.current = now;
-              if (isSelected && now - prev >= 450 && now - prev <= 2200) {
+              if (isSelected && now - prev >= 500 && now - prev <= 2500) {
                 startInlineRename(e);
               }
             }}
-            onDoubleClick={(e) => startInlineRename(e)}
-            className="text-xs font-medium text-white/95 line-clamp-2 break-all tracking-tight leading-snug group-hover:text-white cursor-text rounded px-0.5 -mx-0.5 hover:bg-white/[0.06]"
-            title={`${fullFileName} (Dvojklik na název pro přejmenování)`}
+            className="text-xs font-medium text-white/95 line-clamp-2 break-all tracking-tight leading-snug group-hover:text-white cursor-pointer rounded px-0.5 -mx-0.5 hover:bg-white/[0.06]"
+            title={`${fullFileName} (Dvojklik: Otevřít | F2: Přejmenovat)`}
           >
             {fullFileName}
           </div>

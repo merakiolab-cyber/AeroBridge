@@ -23,6 +23,8 @@ import {
   FileText,
   Terminal,
   Scissors,
+  Undo2,
+  Redo2,
 } from 'lucide-react';
 import {
   scanNativeFolder,
@@ -65,6 +67,7 @@ import { CommanderNotepad } from './CommanderNotepad';
 import { CommanderTerminal } from './CommanderTerminal';
 import { isTextLikeFile, isExecutableFile } from '../utils/fileTypes';
 import { beginPointerDrag, setPointerDropHandler } from '../utils/pointerDrag';
+import { fileUndoRedo } from '../utils/fileUndoRedo';
 
 export interface CommanderViewProps {
   initialLeftPath?: string;
@@ -676,6 +679,7 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
     try {
       const resPath = await renameFileNative(oldPath, trimmed);
       const newPath = resPath || oldPath;
+      fileUndoRedo.recordRename(oldPath, newPath);
       cancelInlineRenameCommander();
       onNotify?.('Přejmenováno', `${originalName} → ${trimmed}`, 'success');
 
@@ -812,6 +816,41 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
     void fetchDirectory(left.currentPath, 'left');
     void fetchDirectory(right.currentPath, 'right');
     onNotify?.('Oba panely aktualizovány', undefined, 'info');
+  }, [fetchDirectory, left.currentPath, right.currentPath, onNotify]);
+
+  // Undo / Redo File Operations (Ctrl+Z / Ctrl+Y)
+  const [undoState, setUndoState] = useState({
+    canUndo: fileUndoRedo.canUndo(),
+    canRedo: fileUndoRedo.canRedo(),
+  });
+
+  useEffect(() => {
+    const onUndoRedoChange = () => {
+      setUndoState({
+        canUndo: fileUndoRedo.canUndo(),
+        canRedo: fileUndoRedo.canRedo(),
+      });
+    };
+    window.addEventListener('aerobridge:undo-redo-change', onUndoRedoChange);
+    return () => window.removeEventListener('aerobridge:undo-redo-change', onUndoRedoChange);
+  }, []);
+
+  const handleUndo = useCallback(async () => {
+    const res = await fileUndoRedo.undo();
+    onNotify?.(res.success ? 'Vráceno zpět' : 'Nelze vrátit', res.message, res.success ? 'info' : 'warning');
+    if (res.success) {
+      void fetchDirectory(left.currentPath, 'left');
+      void fetchDirectory(right.currentPath, 'right');
+    }
+  }, [fetchDirectory, left.currentPath, right.currentPath, onNotify]);
+
+  const handleRedo = useCallback(async () => {
+    const res = await fileUndoRedo.redo();
+    onNotify?.(res.success ? 'Znovu provedeno' : 'Nelze opakovat', res.message, res.success ? 'info' : 'warning');
+    if (res.success) {
+      void fetchDirectory(left.currentPath, 'left');
+      void fetchDirectory(right.currentPath, 'right');
+    }
   }, [fetchDirectory, left.currentPath, right.currentPath, onNotify]);
 
   // Folder tab operations
@@ -1254,7 +1293,8 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
     try {
       if (type === 'copy') {
         const dest = inputValue.trim() || targetDir;
-        await copyFilesNative(sourcePaths, dest);
+        const created = await copyFilesNative(sourcePaths, dest);
+        fileUndoRedo.recordCopy(sourcePaths, dest, created || []);
         onNotify?.(
           'Zkopírováno',
           `${sourcePaths.length} položek do ${dest.split('\\').pop() || dest}`,
@@ -1264,7 +1304,12 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
         void fetchDirectory(right.currentPath, 'right');
       } else if (type === 'move') {
         const dest = inputValue.trim() || targetDir;
-        await moveFilesNative(sourcePaths, dest);
+        const moved = await moveFilesNative(sourcePaths, dest);
+        if (moved && moved.length > 0) {
+          fileUndoRedo.recordMove(
+            sourcePaths.map((src, i) => ({ source: src, destination: moved[i] || src }))
+          );
+        }
         onNotify?.(
           'Přesunuto',
           `${sourcePaths.length} položek do ${dest.split('\\').pop() || dest}`,
@@ -1274,17 +1319,20 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
         void fetchDirectory(right.currentPath, 'right');
       } else if (type === 'new-folder') {
         const folderName = inputValue.trim() || 'Nová složka';
-        await createFolderNative(targetDir, folderName);
+        const created = await createFolderNative(targetDir, folderName);
+        fileUndoRedo.recordCreateFolder(created, targetDir, folderName);
         onNotify?.('Vytvořena složka', folderName, 'success');
         void fetchDirectory(activePane === 'left' ? left.currentPath : right.currentPath, activePane);
       } else if (type === 'delete') {
         await deleteFilesNative(sourcePaths);
+        fileUndoRedo.recordDelete(sourcePaths);
         onNotify?.('Přesunuto do Koše', `${sourcePaths.length} položek`, 'info');
         void fetchDirectory(activePane === 'left' ? left.currentPath : right.currentPath, activePane);
       } else if (type === 'rename') {
         const newName = inputValue.trim();
         if (newName && sourcePaths[0]) {
-          await renameFileNative(sourcePaths[0], newName);
+          const res = await renameFileNative(sourcePaths[0], newName);
+          fileUndoRedo.recordRename(sourcePaths[0], res || sourcePaths[0]);
           onNotify?.('Přejmenováno', newName, 'success');
           void fetchDirectory(activePane === 'left' ? left.currentPath : right.currentPath, activePane);
         }
@@ -1394,6 +1442,7 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
         if (opToUse === 'copy') {
           const copied = await copyFilesNative(pathsToPaste, destFolder);
           const count = copied && copied.length > 0 ? copied.length : pathsToPaste.length;
+          fileUndoRedo.recordCopy(pathsToPaste, destFolder, copied || []);
           onNotify?.(
             'Vloženo (Kopírování)',
             `${count} ${count === 1 ? 'položka vložena' : 'položek vloženo'} do ${destFolder.split('\\').pop() || destFolder}`,
@@ -1402,6 +1451,11 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
         } else {
           const moved = await moveFilesNative(pathsToPaste, destFolder);
           const count = moved && moved.length > 0 ? moved.length : pathsToPaste.length;
+          if (moved && moved.length > 0) {
+            fileUndoRedo.recordMove(
+              pathsToPaste.map((src, i) => ({ source: src, destination: moved[i] || src }))
+            );
+          }
           clipboardRef.current = null;
           setClipboard(null);
           onNotify?.(
@@ -1486,14 +1540,20 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
 
       try {
         if (effectiveCopy) {
-          await copyFilesNative(sourcePaths, destFolder);
+          const copied = await copyFilesNative(sourcePaths, destFolder);
+          fileUndoRedo.recordCopy(sourcePaths, destFolder, copied || []);
           onNotify?.(
             isSameFolder ? 'Duplikováno v kořeni' : 'Zkopírováno',
             `${sourcePaths.length} ${sourcePaths.length === 1 ? 'položka' : 'položek'} ${isSameFolder ? 'zkopírována (vytvořena kopie)' : `zkopírováno do ${destFolder.split('\\').pop() || destFolder}`}`,
             'success'
           );
         } else {
-          await moveFilesNative(sourcePaths, destFolder);
+          const moved = await moveFilesNative(sourcePaths, destFolder);
+          if (moved && moved.length > 0) {
+            fileUndoRedo.recordMove(
+              sourcePaths.map((src, i) => ({ source: src, destination: moved[i] || src }))
+            );
+          }
           onNotify?.(
             'Přesunuto',
             `${sourcePaths.length} ${sourcePaths.length === 1 ? 'položka přesunuta' : 'položek přesunuto'} do ${destFolder.split('\\').pop() || destFolder}`,
@@ -1737,6 +1797,25 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
         return;
       }
 
+      // Ctrl + Z: Undo file operation
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key.toLowerCase() === 'z' || e.code === 'KeyZ')) {
+        e.preventDefault();
+        e.stopPropagation();
+        void handleUndo();
+        return;
+      }
+
+      // Ctrl + Y or Ctrl + Shift + Z: Redo file operation
+      if (
+        ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || e.code === 'KeyY')) ||
+        ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key.toLowerCase() === 'z' || e.code === 'KeyZ'))
+      ) {
+        e.preventDefault();
+        e.stopPropagation();
+        void handleRedo();
+        return;
+      }
+
       // Ctrl+U: Swap panes
       if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'u' || e.code === 'KeyU')) {
         e.preventDefault();
@@ -1916,6 +1995,8 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
     triggerQuickLook,
     handleOpenItem,
     handleSwapPanes,
+    handleUndo,
+    handleRedo,
     handleNavigateUp,
     handleAddFolderTab,
     handleCloseFolderTab,
@@ -2252,7 +2333,7 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
                     }`}
                     title={`${tab.title}\n${tab.path}\n\nStřední klik nebo Ctrl+W: Zavřít záložku`}
                   >
-                    <Folder className={`w-3.5 h-3.5 shrink-0 ${isTabActive ? 'text-[#60cdff]' : 'text-zinc-500'}`} />
+                    <Win11Folder isOpen={isTabActive} className="w-3.5 h-3.5 shrink-0" />
                     <span className="truncate">{tab.title}</span>
                     {folderTabs.length > 1 && (
                       <button
@@ -2348,7 +2429,8 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
           </button>
 
           {/* Editable Path Input */}
-          <div className="relative flex-1 min-w-0">
+          <div className="relative flex-1 min-w-0 flex items-center">
+            <Win11Folder className="w-3.5 h-3.5 absolute left-2 pointer-events-none shrink-0" />
             <input
               type="text"
               value={pane.inputPath}
@@ -2367,7 +2449,7 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
                   e.currentTarget.blur();
                 }
               }}
-              className="w-full bg-[#121316] border border-white/[0.08] rounded px-2 py-1 text-xs text-zinc-200 font-mono placeholder-zinc-500 focus:outline-hidden focus:border-[#60cdff] focus:ring-1 focus:ring-[#60cdff]/30 transition-all truncate"
+              className="w-full bg-[#121316] border border-white/[0.08] rounded pl-7 pr-2 py-1 text-xs text-zinc-200 font-mono placeholder-zinc-500 focus:outline-hidden focus:border-[#60cdff] focus:ring-1 focus:ring-[#60cdff]/30 transition-all truncate"
               title="Stiskněte Enter pro přechod na cestu"
             />
           </div>
@@ -2606,7 +2688,10 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
               }`}
             >
               <div className="flex items-center gap-2 truncate pointer-events-none">
-                <CornerLeftUp className="w-4 h-4 text-amber-400 shrink-0" />
+                <div className="relative shrink-0 flex items-center">
+                  <Win11Folder isOpen className="w-4 h-4 shrink-0" />
+                  <CornerLeftUp className="w-2.5 h-2.5 text-white absolute -top-0.5 -right-1 drop-shadow-xs stroke-[2.5]" />
+                </div>
                 <span className="font-bold tracking-wider">[ .. ]</span>
                 {dragTargetFolder?.pane === paneKey && dragTargetFolder.path === parentDir && (
                   <span className="text-[10px] bg-[#60cdff] text-[#111215] font-bold px-1.5 py-0.2 rounded shadow-xs shrink-0 ml-1">
@@ -2822,7 +2907,11 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
                     ? 'bg-white/[0.08] text-white ring-1 ring-white/10'
                     : 'hover:bg-white/[0.04] text-zinc-300'
                 }`}
-                title={`${it.path} (Dvojklik na název pro přejmenování)`}
+                title={
+                  it.is_dir
+                    ? `${it.path}\n(Dvojklik: Otevřít složku | F2: Přejmenovat)`
+                    : `${it.path}\n(Dvojklik: Otevřít soubor | F2: Přejmenovat)`
+                }
               >
                 {/* Column 1: Icon + Name */}
                 <div className="flex items-center gap-2 truncate pr-2 min-w-0">
@@ -2882,22 +2971,17 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
                           isSelected &&
                           pane.selectedPaths.size === 1 &&
                           prev.path === it.path &&
-                          now - prev.time >= 450 &&
-                          now - prev.time <= 2200
+                          now - prev.time >= 500 &&
+                          now - prev.time <= 2500
                         ) {
                           e.stopPropagation();
                           startInlineRenameCommander(paneKey, it);
                         }
                       }}
-                      onDoubleClick={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        startInlineRenameCommander(paneKey, it);
-                      }}
-                      className={`truncate px-1 -mx-1 rounded hover:bg-white/[0.08] cursor-text ${
+                      className={`truncate px-1 -mx-1 rounded hover:bg-white/[0.08] cursor-pointer ${
                         it.is_dir ? 'font-medium text-white' : ''
                       }`}
-                      title="Dvojklik na název pro přejmenování (dvojklik na ikonu otevře složku/soubor)"
+                      title={it.is_dir ? 'Dvojklik: Otevřít složku | F2: Přejmenovat' : 'Dvojklik: Otevřít soubor | F2: Přejmenovat'}
                     >
                       {it.name}
                     </span>
@@ -2990,14 +3074,54 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
       ref={containerRef}
       className="flex-1 flex flex-col h-full bg-[#111215] text-zinc-300 font-sans select-none overflow-hidden relative"
     >
-      {/* Commander toolbar: Sync (=), Swap (⇆), Refresh — rendered into the TopBar slot */}
+      {/* Commander toolbar: Sync (=), Swap (⇆), New Folder (F7), Undo, Redo, Refresh — rendered into the TopBar slot */}
       {commanderToolbarSlot &&
         createPortal(
         <div className="flex items-center gap-1.5">
           <button
             type="button"
+            onClick={triggerNewFolder}
+            className="flex items-center gap-1.5 px-2 py-1 rounded bg-white/[0.05] hover:bg-white/[0.12] text-zinc-300 hover:text-white border border-white/10 transition-colors cursor-pointer text-xs font-medium"
+            title="Nová složka v aktivním panelu (F7)"
+          >
+            <FolderPlus className="w-3.5 h-3.5 text-amber-400" />
+            <span>Nová složka (F7)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => void handleUndo()}
+            disabled={!undoState.canUndo}
+            className={`flex items-center gap-1.5 px-2 py-1 rounded border border-white/10 transition-colors text-xs font-medium ${
+              undoState.canUndo
+                ? 'bg-white/[0.05] hover:bg-white/[0.12] text-zinc-300 hover:text-white cursor-pointer'
+                : 'opacity-40 text-zinc-600 cursor-not-allowed'
+            }`}
+            title="Vrátit poslední akci zpět (Ctrl+Z)"
+          >
+            <Undo2 className={`w-3.5 h-3.5 ${undoState.canUndo ? 'text-[#60cdff]' : 'text-zinc-600'}`} />
+            <span>Zpět (Ctrl+Z)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => void handleRedo()}
+            disabled={!undoState.canRedo}
+            className={`flex items-center gap-1.5 px-2 py-1 rounded border border-white/10 transition-colors text-xs font-medium ${
+              undoState.canRedo
+                ? 'bg-white/[0.05] hover:bg-white/[0.12] text-zinc-300 hover:text-white cursor-pointer'
+                : 'opacity-40 text-zinc-600 cursor-not-allowed'
+            }`}
+            title="Znovu provést vrácenou akci (Ctrl+Y / Ctrl+Shift+Z)"
+          >
+            <Redo2 className={`w-3.5 h-3.5 ${undoState.canRedo ? 'text-zinc-300' : 'text-zinc-600'}`} />
+            <span>Znovu</span>
+          </button>
+
+          <button
+            type="button"
             onClick={handleSyncPaths}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-white/[0.05] hover:bg-white/[0.12] text-zinc-300 hover:text-white border border-white/10 transition-colors cursor-pointer text-xs font-medium"
+            className="flex items-center gap-1.5 px-2 py-1 rounded bg-white/[0.05] hover:bg-white/[0.12] text-zinc-300 hover:text-white border border-white/10 transition-colors cursor-pointer text-xs font-medium"
             title="Nastavit cílový panel na stejnou složku jako aktivní (=)"
           >
             <Equal className="w-3.5 h-3.5 text-[#60cdff]" />
@@ -3007,7 +3131,7 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
           <button
             type="button"
             onClick={handleSwapPanes}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-white/[0.05] hover:bg-white/[0.12] text-zinc-300 hover:text-white border border-white/10 transition-colors cursor-pointer text-xs font-medium"
+            className="flex items-center gap-1.5 px-2 py-1 rounded bg-white/[0.05] hover:bg-white/[0.12] text-zinc-300 hover:text-white border border-white/10 transition-colors cursor-pointer text-xs font-medium"
             title="Prohodit levý a pravý panel (Ctrl+U)"
           >
             <ArrowLeftRight className="w-3.5 h-3.5 text-amber-400" />
@@ -3017,7 +3141,7 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
           <button
             type="button"
             onClick={handleRefreshBoth}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-white/[0.05] hover:bg-white/[0.12] text-zinc-300 hover:text-white border border-white/10 transition-colors cursor-pointer text-xs font-medium"
+            className="flex items-center gap-1.5 px-2 py-1 rounded bg-white/[0.05] hover:bg-white/[0.12] text-zinc-300 hover:text-white border border-white/10 transition-colors cursor-pointer text-xs font-medium"
             title="Obnovit oba panely (F5)"
           >
             <RotateCw className="w-3.5 h-3.5 text-emerald-400" />

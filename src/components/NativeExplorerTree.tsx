@@ -7,6 +7,7 @@ import {
   renameFileNative,
   type NativePlace,
 } from '../utils/tauriBridge';
+import { fileUndoRedo } from '../utils/fileUndoRedo';
 import { resolveDropItems } from '../utils/dragSession';
 import {
   Win11Folder,
@@ -350,6 +351,7 @@ export const NativeExplorerTree: React.FC<NativeExplorerTreeProps> = ({
     try {
       const resPath = await renameFileNative(oldPath, trimmed);
       const newPath = resPath || oldPath;
+      fileUndoRedo.recordRename(oldPath, newPath);
       const oldKey = norm(oldPath);
       const newKey = norm(newPath);
       originalsRef.current.set(newKey, newPath);
@@ -793,6 +795,7 @@ export const NativeExplorerTree: React.FC<NativeExplorerTreeProps> = ({
           onDragOver={(e) => handleNodeDragOver(e, node.path)}
           onDragLeave={(e) => handleNodeDragLeave(e, node.path)}
           onDrop={(e) => handleNodeDrop(e, node.path)}
+          onDoubleClick={() => !isLeaf && toggle(node.path)}
           className={`group relative flex items-center mx-1.5 my-[1.5px] py-1.5 pr-2.5 text-[12px] font-normal rounded-[5px] transition-all duration-120 cursor-pointer select-none ${
             isDragTarget
               ? 'bg-[#60cdff]/20 text-white font-semibold ring-1 ring-[#60cdff]/50'
@@ -803,7 +806,7 @@ export const NativeExplorerTree: React.FC<NativeExplorerTreeProps> = ({
               : 'text-zinc-300 hover:bg-white/[0.05] hover:text-white'
           }`}
           style={{ paddingLeft: `${6 + level * 14}px` }}
-          title={isDrive ? node.path : `${node.path}\n(Dvojklik na název složky pro přejmenování)`}
+          title={isDrive ? node.path : `${node.path}\n(Klik: Přejít | Dvojklik: Rozbalit | F2: Přejmenovat)`}
         >
           {/* Windows 11 Signature Left Pill Indicator for Active Selection */}
           {isActive && (
@@ -861,7 +864,6 @@ export const NativeExplorerTree: React.FC<NativeExplorerTreeProps> = ({
             <span
               data-folder-name="true"
               onClick={(e) => handleFolderNameClick(e, node, isActive)}
-              onDoubleClick={(e) => handleFolderNameDoubleClick(e, node)}
               className="truncate tracking-tight flex-1"
             >
               {node.name}
@@ -966,7 +968,6 @@ export const NativeExplorerTree: React.FC<NativeExplorerTreeProps> = ({
                       <Win11Folder className="w-4 h-4 shrink-0" />
                       <span
                         data-folder-name="true"
-                        onDoubleClick={(e) => handleFolderNameDoubleClick(e, { name, path: favPath })}
                         className="truncate"
                       >
                         {name}

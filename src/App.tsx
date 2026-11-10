@@ -356,6 +356,8 @@ export default function App() {
     handleOpenTerminal,
     handleCompressZip,
     handleExtractZip,
+    handleUndo,
+    handleRedo,
   } = useFileOperations({
     assets,
     setAssets,
@@ -1071,6 +1073,8 @@ export default function App() {
     settingsOpen,
     setSettingsOpen,
     handlePurgeFolderCache,
+    handleUndo,
+    handleRedo,
     addToast,
   });
 

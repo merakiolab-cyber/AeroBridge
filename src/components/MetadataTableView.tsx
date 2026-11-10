@@ -349,9 +349,8 @@ export const MetadataTableView: React.FC<MetadataTableViewProps> = ({
                       ) : (
                         <span
                           data-rename-label="true"
-                          onDoubleClick={(e) => startInlineRename(asset, e)}
-                          className="truncate max-w-sm lg:max-w-md xl:max-w-xl text-xs px-1 py-0.5 -mx-1 rounded hover:bg-white/[0.06] cursor-text"
-                          title={`${asset.name} (Dvojklik na název pro přejmenování)`}
+                          className="truncate max-w-sm lg:max-w-md xl:max-w-xl text-xs px-1 py-0.5 -mx-1 rounded hover:bg-white/[0.06] cursor-pointer"
+                          title={`${asset.name} (Dvojklik: Otevřít | F2: Přejmenovat)`}
                         >
                           {asset.name}
                         </span>

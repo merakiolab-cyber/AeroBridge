@@ -16,6 +16,7 @@ import {
 import { copyFilesToClipboard } from '../utils/localFileSystem';
 import { isVisualAsset } from '../utils/adobeThumbnailExtractor';
 import { type ContextMenuPosition, type ContextMenuTarget } from '../components/FileContextMenu';
+import { fileUndoRedo } from '../utils/fileUndoRedo';
 
 export interface InputDialogState {
   isOpen: boolean;
@@ -240,10 +241,16 @@ export function useFileOperations({
         if (opToUse === 'copy') {
           const created = await copyFilesNative(pathsToPaste, destFolder);
           const count = created && created.length > 0 ? created.length : pathsToPaste.length;
+          fileUndoRedo.recordCopy(pathsToPaste, destFolder, created || []);
           addToast('Položky zkopírovány', `Vloženo ${count} položek`);
         } else {
           const moved = await moveFilesNative(pathsToPaste, destFolder);
           const count = moved && moved.length > 0 ? moved.length : pathsToPaste.length;
+          if (moved && moved.length > 0) {
+            fileUndoRedo.recordMove(
+              pathsToPaste.map((src, i) => ({ source: src, destination: moved[i] || src }))
+            );
+          }
           clipboardRef.current = null;
           setClipboard(null);
           addToast('Položky přesunuty', `Přesunuto ${count} položek`);
@@ -319,6 +326,7 @@ export function useFileOperations({
       try {
         if (isDesktopApp()) {
           await deleteFilesNative(paths);
+          fileUndoRedo.recordDelete(paths);
         }
         const pathSet = new Set(paths);
         setAssets((prev) => prev.filter((a) => !a.fullPath || !pathSet.has(a.fullPath)));
@@ -339,14 +347,16 @@ export function useFileOperations({
     async (value: string) => {
       try {
         if (inputDialog.type === 'rename' && inputDialog.targetPath) {
-          await renameFileNative(inputDialog.targetPath, value);
+          const newPath = await renameFileNative(inputDialog.targetPath, value);
+          fileUndoRedo.recordRename(inputDialog.targetPath, newPath || inputDialog.targetPath);
           addToast('Přejmenováno', `Nový název: ${value}`);
           if (nativeDir) await navigateNative(nativeDir);
           window.dispatchEvent(
             new CustomEvent('aerobridge:tree-refresh', { detail: { path: nativeDir || undefined, silent: true } })
           );
         } else if (inputDialog.type === 'new-folder' && inputDialog.targetPath) {
-          await createFolderNative(inputDialog.targetPath, value);
+          const created = await createFolderNative(inputDialog.targetPath, value);
+          fileUndoRedo.recordCreateFolder(created, inputDialog.targetPath, value);
           addToast('Složka vytvořena', value);
           if (nativeDir) await navigateNative(nativeDir);
           window.dispatchEvent(
@@ -370,7 +380,8 @@ export function useFileOperations({
       if (!trimmed) return;
       try {
         if (isDesktopApp() && asset.fullPath) {
-          await renameFileNative(asset.fullPath, trimmed);
+          const newPath = await renameFileNative(asset.fullPath, trimmed);
+          fileUndoRedo.recordRename(asset.fullPath, newPath || asset.fullPath);
           addToast('Přejmenováno', `Nový název: ${trimmed}`);
           if (nativeDir) await navigateNative(nativeDir);
           window.dispatchEvent(
@@ -466,9 +477,27 @@ export function useFileOperations({
     [nativeDir, navigateNative, addToast]
   );
 
+  const handleUndo = useCallback(async () => {
+    const res = await fileUndoRedo.undo();
+    addToast(res.success ? 'Vráceno zpět' : 'Nelze vrátit', res.message, res.success ? 'info' : 'warning');
+    if (res.success && nativeDir) {
+      await navigateNative(nativeDir);
+    }
+  }, [addToast, nativeDir, navigateNative]);
+
+  const handleRedo = useCallback(async () => {
+    const res = await fileUndoRedo.redo();
+    addToast(res.success ? 'Znovu provedeno' : 'Nelze opakovat', res.message, res.success ? 'info' : 'warning');
+    if (res.success && nativeDir) {
+      await navigateNative(nativeDir);
+    }
+  }, [addToast, nativeDir, navigateNative]);
+
   return {
     handleCompressZip,
     handleExtractZip,
+    handleUndo,
+    handleRedo,
     clipboard,
     setClipboard,
     contextMenuPos,
