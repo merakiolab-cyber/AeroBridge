@@ -203,16 +203,19 @@ function getExtBadgeStyle(ext: string, isDir: boolean): { bg: string; text: stri
 let activeDragPayload: { paths: string[]; sourcePane: 'left' | 'right' } | null = null;
 
 const getInitialPanePath = (initial?: string, storageKey?: string): string => {
-  if (initial && !initial.toUpperCase().startsWith('C:')) return initial;
-  let saved: string | null = null;
   if (storageKey) {
     try {
-      saved = localStorage.getItem(storageKey);
+      const saved = localStorage.getItem(storageKey);
+      if (saved && !saved.toUpperCase().startsWith('C:')) return saved;
     } catch {}
   }
-  if (saved && !saved.toUpperCase().startsWith('C:')) return saved;
+  if (initial && !initial.toUpperCase().startsWith('C:')) return initial;
   return 'F:\\';
 };
+
+function computeCommanderEntriesFp(entries: NativeFileEntry[]): string {
+  return entries.map((e) => `${e.path}|${e.is_dir ? 1 : 0}|${e.size}|${e.modified_ms}`).join('\n');
+}
 
 export const CommanderView: React.FC<CommanderViewProps> = ({
   initialLeftPath,
@@ -229,12 +232,63 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
   const [places, setPlaces] = useState<NativePlace[]>([]);
 
   // Splitter ratio (percentage for left pane, default 50%)
-  const [splitRatio, setSplitRatio] = useState<number>(50);
+  const [splitRatio, setSplitRatio] = useState<number>(() => {
+    try {
+      const s = localStorage.getItem('aerobridge_commander_split_ratio');
+      const v = s ? parseFloat(s) : 50;
+      return Number.isFinite(v) && v >= 20 && v <= 80 ? v : 50;
+    } catch {
+      return 50;
+    }
+  });
   const [isDraggingSplitter, setIsDraggingSplitter] = useState<boolean>(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Active Pane ('left' | 'right')
-  const [activePane, setActivePane] = useState<'left' | 'right'>('left');
+  // Active Pane ('left' | 'right') persisted so returning from Browser restores exact active pane
+  const [activePane, setActivePane] = useState<'left' | 'right'>(() => {
+    try {
+      return localStorage.getItem('aerobridge_commander_active_pane') === 'right' ? 'right' : 'left';
+    } catch {
+      return 'left';
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem('aerobridge_commander_active_pane', activePane);
+    } catch {}
+  }, [activePane]);
+  useEffect(() => {
+    try {
+      localStorage.setItem('aerobridge_commander_split_ratio', String(splitRatio));
+    } catch {}
+  }, [splitRatio]);
+
+  // Scroll containers & preserved scroll offsets when switching between Browser and Commander
+  const leftListScrollRef = useRef<HTMLDivElement | null>(null);
+  const rightListScrollRef = useRef<HTMLDivElement | null>(null);
+  const leftSavedScrollTopRef = useRef<number>(0);
+  const rightSavedScrollTopRef = useRef<number>(0);
+
+  // Selection anchor indices for Shift+Click and Shift+Arrow in each pane
+  const leftAnchorIdxRef = useRef<number | null>(null);
+  const rightAnchorIdxRef = useRef<number | null>(null);
+
+  // Fingerprints for background auto-refresh
+  const leftFpRef = useRef<string>('');
+  const rightFpRef = useRef<string>('');
+  const leftScanningRef = useRef<boolean>(false);
+  const rightScanningRef = useRef<boolean>(false);
+
+  // Inline folder/file rename state (Windows Explorer style double-click / slow-click on name)
+  const [inlineEdit, setInlineEdit] = useState<{
+    paneKey: 'left' | 'right';
+    path: string;
+    originalName: string;
+    value: string;
+  } | null>(null);
+  const inlineRenameInputRef = useRef<HTMLInputElement | null>(null);
+  const inlineRenameCommittingRef = useRef<boolean>(false);
+  const lastCommanderLabelClickRef = useRef<{ path: string; time: number }>({ path: '', time: 0 });
 
   // Initial path resolution (defaults to Working drive F:\ instead of C:\ System)
   const initialLeftRaw = getInitialPanePath(initialLeftPath, 'aerobridge_commander_left_path');
@@ -299,8 +353,32 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
   });
 
   // Pane view mode: each pane can be toggled between 'files' (explorer), 'notepad' (scratchpad), and 'terminal'
-  const [leftViewMode, setLeftViewMode] = useState<'files' | 'notepad' | 'terminal'>('files');
-  const [rightViewMode, setRightViewMode] = useState<'files' | 'notepad' | 'terminal'>('files');
+  const [leftViewMode, setLeftViewMode] = useState<'files' | 'notepad' | 'terminal'>(() => {
+    try {
+      const saved = sessionStorage.getItem('aerobridge_commander_left_view_mode');
+      return saved === 'notepad' || saved === 'terminal' ? saved : 'files';
+    } catch {
+      return 'files';
+    }
+  });
+  const [rightViewMode, setRightViewMode] = useState<'files' | 'notepad' | 'terminal'>(() => {
+    try {
+      const saved = sessionStorage.getItem('aerobridge_commander_right_view_mode');
+      return saved === 'notepad' || saved === 'terminal' ? saved : 'files';
+    } catch {
+      return 'files';
+    }
+  });
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('aerobridge_commander_left_view_mode', leftViewMode);
+    } catch {}
+  }, [leftViewMode]);
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('aerobridge_commander_right_view_mode', rightViewMode);
+    } catch {}
+  }, [rightViewMode]);
   const [leftNotepadTarget, setLeftNotepadTarget] = useState<{ path: string; timestamp: number } | null>(null);
   const [rightNotepadTarget, setRightNotepadTarget] = useState<{ path: string; timestamp: number } | null>(null);
 
@@ -314,8 +392,8 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
   const isListedFolder = (path: string) => [...left.items, ...right.items].some((it) => it.is_dir && it.path === path);
 
   // Background terminal lifecycle and multi-tab state
-  const [leftTerminalInitialized, setLeftTerminalInitialized] = useState(false);
-  const [rightTerminalInitialized, setRightTerminalInitialized] = useState(false);
+  const [leftTerminalInitialized, setLeftTerminalInitialized] = useState(() => leftViewMode === 'terminal');
+  const [rightTerminalInitialized, setRightTerminalInitialized] = useState(() => rightViewMode === 'terminal');
   const [leftTerminalProcessCount, setLeftTerminalProcessCount] = useState(0);
   const [rightTerminalProcessCount, setRightTerminalProcessCount] = useState(0);
   const [leftTerminalRequest, setLeftTerminalRequest] = useState<{ path: string; timestamp: number } | null>(null);
@@ -380,70 +458,247 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
     } catch {}
   }, [rightTabs, rightActiveTabId]);
 
-  // Fetch directory listing for a pane
-  const fetchDirectory = useCallback(async (targetPath: string, paneKey: 'left' | 'right') => {
-    if (!targetPath) return;
+  // Fetch directory listing for a pane (supports preserveState and silent background refresh)
+  const fetchDirectory = useCallback(
+    async (
+      targetPath: string,
+      paneKey: 'left' | 'right',
+      opts?: { preserveState?: boolean; silent?: boolean }
+    ) => {
+      if (!targetPath) return;
 
-    if (paneKey === 'left') {
-      setLeft((prev) => ({ ...prev, loading: true, inputPath: targetPath }));
-    } else {
-      setRight((prev) => ({ ...prev, loading: true, inputPath: targetPath }));
-    }
+      const scanFlagRef = paneKey === 'left' ? leftScanningRef : rightScanningRef;
+      if (opts?.silent && scanFlagRef.current) return;
+      scanFlagRef.current = true;
 
-    try {
-      const entries = await scanNativeFolder(targetPath);
-      const hasParent = !!getParentDir(targetPath);
-      const defaultFocus = entries.length > 0 && hasParent ? 1 : 0;
-      const defaultSel = entries.length > 0 ? new Set([entries[0].path]) : new Set<string>();
-
-      if (paneKey === 'left') {
-        setLeft((prev) => ({
-          ...prev,
-          items: entries,
-          loading: false,
-          currentPath: targetPath,
-          inputPath: targetPath,
-          selectedPaths: defaultSel,
-          focusedIndex: defaultFocus,
-        }));
-        setLeftTabs((prev) =>
-          prev.map((t) =>
-            t.id === leftActiveTabIdRef.current
-              ? { ...t, path: targetPath, title: getFolderTabTitle(targetPath) }
-              : t
-          )
-        );
-        try {
-          localStorage.setItem('aerobridge_commander_left_path', targetPath);
-        } catch {}
-      } else {
-        setRight((prev) => ({
-          ...prev,
-          items: entries,
-          loading: false,
-          currentPath: targetPath,
-          inputPath: targetPath,
-          selectedPaths: defaultSel,
-          focusedIndex: defaultFocus,
-        }));
-        setRightTabs((prev) =>
-          prev.map((t) =>
-            t.id === rightActiveTabIdRef.current
-              ? { ...t, path: targetPath, title: getFolderTabTitle(targetPath) }
-              : t
-          )
-        );
-        try {
-          localStorage.setItem('aerobridge_commander_right_path', targetPath);
-        } catch {}
+      if (!opts?.silent) {
+        if (paneKey === 'left') {
+          setLeft((prev) => ({ ...prev, loading: true, inputPath: targetPath }));
+        } else {
+          setRight((prev) => ({ ...prev, loading: true, inputPath: targetPath }));
+        }
       }
-    } catch (err) {
-      console.warn(`[CommanderView] Error loading directory for ${paneKey}:`, err);
-      onNotify?.('Chyba při čtení složky', String(err), 'error');
-      if (paneKey === 'left') setLeft((prev) => ({ ...prev, loading: false }));
-      else setRight((prev) => ({ ...prev, loading: false }));
+
+      try {
+        const entries = await scanNativeFolder(targetPath);
+        const nextFp = computeCommanderEntriesFp(entries);
+        const fpRef = paneKey === 'left' ? leftFpRef : rightFpRef;
+
+        if (opts?.silent && fpRef.current === nextFp) {
+          return;
+        }
+        fpRef.current = nextFp;
+
+        const hasParent = !!getParentDir(targetPath);
+        const defaultFocus = entries.length > 0 && hasParent ? 1 : 0;
+        const defaultSel = entries.length > 0 ? new Set([entries[0].path]) : new Set<string>();
+        const validPathSet = new Set(entries.map((e) => e.path));
+        const maxRowIdx = Math.max(0, entries.length + (hasParent ? 1 : 0) - 1);
+
+        if (paneKey === 'left') {
+          setLeft((prev) => {
+            const isSameDir =
+              opts?.preserveState ||
+              opts?.silent ||
+              prev.currentPath.replace(/[\\/]+$/, '').toLowerCase() ===
+                targetPath.replace(/[\\/]+$/, '').toLowerCase();
+
+            if (!isSameDir) {
+              leftAnchorIdxRef.current = defaultFocus;
+              leftSavedScrollTopRef.current = 0;
+              requestAnimationFrame(() => {
+                if (leftListScrollRef.current) leftListScrollRef.current.scrollTop = 0;
+              });
+            }
+
+            const preservedSel = isSameDir
+              ? new Set(Array.from(prev.selectedPaths).filter((p) => validPathSet.has(p)))
+              : defaultSel;
+
+            return {
+              ...prev,
+              items: entries,
+              loading: false,
+              currentPath: targetPath,
+              inputPath: opts?.silent && prev.isEditingPath ? prev.inputPath : targetPath,
+              selectedPaths: isSameDir ? preservedSel : defaultSel,
+              focusedIndex: isSameDir ? Math.min(prev.focusedIndex, maxRowIdx) : defaultFocus,
+            };
+          });
+          if (!opts?.silent) {
+            setLeftTabs((prev) =>
+              prev.map((t) =>
+                t.id === leftActiveTabIdRef.current
+                  ? { ...t, path: targetPath, title: getFolderTabTitle(targetPath) }
+                  : t
+              )
+            );
+            try {
+              localStorage.setItem('aerobridge_commander_left_path', targetPath);
+            } catch {}
+          }
+        } else {
+          setRight((prev) => {
+            const isSameDir =
+              opts?.preserveState ||
+              opts?.silent ||
+              prev.currentPath.replace(/[\\/]+$/, '').toLowerCase() ===
+                targetPath.replace(/[\\/]+$/, '').toLowerCase();
+
+            if (!isSameDir) {
+              rightAnchorIdxRef.current = defaultFocus;
+              rightSavedScrollTopRef.current = 0;
+              requestAnimationFrame(() => {
+                if (rightListScrollRef.current) rightListScrollRef.current.scrollTop = 0;
+              });
+            }
+
+            const preservedSel = isSameDir
+              ? new Set(Array.from(prev.selectedPaths).filter((p) => validPathSet.has(p)))
+              : defaultSel;
+
+            return {
+              ...prev,
+              items: entries,
+              loading: false,
+              currentPath: targetPath,
+              inputPath: opts?.silent && prev.isEditingPath ? prev.inputPath : targetPath,
+              selectedPaths: isSameDir ? preservedSel : defaultSel,
+              focusedIndex: isSameDir ? Math.min(prev.focusedIndex, maxRowIdx) : defaultFocus,
+            };
+          });
+          if (!opts?.silent) {
+            setRightTabs((prev) =>
+              prev.map((t) =>
+                t.id === rightActiveTabIdRef.current
+                  ? { ...t, path: targetPath, title: getFolderTabTitle(targetPath) }
+                  : t
+              )
+            );
+            try {
+              localStorage.setItem('aerobridge_commander_right_path', targetPath);
+            } catch {}
+          }
+        }
+      } catch (err) {
+        if (!opts?.silent) {
+          console.warn(`[CommanderView] Error loading directory for ${paneKey}:`, err);
+          onNotify?.('Chyba při čtení složky', String(err), 'error');
+        }
+        if (paneKey === 'left') setLeft((prev) => ({ ...prev, loading: false }));
+        else setRight((prev) => ({ ...prev, loading: false }));
+      } finally {
+        scanFlagRef.current = false;
+      }
+    },
+    [onNotify]
+  );
+
+  // Restore exact scroll positions & active pane focus when returning from Browser to Commander
+  useEffect(() => {
+    if (!isActive) return;
+    const raf = requestAnimationFrame(() => {
+      if (leftListScrollRef.current) {
+        leftListScrollRef.current.scrollTop = leftSavedScrollTopRef.current;
+      }
+      if (rightListScrollRef.current) {
+        rightListScrollRef.current.scrollTop = rightSavedScrollTopRef.current;
+      }
+      // Refresh both panes silently so any changes made while in Browser are immediately reflected
+      if (left.currentPath) void fetchDirectory(left.currentPath, 'left', { silent: true, preserveState: true });
+      if (right.currentPath) void fetchDirectory(right.currentPath, 'right', { silent: true, preserveState: true });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [isActive, left.currentPath, right.currentPath, fetchDirectory]);
+
+  // Silent background auto-refresh for both Commander panes (every 2000ms + on window focus)
+  useEffect(() => {
+    const checkBothPanes = () => {
+      if (inlineEdit) return;
+      if (left.currentPath) {
+        void fetchDirectory(left.currentPath, 'left', { silent: true, preserveState: true });
+      }
+      if (right.currentPath) {
+        void fetchDirectory(right.currentPath, 'right', { silent: true, preserveState: true });
+      }
+    };
+
+    const id = window.setInterval(checkBothPanes, 2000);
+    window.addEventListener('focus', checkBothPanes);
+    return () => {
+      window.clearInterval(id);
+      window.removeEventListener('focus', checkBothPanes);
+    };
+  }, [left.currentPath, right.currentPath, inlineEdit, fetchDirectory]);
+
+  // Inline folder/file rename handlers (Windows Explorer style double-click / slow-click on name)
+  const startInlineRenameCommander = useCallback(
+    (paneKey: 'left' | 'right', item: NativeFileEntry) => {
+      inlineRenameCommittingRef.current = false;
+      setActivePane(paneKey);
+      setInlineEdit({
+        paneKey,
+        path: item.path,
+        originalName: item.name,
+        value: item.name,
+      });
+      requestAnimationFrame(() => {
+        const input = inlineRenameInputRef.current;
+        if (input) {
+          input.focus();
+          const dotIdx = !item.is_dir ? item.name.lastIndexOf('.') : -1;
+          if (dotIdx > 0) {
+            input.setSelectionRange(0, dotIdx);
+          } else {
+            input.select();
+          }
+        }
+      });
+    },
+    []
+  );
+
+  const cancelInlineRenameCommander = useCallback(() => {
+    inlineRenameCommittingRef.current = false;
+    setInlineEdit(null);
+  }, []);
+
+  const commitInlineRenameCommander = useCallback(async () => {
+    if (inlineRenameCommittingRef.current || !inlineEdit) return;
+    const { paneKey, path: oldPath, originalName, value } = inlineEdit;
+    const trimmed = value.trim();
+    if (!trimmed || trimmed === originalName) {
+      cancelInlineRenameCommander();
+      return;
     }
-  }, [onNotify]);
+
+    inlineRenameCommittingRef.current = true;
+    try {
+      const resPath = await renameFileNative(oldPath, trimmed);
+      const newPath = resPath || oldPath;
+      cancelInlineRenameCommander();
+      onNotify?.('Přejmenováno', `${originalName} → ${trimmed}`, 'success');
+
+      const panePath = paneKey === 'left' ? left.currentPath : right.currentPath;
+      const setter = paneKey === 'left' ? setLeft : setRight;
+      setter((prev) => ({
+        ...prev,
+        selectedPaths: new Set([newPath]),
+      }));
+      await fetchDirectory(panePath, paneKey, { preserveState: true });
+
+      if (left.currentPath.toLowerCase() === right.currentPath.toLowerCase()) {
+        const otherKey = paneKey === 'left' ? 'right' : 'left';
+        await fetchDirectory(panePath, otherKey, { preserveState: true, silent: true });
+      }
+      window.dispatchEvent(
+        new CustomEvent('aerobridge:tree-refresh', { detail: { path: panePath, silent: true } })
+      );
+    } catch (err) {
+      onNotify?.('Přejmenování selhalo', String(err), 'error');
+      cancelInlineRenameCommander();
+    }
+  }, [cancelInlineRenameCommander, fetchDirectory, inlineEdit, left.currentPath, onNotify, right.currentPath]);
 
   // Initial load and drive resolution (F:\ Working drive preference)
   useEffect(() => {
@@ -1550,7 +1805,7 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
         return;
       }
 
-      // Arrow Up / Down navigation
+      // Arrow Up / Down navigation (supports Shift+Arrow multi-selection from bottom-up or top-down)
       if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
         e.preventDefault();
         const isLeft = s.activePane === 'left';
@@ -1567,15 +1822,34 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
           nextIdx = Math.max(0, pane.focusedIndex - 1);
         }
 
+        const anchorRef = isLeft ? leftAnchorIdxRef : rightAnchorIdxRef;
         const setter = isLeft ? setLeft : setRight;
-        const itemIdx = hasParent ? nextIdx - 1 : nextIdx;
-        const targetItem = itemIdx >= 0 && itemIdx < list.length ? list[itemIdx] : null;
 
-        setter((prev) => ({
-          ...prev,
-          focusedIndex: nextIdx,
-          selectedPaths: targetItem ? new Set([targetItem.path]) : prev.selectedPaths,
-        }));
+        if (e.shiftKey) {
+          const anchorIdx = anchorRef.current ?? pane.focusedIndex;
+          anchorRef.current = anchorIdx;
+          const start = Math.min(anchorIdx, nextIdx);
+          const end = Math.max(anchorIdx, nextIdx);
+          const nextSel = new Set<string>();
+          for (let i = start; i <= end; i++) {
+            const targetItem = hasParent ? list[i - 1] : list[i];
+            if (targetItem) nextSel.add(targetItem.path);
+          }
+          setter((prev) => ({
+            ...prev,
+            focusedIndex: nextIdx,
+            selectedPaths: nextSel,
+          }));
+        } else {
+          anchorRef.current = nextIdx;
+          const itemIdx = hasParent ? nextIdx - 1 : nextIdx;
+          const targetItem = itemIdx >= 0 && itemIdx < list.length ? list[itemIdx] : null;
+          setter((prev) => ({
+            ...prev,
+            focusedIndex: nextIdx,
+            selectedPaths: targetItem ? new Set([targetItem.path]) : new Set(),
+          }));
+        }
         return;
       }
 
@@ -2222,6 +2496,15 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
 
         {/* Scrollable File List */}
         <div
+          ref={isLeft ? leftListScrollRef : rightListScrollRef}
+          onScroll={(e) => {
+            if (!isActiveRef.current) return;
+            if (isLeft) {
+              leftSavedScrollTopRef.current = e.currentTarget.scrollTop;
+            } else {
+              rightSavedScrollTopRef.current = e.currentTarget.scrollTop;
+            }
+          }}
           onClick={(e) => {
             setActivePane(paneKey);
             if (
@@ -2480,6 +2763,7 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
                   setContextMenuPos({ x: e.clientX, y: e.clientY });
                 }}
                 onClick={(e) => {
+                  if (inlineEdit?.paneKey === paneKey && inlineEdit?.path === it.path) return;
                   setActivePane(paneKey);
                   if (
                     document.activeElement instanceof HTMLElement &&
@@ -2487,8 +2771,10 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
                   ) {
                     document.activeElement.blur();
                   }
+                  const anchorRef = isLeft ? leftAnchorIdxRef : rightAnchorIdxRef;
                   const setter = isLeft ? setLeft : setRight;
                   if (e.ctrlKey || e.metaKey) {
+                    anchorRef.current = absoluteRowIdx;
                     setter((prev) => {
                       const next = new Set(prev.selectedPaths);
                       if (next.has(it.path)) next.delete(it.path);
@@ -2497,8 +2783,10 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
                     });
                   } else if (e.shiftKey) {
                     setter((prev) => {
-                      const start = Math.min(prev.focusedIndex, absoluteRowIdx);
-                      const end = Math.max(prev.focusedIndex, absoluteRowIdx);
+                      const anchorIdx = anchorRef.current ?? prev.focusedIndex;
+                      anchorRef.current = anchorIdx;
+                      const start = Math.min(anchorIdx, absoluteRowIdx);
+                      const end = Math.max(anchorIdx, absoluteRowIdx);
                       const next = new Set<string>();
                       for (let i = start; i <= end; i++) {
                         const targetItem = hasParent ? items[i - 1] : items[i];
@@ -2507,6 +2795,7 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
                       return { ...prev, selectedPaths: next, focusedIndex: absoluteRowIdx };
                     });
                   } else {
+                    anchorRef.current = absoluteRowIdx;
                     setter((prev) => ({
                       ...prev,
                       selectedPaths: new Set([it.path]),
@@ -2515,6 +2804,7 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
                   }
                 }}
                 onDoubleClick={(e) => {
+                  if (inlineEdit?.paneKey === paneKey && inlineEdit?.path === it.path) return;
                   if (it.is_dir && (e.ctrlKey || e.metaKey)) {
                     handleAddFolderTab(paneKey, it.path);
                   } else {
@@ -2532,28 +2822,86 @@ export const CommanderView: React.FC<CommanderViewProps> = ({
                     ? 'bg-white/[0.08] text-white ring-1 ring-white/10'
                     : 'hover:bg-white/[0.04] text-zinc-300'
                 }`}
-                title={it.path}
+                title={`${it.path} (Dvojklik na název pro přejmenování)`}
               >
                 {/* Column 1: Icon + Name */}
-                <div className="flex items-center gap-2 truncate pr-2 pointer-events-none">
-                  {it.is_dir ? (
-                    <Win11Folder className="w-4 h-4 shrink-0" />
-                  ) : (() => {
-                    const AppIconComp = getAppIcon(it.extension);
-                    if (AppIconComp) {
-                      return <AppIconComp size={15} className="shrink-0" />;
-                    }
-                    return (
-                      <span
-                        className={`text-[9px] font-mono px-1 py-0.2 rounded-xs font-bold shrink-0 ${badge.bg} ${badge.text}`}
-                      >
-                        {it.extension.toUpperCase().slice(0, 4) || 'FILE'}
-                      </span>
-                    );
-                  })()}
-                  <span className={`truncate ${it.is_dir ? 'font-medium text-white' : ''}`}>
-                    {it.name}
+                <div className="flex items-center gap-2 truncate pr-2 min-w-0">
+                  <span className="shrink-0 flex items-center pointer-events-none">
+                    {it.is_dir ? (
+                      <Win11Folder className="w-4 h-4 shrink-0" />
+                    ) : (() => {
+                      const AppIconComp = getAppIcon(it.extension);
+                      if (AppIconComp) {
+                        return <AppIconComp size={15} className="shrink-0" />;
+                      }
+                      return (
+                        <span
+                          className={`text-[9px] font-mono px-1 py-0.2 rounded-xs font-bold shrink-0 ${badge.bg} ${badge.text}`}
+                        >
+                          {it.extension.toUpperCase().slice(0, 4) || 'FILE'}
+                        </span>
+                      );
+                    })()}
                   </span>
+                  {inlineEdit?.paneKey === paneKey && inlineEdit?.path === it.path ? (
+                    <input
+                      ref={inlineRenameInputRef}
+                      type="text"
+                      value={inlineEdit.value}
+                      onChange={(e) =>
+                        setInlineEdit((prev) =>
+                          prev ? { ...prev, value: e.target.value } : null
+                        )
+                      }
+                      onClick={(e) => e.stopPropagation()}
+                      onDoubleClick={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => {
+                        e.stopPropagation();
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          void commitInlineRenameCommander();
+                        } else if (e.key === 'Escape') {
+                          e.preventDefault();
+                          cancelInlineRenameCommander();
+                        }
+                      }}
+                      onBlur={() => void commitInlineRenameCommander()}
+                      className="flex-1 min-w-0 bg-[#0d1117] text-white text-xs font-mono px-1.5 py-0.5 rounded border border-[#60cdff] outline-none font-normal shadow-inner select-text"
+                    />
+                  ) : (
+                    <span
+                      data-rename-label="true"
+                      onClick={(e) => {
+                        if (e.ctrlKey || e.metaKey || e.shiftKey) return;
+                        const now = Date.now();
+                        const prev = lastCommanderLabelClickRef.current;
+                        lastCommanderLabelClickRef.current = { path: it.path, time: now };
+                        if (
+                          isSelected &&
+                          pane.selectedPaths.size === 1 &&
+                          prev.path === it.path &&
+                          now - prev.time >= 450 &&
+                          now - prev.time <= 2200
+                        ) {
+                          e.stopPropagation();
+                          startInlineRenameCommander(paneKey, it);
+                        }
+                      }}
+                      onDoubleClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        startInlineRenameCommander(paneKey, it);
+                      }}
+                      className={`truncate px-1 -mx-1 rounded hover:bg-white/[0.08] cursor-text ${
+                        it.is_dir ? 'font-medium text-white' : ''
+                      }`}
+                      title="Dvojklik na název pro přejmenování (dvojklik na ikonu otevře složku/soubor)"
+                    >
+                      {it.name}
+                    </span>
+                  )}
                   {isDropTarget && (
                     <span className="text-[10px] bg-[#60cdff] text-[#111215] font-bold px-1.5 py-0.2 rounded shadow-xs shrink-0 ml-1">
                       ↳ Vložit do podsložky

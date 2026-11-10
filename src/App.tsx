@@ -346,6 +346,7 @@ export default function App() {
     handleCutFiles,
     handlePasteFiles,
     handleRenameRequest,
+    handleInlineRenameAsset,
     handleCreateFolderRequest,
     handleDeleteRequest,
     handleExecuteDelete,
@@ -369,15 +370,37 @@ export default function App() {
     addToast,
   });
 
-  // --- Handlers: Selection ---
+  // --- Handlers: Selection (Anchor + Focus separated & ref-backed to prevent stale closures) ---
+  const filteredAssetsRef = useRef<AssetItem[]>(filteredAssets);
+  filteredAssetsRef.current = filteredAssets;
+  const focusedIdRef = useRef<string | null>(focusedId);
+  focusedIdRef.current = focusedId;
+  const selectionAnchorRef = useRef<string | null>(focusedId);
+
+  // Reset selection anchor when navigating to a different folder
+  const prevSelectionFolderRef = useRef<string>(activeFolder);
+  useEffect(() => {
+    if (prevSelectionFolderRef.current !== activeFolder) {
+      prevSelectionFolderRef.current = activeFolder;
+      selectionAnchorRef.current = focusedId;
+    }
+  }, [activeFolder, focusedId]);
+
   const handleSelect = useCallback((id: string, e?: React.MouseEvent) => {
-    setFocusedId(id);
+    const list = filteredAssetsRef.current;
+
     if (!e) {
+      selectionAnchorRef.current = id;
+      focusedIdRef.current = id;
+      setFocusedId(id);
       setSelectedIds(new Set([id]));
       return;
     }
 
     if (e.metaKey || e.ctrlKey) {
+      selectionAnchorRef.current = id;
+      focusedIdRef.current = id;
+      setFocusedId(id);
       setSelectedIds((prev) => {
         const next = new Set(prev);
         if (next.has(id)) {
@@ -387,22 +410,41 @@ export default function App() {
         }
         return next;
       });
-    } else if (e.shiftKey && focusedId) {
-      // Range select
-      const lastIndex = filteredAssets.findIndex((a) => a.id === focusedId);
-      const currentIndex = filteredAssets.findIndex((a) => a.id === id);
-      if (lastIndex >= 0 && currentIndex >= 0) {
-        const start = Math.min(lastIndex, currentIndex);
-        const end = Math.max(lastIndex, currentIndex);
-        const rangeIds = filteredAssets.slice(start, end + 1).map((a) => a.id);
+    } else if (e.shiftKey) {
+      // Range select between selectionAnchor (e.g. bottom file) and clicked item (e.g. 3 files above it)
+      const anchorId = selectionAnchorRef.current || focusedIdRef.current || id;
+      selectionAnchorRef.current = anchorId;
+      focusedIdRef.current = id;
+      setFocusedId(id);
+
+      const anchorIndex = list.findIndex((a) => a.id === anchorId);
+      const currentIndex = list.findIndex((a) => a.id === id);
+      if (anchorIndex >= 0 && currentIndex >= 0) {
+        const start = Math.min(anchorIndex, currentIndex);
+        const end = Math.max(anchorIndex, currentIndex);
+        const rangeIds = list.slice(start, end + 1).map((a) => a.id);
         setSelectedIds(new Set(rangeIds));
       } else {
         setSelectedIds(new Set([id]));
       }
     } else {
+      selectionAnchorRef.current = id;
+      focusedIdRef.current = id;
+      setFocusedId(id);
       setSelectedIds(new Set([id]));
     }
-  }, [filteredAssets, focusedId]);
+  }, []);
+
+  const handleMarqueeSelect = useCallback((ids: Set<string>, lastHitId: string | null) => {
+    setSelectedIds(ids);
+    if (lastHitId) {
+      focusedIdRef.current = lastHitId;
+      setFocusedId(lastHitId);
+      if (!selectionAnchorRef.current) {
+        selectionAnchorRef.current = lastHitId;
+      }
+    }
+  }, []);
 
   // --- Copy Handlers ---
   const handleCopyPath = useCallback(async (asset: AssetItem) => {
@@ -995,6 +1037,7 @@ export default function App() {
     focusedId,
     selectedIds,
     selectedAssets,
+    selectionAnchorRef,
     nativeDir,
     clipboard,
     setClipboard,
@@ -1298,10 +1341,13 @@ export default function App() {
                 onCopyImage={handleCopyImage}
                 isDragOver={isDragOver}
                 showAllInfo={showAllInfo}
+                activeFolder={activeFolder}
                 onNavigateFolder={navigateNative}
                 onContextMenu={handleContextMenu}
                 onPageChange={handlePageChange}
                 onMoveAssets={handleMoveAssetsToFolder}
+                onRename={handleInlineRenameAsset}
+                onMarqueeSelect={handleMarqueeSelect}
               />
             ) : (
               <MetadataTableView
@@ -1331,6 +1377,7 @@ export default function App() {
                 onThumbnailSizeChange={setThumbnailSize}
                 fitMode={fitMode}
                 onMoveAssets={handleMoveAssetsToFolder}
+                onRename={handleInlineRenameAsset}
               />
             )
           )}
@@ -1493,7 +1540,10 @@ export default function App() {
         onCreateFolder={handleCreateFolderRequest}
         onRefresh={() => {
           if (nativeDir) {
-            void navigateNative(nativeDir);
+            handleNativeRefresh();
+            addToast('Aktualizováno');
+          } else {
+            window.dispatchEvent(new CustomEvent('aerobridge:tree-refresh', { detail: {} }));
             addToast('Aktualizováno');
           }
         }}

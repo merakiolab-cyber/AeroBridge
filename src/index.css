@@ -193,3 +193,20 @@ body.ab-dragging * {
   background-color: rgba(96, 205, 255, 0.18) !important;
   box-shadow: inset 0 0 0 1px rgba(96, 205, 255, 0.6) !important;
 }
+
+/* Terminal (xterm.js) layout, decorations & scrollbar enhancements */
+.xterm {
+  padding: 6px 8px;
+  height: 100%;
+  width: 100%;
+}
+
+.xterm-screen .xterm-decoration-container .xterm-decoration {
+  pointer-events: none !important;
+}
+
+/* Hide xterm's auto-fading internal scrollbar since TerminalSession renders an always-visible interactive scrollbar */
+.xterm .xterm-scrollable-element > .scrollbar.vertical {
+  display: none !important;
+}
+

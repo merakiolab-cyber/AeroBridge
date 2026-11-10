@@ -424,6 +424,22 @@ export const CommanderTerminal: React.FC<CommanderTerminalProps> = ({
               {activeTab?.cwd || currentPath}
             </span>
           </div>
+
+          {/* Color differentiation legend (User Input vs AI Response) */}
+          <div
+            className="hidden md:flex items-center gap-2 px-2 py-0.5 rounded bg-[#21262d]/80 border border-slate-700/50 text-[10px] font-sans select-none"
+            title="Barevné odlišení v terminálu: Vaše zadání a odpovědi (modře) vs. odpovědi AI (zeleně)"
+          >
+            <span className="flex items-center gap-1 text-sky-300 font-medium">
+              <span className="w-2 h-2 rounded-xs bg-sky-400 shadow-[0_0_4px_rgba(56,189,248,0.6)]" />
+              Vy (zadání)
+            </span>
+            <span className="text-slate-600">|</span>
+            <span className="flex items-center gap-1 text-emerald-300 font-medium">
+              <span className="w-2 h-2 rounded-xs bg-emerald-400 shadow-[0_0_4px_rgba(16,185,129,0.6)]" />
+              AI odpověď
+            </span>
+          </div>
         </div>
 
         {/* Right: Quick actions */}

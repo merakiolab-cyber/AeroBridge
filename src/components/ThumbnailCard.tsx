@@ -24,6 +24,7 @@ interface ThumbnailCardProps {
   /** Desktop: files to carry when this card is dragged (selection-aware); defaults to just this file. */
   getDragPayload?: (asset: AssetItem) => PointerDragPayload | null;
   onDropOnFolder?: (e: React.DragEvent, targetFolderPath: string) => void;
+  onRename?: (asset: AssetItem, newName: string) => void;
 }
 
 const ThumbnailCardComponent: React.FC<ThumbnailCardProps> = ({
@@ -42,6 +43,7 @@ const ThumbnailCardComponent: React.FC<ThumbnailCardProps> = ({
   onDragStart,
   getDragPayload,
   onDropOnFolder,
+  onRename,
 }) => {
   const fullFileName = React.useMemo(() => {
     if (asset.isFolder) return asset.name;
@@ -56,6 +58,51 @@ const ThumbnailCardComponent: React.FC<ThumbnailCardProps> = ({
   const [hasImgError, setHasImgError] = React.useState(false);
   const [fallbackIcon, setFallbackIcon] = React.useState<string | null>(null);
   const [isDragTarget, setIsDragTarget] = React.useState(false);
+  const [isEditingName, setIsEditingName] = React.useState(false);
+  const [editingValue, setEditingValue] = React.useState('');
+  const renameInputRef = React.useRef<HTMLInputElement | null>(null);
+  const committingRenameRef = React.useRef(false);
+  const lastNameClickTimeRef = React.useRef<number>(0);
+
+  const startInlineRename = React.useCallback(
+    (e?: React.MouseEvent) => {
+      if (!onRename) return;
+      e?.stopPropagation();
+      e?.preventDefault();
+      committingRenameRef.current = false;
+      setEditingValue(fullFileName);
+      setIsEditingName(true);
+      requestAnimationFrame(() => {
+        const input = renameInputRef.current;
+        if (input) {
+          input.focus();
+          const dotIdx = !asset.isFolder ? fullFileName.lastIndexOf('.') : -1;
+          if (dotIdx > 0) {
+            input.setSelectionRange(0, dotIdx);
+          } else {
+            input.select();
+          }
+        }
+      });
+    },
+    [asset.isFolder, fullFileName, onRename]
+  );
+
+  const cancelInlineRename = React.useCallback(() => {
+    committingRenameRef.current = false;
+    setIsEditingName(false);
+    setEditingValue('');
+  }, []);
+
+  const commitInlineRename = React.useCallback(() => {
+    if (committingRenameRef.current) return;
+    committingRenameRef.current = true;
+    const trimmed = editingValue.trim();
+    setIsEditingName(false);
+    if (trimmed && trimmed !== fullFileName && onRename) {
+      onRename(asset, trimmed);
+    }
+  }, [asset, editingValue, fullFileName, onRename]);
 
   React.useEffect(() => {
     setHasImgError(false);
@@ -127,22 +174,30 @@ const ThumbnailCardComponent: React.FC<ThumbnailCardProps> = ({
   return (
     <div
       // Desktop uses pointer-based dragging (see utils/pointerDrag.ts); HTML5 DnD stays for the web build
-      draggable={!isDesktopApp()}
+      draggable={!isDesktopApp() && !isEditingName}
+      data-asset-card-id={asset.id}
       data-drop-path={asset.isFolder ? asset.fullPath || undefined : undefined}
-      onPointerDown={(e) =>
+      onPointerDown={(e) => {
+        if (isEditingName) return;
         beginPointerDrag(e, () => {
           if (getDragPayload) return getDragPayload(asset);
           if (!asset.fullPath) return null;
           return { paths: [asset.fullPath], icon: asset.url?.startsWith('data:image/png;base64,') ? asset.url : undefined };
-        })
-      }
+        });
+      }}
       onDragStart={handleDrag}
       onDragEnd={handleDragEnd}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      onClick={onClick}
-      onDoubleClick={onDoubleClick}
+      onClick={(e) => {
+        if (isEditingName) return;
+        onClick(e);
+      }}
+      onDoubleClick={() => {
+        if (isEditingName) return;
+        onDoubleClick();
+      }}
       onContextMenu={onContextMenu}
       className={`group relative flex flex-col rounded-xl transition-all duration-150 ease-out hover:-translate-y-0.5 active:scale-[0.99] cursor-pointer select-none text-left overflow-hidden will-change-transform ${
         isDragTarget
@@ -186,10 +241,29 @@ const ThumbnailCardComponent: React.FC<ThumbnailCardProps> = ({
         )}
 
         {asset.isFolder ? (
-          <div className="w-full h-full flex flex-col items-center justify-center bg-[#131419] group-hover:bg-[#191a21] transition-colors relative">
-            <div className="w-16 h-16 rounded-xl bg-white/[0.04] flex items-center justify-center mb-1 group-hover:scale-105 transition-all shadow-sm">
+          <div className="w-full h-full flex flex-col items-center justify-center bg-[#131419] group-hover:bg-[#191a21] transition-colors relative px-3">
+            <div className="w-16 h-16 rounded-xl bg-white/[0.04] flex items-center justify-center mb-1.5 group-hover:scale-105 transition-all shadow-sm">
               <Win11Folder className="w-11 h-11 drop-shadow-md" />
             </div>
+            {!showAllInfo && !isEditingName && (
+              <span
+                data-rename-label="true"
+                onClick={(e) => {
+                  if (!onRename || e.ctrlKey || e.metaKey || e.shiftKey) return;
+                  const now = Date.now();
+                  const prev = lastNameClickTimeRef.current;
+                  lastNameClickTimeRef.current = now;
+                  if (isSelected && now - prev >= 450 && now - prev <= 2200) {
+                    startInlineRename(e);
+                  }
+                }}
+                onDoubleClick={(e) => startInlineRename(e)}
+                className="text-xs font-medium text-zinc-200 truncate max-w-full px-1.5 py-0.5 rounded hover:bg-white/[0.08] hover:text-white cursor-text"
+                title={`${asset.name} (Dvojklik na název složky pro přejmenování)`}
+              >
+                {asset.name}
+              </span>
+            )}
           </div>
         ) : (asset.isIcon || hasImgError || !asset.url) ? (
           <div className="w-full h-full flex items-center justify-center bg-[#131419] group-hover:bg-[#191a21] transition-colors p-4">
@@ -339,15 +413,53 @@ const ThumbnailCardComponent: React.FC<ThumbnailCardProps> = ({
         className={`p-3 px-3.5 flex flex-col justify-between gap-1 transition-all duration-200 select-none ${
           showAllInfo
             ? 'relative bg-[#14151b] opacity-100 min-h-[72px] rounded-b-xl'
+            : isEditingName
+            ? 'absolute inset-x-0 bottom-0 bg-[#14151b]/95 backdrop-blur-md opacity-100 translate-y-0 z-30 shadow-2xl rounded-b-xl'
             : 'absolute inset-x-0 bottom-0 bg-[#14151b]/95 backdrop-blur-md opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 z-30 shadow-2xl rounded-b-xl'
         }`}
       >
-        <div
-          className="text-xs font-medium text-white/95 line-clamp-2 break-all tracking-tight leading-snug group-hover:text-white"
-          title={fullFileName}
-        >
-          {fullFileName}
-        </div>
+        {isEditingName ? (
+          <input
+            ref={renameInputRef}
+            type="text"
+            value={editingValue}
+            onChange={(e) => setEditingValue(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            onDoubleClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+            onKeyDown={(e) => {
+              e.stopPropagation();
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                commitInlineRename();
+              } else if (e.key === 'Escape') {
+                e.preventDefault();
+                cancelInlineRename();
+              }
+            }}
+            onBlur={commitInlineRename}
+            className="w-full bg-[#0d1117] text-white text-xs font-medium px-2 py-1 rounded border border-[#60cdff] outline-none shadow-inner select-text"
+          />
+        ) : (
+          <div
+            data-rename-label="true"
+            onClick={(e) => {
+              if (!onRename || e.ctrlKey || e.metaKey || e.shiftKey) return;
+              const now = Date.now();
+              const prev = lastNameClickTimeRef.current;
+              lastNameClickTimeRef.current = now;
+              if (isSelected && now - prev >= 450 && now - prev <= 2200) {
+                startInlineRename(e);
+              }
+            }}
+            onDoubleClick={(e) => startInlineRename(e)}
+            className="text-xs font-medium text-white/95 line-clamp-2 break-all tracking-tight leading-snug group-hover:text-white cursor-text rounded px-0.5 -mx-0.5 hover:bg-white/[0.06]"
+            title={`${fullFileName} (Dvojklik na název pro přejmenování)`}
+          >
+            {fullFileName}
+          </div>
+        )}
         <div className="flex items-center justify-between text-[11px] text-zinc-400 font-mono tabular-nums pt-0.5">
           <span>{asset.isFolder ? (asset.size > 0 ? formatBytes(asset.size) : 'Složka') : formatBytes(asset.size)}</span>
           <div className="flex items-center gap-1.5">
@@ -387,6 +499,8 @@ export const ThumbnailCard = React.memo(
       prev.thumbnailSize === next.thumbnailSize &&
       prev.fitMode === next.fitMode &&
       prev.showAllInfo === next.showAllInfo &&
+      prev.onClick === next.onClick &&
+      prev.onRename === next.onRename &&
       prev.asset.id === next.asset.id &&
       prev.asset.url === next.asset.url &&
       prev.asset.name === next.asset.name &&

@@ -13,6 +13,7 @@ export interface UseKeyboardShortcutsProps {
   focusedId: string | null;
   selectedIds: Set<string>;
   selectedAssets: AssetItem[];
+  selectionAnchorRef?: React.MutableRefObject<string | null>;
   nativeDir: string | null;
   clipboard: { paths: string[]; op: 'copy' | 'cut' } | null;
   setClipboard?: (clipboard: { paths: string[]; op: 'copy' | 'cut' } | null) => void;
@@ -425,22 +426,67 @@ export function useKeyboardShortcuts(props: UseKeyboardShortcutsProps) {
         return;
       }
 
-      // Navigation: Arrow keys
+      // Navigation: Arrow keys (supports Shift+Arrow multi-selection from bottom-up or top-down)
       if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+        if (p.filteredAssets.length === 0) return;
         e.preventDefault();
         e.stopPropagation();
-        const currentIndex = p.filteredAssets.findIndex((a) => a.id === p.focusedId);
+
+        const currentIndex = Math.max(
+          0,
+          p.filteredAssets.findIndex((a) => a.id === p.focusedId)
+        );
+        let cols = 1;
+        if (p.browserViewMode !== 'table') {
+          const gridEl = document.querySelector('[data-grid-columns]');
+          const parsedCols = gridEl ? parseInt(gridEl.getAttribute('data-grid-columns') || '4', 10) : 4;
+          cols = Number.isFinite(parsedCols) && parsedCols > 0 ? parsedCols : 4;
+        }
+
         let nextIndex = currentIndex;
+        if (e.key === 'ArrowLeft' && currentIndex > 0) {
+          nextIndex = currentIndex - 1;
+        } else if (e.key === 'ArrowRight' && currentIndex < p.filteredAssets.length - 1) {
+          nextIndex = currentIndex + 1;
+        } else if (e.key === 'ArrowUp') {
+          if (p.browserViewMode === 'table') {
+            nextIndex = Math.max(0, currentIndex - 1);
+          } else if (currentIndex - cols >= 0) {
+            nextIndex = currentIndex - cols;
+          }
+        } else if (e.key === 'ArrowDown') {
+          if (p.browserViewMode === 'table') {
+            nextIndex = Math.min(p.filteredAssets.length - 1, currentIndex + 1);
+          } else if (currentIndex + cols < p.filteredAssets.length) {
+            nextIndex = currentIndex + cols;
+          } else {
+            nextIndex = p.filteredAssets.length - 1;
+          }
+        }
 
-        if (e.key === 'ArrowLeft' && currentIndex > 0) nextIndex = currentIndex - 1;
-        if (e.key === 'ArrowRight' && currentIndex < p.filteredAssets.length - 1) nextIndex = currentIndex + 1;
-        if (e.key === 'ArrowUp' && currentIndex > 3) nextIndex = currentIndex - 4;
-        if (e.key === 'ArrowDown' && currentIndex < p.filteredAssets.length - 4) nextIndex = currentIndex + 4;
-
-        if (nextIndex >= 0 && nextIndex < p.filteredAssets.length && nextIndex !== currentIndex) {
+        if (nextIndex >= 0 && nextIndex < p.filteredAssets.length) {
           const nextAsset = p.filteredAssets[nextIndex];
-          p.setFocusedId(nextAsset.id);
-          p.setSelectedIds(new Set([nextAsset.id]));
+          if (e.shiftKey) {
+            const anchorId = p.selectionAnchorRef?.current || p.focusedId || p.filteredAssets[currentIndex]?.id;
+            if (p.selectionAnchorRef && !p.selectionAnchorRef.current && anchorId) {
+              p.selectionAnchorRef.current = anchorId;
+            }
+            const anchorIdx = anchorId
+              ? p.filteredAssets.findIndex((a) => a.id === anchorId)
+              : currentIndex;
+            const validAnchorIdx = anchorIdx >= 0 ? anchorIdx : currentIndex;
+            const start = Math.min(validAnchorIdx, nextIndex);
+            const end = Math.max(validAnchorIdx, nextIndex);
+            const rangeIds = p.filteredAssets.slice(start, end + 1).map((a) => a.id);
+            p.setFocusedId(nextAsset.id);
+            p.setSelectedIds(new Set(rangeIds));
+          } else if (nextIndex !== currentIndex || p.selectedIds.size !== 1) {
+            if (p.selectionAnchorRef) {
+              p.selectionAnchorRef.current = nextAsset.id;
+            }
+            p.setFocusedId(nextAsset.id);
+            p.setSelectedIds(new Set([nextAsset.id]));
+          }
         }
         return;
       }

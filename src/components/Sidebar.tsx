@@ -120,7 +120,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <aside
       style={{ width: `${width}px` }}
-      className="bg-[#16171a] border-r border-white/[0.06] flex flex-col h-full shrink-0 select-none overflow-y-auto"
+      className="bg-[#16171a] border-r border-white/[0.06] flex flex-col h-full shrink-0 select-none overflow-hidden"
     >
       {/* 0. NATIVE FILE EXPLORER (desktop only): places + drives */}
       {onNavigateNative ? (

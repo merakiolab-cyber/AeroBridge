@@ -26,6 +26,8 @@ interface AssetGridProps {
   onContextMenu?: (e: React.MouseEvent, asset?: AssetItem) => void;
   onPageChange?: (assetId: string, pageNum: number) => void;
   onMoveAssets?: (idsOrPaths: string[], targetFolder: string, isCopy?: boolean) => void;
+  onRename?: (asset: AssetItem, newName: string) => void;
+  onMarqueeSelect?: (ids: Set<string>, lastFocusedId: string | null) => void;
 }
 
 export const AssetGrid: React.FC<AssetGridProps> = ({
@@ -47,13 +49,23 @@ export const AssetGrid: React.FC<AssetGridProps> = ({
   onContextMenu,
   onPageChange,
   onMoveAssets,
+  onRename,
+  onMarqueeSelect,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
+  const prevFolderRef = useRef<string | undefined>(activeFolder);
+  const prevFocusedIdRef = useRef<string | null>(focusedId);
 
   // Viewport dimensions for virtualized grid calculation
   const [dimensions, setDimensions] = useState({ width: 1200, height: 800 });
   const [scrollTop, setScrollTop] = useState(0);
+  const [marqueeRect, setMarqueeRect] = useState<{
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  } | null>(null);
 
   // Measure viewport size
   useEffect(() => {
@@ -73,11 +85,14 @@ export const AssetGrid: React.FC<AssetGridProps> = ({
     return () => ro.disconnect();
   }, []);
 
-  // Reset scroll position on folder change
+  // Reset scroll position ONLY when navigating to a genuinely different folder (never on refresh)
   useEffect(() => {
-    if (viewportRef.current) {
-      viewportRef.current.scrollTop = 0;
-      setScrollTop(0);
+    if (prevFolderRef.current !== activeFolder) {
+      prevFolderRef.current = activeFolder;
+      if (viewportRef.current) {
+        viewportRef.current.scrollTop = 0;
+        setScrollTop(0);
+      }
     }
   }, [activeFolder]);
 
@@ -149,10 +164,18 @@ export const AssetGrid: React.FC<AssetGridProps> = ({
     };
   }, [assets, scrollTop, rowHeight, totalRows, dimensions.height, columns]);
 
-  // Auto-scroll viewport into view when focusedId changes (e.g. keyboard arrow navigation)
+  // Auto-scroll viewport into view ONLY when focusedId itself changes (e.g. keyboard arrow navigation),
+  // NEVER when assets array updates during thumbnail hydration or folder refresh!
+  const assetsRef = useRef(assets);
+  assetsRef.current = assets;
+  const selectedIdsRef = useRef(selectedIds);
+  selectedIdsRef.current = selectedIds;
+
   useEffect(() => {
+    if (prevFocusedIdRef.current === focusedId) return;
+    prevFocusedIdRef.current = focusedId;
     if (!focusedId || !viewportRef.current) return;
-    const index = assets.findIndex((a) => a.id === focusedId);
+    const index = assetsRef.current.findIndex((a) => a.id === focusedId);
     if (index === -1) return;
 
     const itemRow = Math.floor(index / columns);
@@ -166,7 +189,95 @@ export const AssetGrid: React.FC<AssetGridProps> = ({
     } else if (itemBottom > currentScrollTop + viewHeight - 24) {
       viewportRef.current.scrollTop = itemBottom - viewHeight + 24;
     }
-  }, [focusedId, assets, columns, rowHeight, dimensions.height]);
+  }, [focusedId, columns, rowHeight, dimensions.height]);
+
+  // Windows 11 Rubber-Band (Marquee) Drag Selection on empty grid space (supports dragging bottom-to-top or top-to-bottom)
+  const handleViewportMouseDown = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (e.button !== 0 || !onMarqueeSelect || !viewportRef.current) return;
+      const target = e.target as HTMLElement | null;
+      if (
+        !target ||
+        target.closest('[data-asset-card-id]') ||
+        target.closest('button') ||
+        target.closest('input')
+      ) {
+        return;
+      }
+
+      const viewport = viewportRef.current;
+      const rect = viewport.getBoundingClientRect();
+      const startX = e.clientX - rect.left;
+      const startY = e.clientY - rect.top + viewport.scrollTop;
+      const additive = e.ctrlKey || e.metaKey || e.shiftKey;
+      const baseSelection = additive ? new Set(selectedIdsRef.current) : new Set<string>();
+      let hasDragged = false;
+
+      const onMouseMove = (moveEv: MouseEvent) => {
+        const curRect = viewport.getBoundingClientRect();
+        const curX = moveEv.clientX - curRect.left;
+        const curY = moveEv.clientY - curRect.top + viewport.scrollTop;
+
+        if (!hasDragged && Math.hypot(curX - startX, curY - startY) < 5) {
+          return;
+        }
+        hasDragged = true;
+
+        const minX = Math.min(startX, curX);
+        const maxX = Math.max(startX, curX);
+        const minY = Math.min(startY, curY);
+        const maxY = Math.max(startY, curY);
+
+        setMarqueeRect({
+          left: minX,
+          top: minY,
+          width: maxX - minX,
+          height: maxY - minY,
+        });
+
+        const nextSelected = new Set<string>(baseSelection);
+        let lastHitId: string | null = null;
+        const currentAssets = assetsRef.current;
+        const padLeft = 24;
+        const padTop = 24;
+
+        for (let i = 0; i < currentAssets.length; i++) {
+          const r = Math.floor(i / columns);
+          const c = i % columns;
+          const cellLeft = padLeft + c * (itemWidth + GAP);
+          const cellRight = cellLeft + itemWidth;
+          const cellTop = padTop + r * rowHeight;
+          const cellBottom = cellTop + itemHeight;
+
+          const intersects =
+            cellRight >= minX &&
+            cellLeft <= maxX &&
+            cellBottom >= minY &&
+            cellTop <= maxY;
+
+          if (intersects) {
+            nextSelected.add(currentAssets[i].id);
+            lastHitId = currentAssets[i].id;
+          }
+        }
+
+        onMarqueeSelect(nextSelected, lastHitId);
+      };
+
+      const onMouseUp = () => {
+        window.removeEventListener('mousemove', onMouseMove);
+        window.removeEventListener('mouseup', onMouseUp);
+        setMarqueeRect(null);
+        if (!hasDragged && !additive) {
+          onMarqueeSelect(new Set(), null);
+        }
+      };
+
+      window.addEventListener('mousemove', onMouseMove);
+      window.addEventListener('mouseup', onMouseUp);
+    },
+    [columns, itemHeight, itemWidth, onMarqueeSelect, rowHeight]
+  );
 
   /** Files carried by a pointer drag of `asset`: the whole selection when the dragged card is part of it. */
   const getDragPayload = useCallback(
@@ -229,6 +340,7 @@ export const AssetGrid: React.FC<AssetGridProps> = ({
   return (
     <div
       ref={containerRef}
+      data-grid-columns={columns}
       className="flex-1 flex flex-col h-full bg-[#121316] relative overflow-hidden select-none outline-hidden"
       tabIndex={0}
     >
@@ -236,13 +348,27 @@ export const AssetGrid: React.FC<AssetGridProps> = ({
       <div
         ref={viewportRef}
         onScroll={handleScroll}
+        onMouseDown={handleViewportMouseDown}
         onContextMenu={(e) => {
           // If clicked directly on the viewport, the spacer canvas or empty area
           e.preventDefault();
           onContextMenu?.(e, undefined);
         }}
-        className="flex-1 overflow-y-auto p-6"
+        className="flex-1 overflow-y-auto p-6 relative"
       >
+        {/* Windows 11 Rubber-Band Marquee Selection Box */}
+        {marqueeRect && (
+          <div
+            className="absolute bg-[#60cdff]/15 border border-[#60cdff]/80 rounded-xs pointer-events-none z-40"
+            style={{
+              left: `${marqueeRect.left}px`,
+              top: `${marqueeRect.top}px`,
+              width: `${marqueeRect.width}px`,
+              height: `${marqueeRect.height}px`,
+            }}
+          />
+        )}
+
         {/* Drop zone overlay in Material surface style */}
         {isDragOver && (
           <div className="absolute inset-0 z-40 bg-sky-500/10 m-4 rounded-3xl flex items-center justify-center backdrop-blur-sm pointer-events-none transition-all">
@@ -298,6 +424,7 @@ export const AssetGrid: React.FC<AssetGridProps> = ({
                 onCopyImage={() => onCopyImage(asset)}
                 onPageChange={onPageChange}
                 onDropOnFolder={handleDropOnFolder}
+                onRename={onRename}
               />
             ))}
           </div>

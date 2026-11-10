@@ -1,9 +1,10 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { ChevronRight, X } from 'lucide-react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { ChevronRight, X, RefreshCw } from 'lucide-react';
 import {
   listNativeDrives,
   listNativePlaces,
   listNativeSubdirs,
+  renameFileNative,
   type NativePlace,
 } from '../utils/tauriBridge';
 import { resolveDropItems } from '../utils/dragSession';
@@ -144,34 +145,144 @@ export const NativeExplorerTree: React.FC<NativeExplorerTreeProps> = ({
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
   const [selectedOriginals, setSelectedOriginals] = useState<Map<string, string>>(new Map());
   const [lastAnchor, setLastAnchor] = useState<string | null>(null);
+  const [isRefreshingTree, setIsRefreshingTree] = useState(false);
+
+  // Inline folder rename state (Windows Explorer style double-click / slow-click on folder name)
+  const [editingNodePath, setEditingNodePath] = useState<string | null>(null);
+  const [editingOriginalName, setEditingOriginalName] = useState<string>('');
+  const [editingNameValue, setEditingNameValue] = useState<string>('');
+  const renameInputRef = useRef<HTMLInputElement | null>(null);
+  const renameCommittingRef = useRef(false);
+  const lastLabelClickRef = useRef<{ key: string; time: number }>({ key: '', time: 0 });
+
+  // Scroll container & state refs to prevent scroll-jump-to-top on refresh or focus
+  const treeScrollRef = useRef<HTMLDivElement | null>(null);
+  const savedScrollTopRef = useRef<number>(0);
+  const prevActiveKeyRef = useRef<string>('');
+  const expandedRef = useRef<Set<string>>(expanded);
+  expandedRef.current = expanded;
+  const childrenRef = useRef<Record<string, NativePlace[]>>(children);
+  childrenRef.current = children;
+  const originalsRef = useRef<Map<string, string>>(new Map());
+
+  const loadDrivesAndPlaces = useCallback(async () => {
+    const [drv, allPlaces] = await Promise.all([listNativeDrives(), listNativePlaces()]);
+    setDrives(drv);
+    const filteredPlaces = allPlaces.filter((p) => {
+      const lower = p.name.toLowerCase();
+      const isDoc = lower.includes('dokumenty') || lower.includes('documents');
+      const isMusic = lower.includes('hudba') || lower.includes('music');
+      const isVideo = lower.includes('videa') || lower.includes('video') || lower.includes('videos');
+      return !isDoc && !isMusic && !isVideo;
+    });
+    setPlaces(filteredPlaces);
+    for (const d of drv) originalsRef.current.set(norm(d.path), d.path);
+    for (const p of filteredPlaces) originalsRef.current.set(norm(p.path), p.path);
+  }, []);
 
   useEffect(() => {
-    listNativeDrives().then(setDrives);
-    listNativePlaces().then((allPlaces) => {
-      setPlaces(
-        allPlaces.filter((p) => {
-          const lower = p.name.toLowerCase();
-          const isDoc = lower.includes('dokumenty') || lower.includes('documents');
-          const isMusic = lower.includes('hudba') || lower.includes('music');
-          const isVideo = lower.includes('videa') || lower.includes('video') || lower.includes('videos');
-          return !isDoc && !isMusic && !isVideo;
-        })
-      );
+    void loadDrivesAndPlaces();
+  }, [loadDrivesAndPlaces]);
+
+  const loadChildren = useCallback(async (path: string, onlyIfChanged = false) => {
+    const key = norm(path);
+    originalsRef.current.set(key, path);
+    const subs = await listNativeSubdirs(path);
+    for (const s of subs) {
+      originalsRef.current.set(norm(s.path), s.path);
+    }
+    const mapped = subs.map((s) => ({ name: s.name, path: s.path }));
+    setChildren((prev) => {
+      if (onlyIfChanged && prev[key]) {
+        const prevSig = prev[key].map((x) => `${x.name}|${x.path}`).join('\n');
+        const nextSig = mapped.map((x) => `${x.name}|${x.path}`).join('\n');
+        if (prevSig === nextSig) return prev;
+      }
+      return {
+        ...prev,
+        [key]: mapped,
+      };
     });
   }, []);
 
-  const loadChildren = useCallback(async (path: string) => {
-    const key = norm(path);
-    const subs = await listNativeSubdirs(path);
-    setChildren((prev) => ({
-      ...prev,
-      [key]: subs.map((s) => ({ name: s.name, path: s.path })),
-    }));
-  }, []);
+  // Refresh entire tree in-place while preserving scroll position & active folder view
+  const refreshTreeInPlace = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      const preservedScroll = treeScrollRef.current?.scrollTop ?? savedScrollTopRef.current;
+      if (!opts?.silent) setIsRefreshingTree(true);
+      try {
+        await loadDrivesAndPlaces();
+        const expandedKeys = Array.from(expandedRef.current);
+        if (activePath) {
+          for (const anc of pathAncestors(activePath)) {
+            const k = norm(anc);
+            originalsRef.current.set(k, anc);
+            if (!expandedKeys.includes(k)) expandedKeys.push(k);
+          }
+        }
+        await Promise.all(
+          expandedKeys.map(async (k) => {
+            const rawPath = originalsRef.current.get(k) || k;
+            await loadChildren(rawPath, !!opts?.silent);
+          })
+        );
+      } finally {
+        if (!opts?.silent) setIsRefreshingTree(false);
+        requestAnimationFrame(() => {
+          if (treeScrollRef.current) {
+            treeScrollRef.current.scrollTop = preservedScroll;
+            savedScrollTopRef.current = preservedScroll;
+          }
+          if (!opts?.silent && activePath && treeScrollRef.current) {
+            const activeKey = norm(activePath);
+            const activeEl = treeScrollRef.current.querySelector(
+              `[data-tree-node-key="${CSS.escape(activeKey)}"]`
+            ) as HTMLElement | null;
+            if (activeEl) {
+              const containerRect = treeScrollRef.current.getBoundingClientRect();
+              const elRect = activeEl.getBoundingClientRect();
+              if (elRect.top < containerRect.top || elRect.bottom > containerRect.bottom) {
+                activeEl.scrollIntoView({ block: 'nearest' });
+                savedScrollTopRef.current = treeScrollRef.current.scrollTop;
+              }
+            }
+          }
+        });
+      }
+    },
+    [activePath, loadChildren, loadDrivesAndPlaces]
+  );
+
+  // Listen to global tree refresh event (triggered by Browser refresh button or F5)
+  useEffect(() => {
+    const onTreeRefresh = (ev: Event) => {
+      const detail = (ev as CustomEvent<{ path?: string; silent?: boolean }>).detail;
+      void refreshTreeInPlace({ silent: detail?.silent });
+    };
+    window.addEventListener('aerobridge:tree-refresh', onTreeRefresh);
+    return () => window.removeEventListener('aerobridge:tree-refresh', onTreeRefresh);
+  }, [refreshTreeInPlace]);
+
+  // Silent background auto-refresh for expanded folders (detects newly created/renamed/deleted subfolders)
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      if (editingNodePath) return;
+      void refreshTreeInPlace({ silent: true });
+    }, 2500);
+    const onFocus = () => {
+      if (!editingNodePath) void refreshTreeInPlace({ silent: true });
+    };
+    window.addEventListener('focus', onFocus);
+    return () => {
+      window.clearInterval(id);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [editingNodePath, refreshTreeInPlace]);
 
   const toggle = useCallback(
     (path: string) => {
       const key = norm(path);
+      originalsRef.current.set(key, path);
       setExpanded((prev) => {
         const next = new Set(prev);
         if (next.has(key)) {
@@ -193,6 +304,114 @@ export const NativeExplorerTree: React.FC<NativeExplorerTreeProps> = ({
   const collapseAll = useCallback(() => {
     setExpanded(new Set());
   }, []);
+
+  // Inline Folder Rename helpers
+  const canRenameFolder = useCallback((path: string): boolean => {
+    if (!path) return false;
+    // Drive roots like C:\ or F:\ cannot be renamed as folders
+    if (/^[a-zA-Z]:\\?$/.test(path.trim())) return false;
+    return true;
+  }, []);
+
+  const startInlineRename = useCallback(
+    (node: NativePlace) => {
+      if (!canRenameFolder(node.path)) return;
+      renameCommittingRef.current = false;
+      setEditingNodePath(node.path);
+      setEditingOriginalName(node.name);
+      setEditingNameValue(node.name);
+      requestAnimationFrame(() => {
+        if (renameInputRef.current) {
+          renameInputRef.current.focus();
+          renameInputRef.current.select();
+        }
+      });
+    },
+    [canRenameFolder]
+  );
+
+  const cancelInlineRename = useCallback(() => {
+    renameCommittingRef.current = false;
+    setEditingNodePath(null);
+    setEditingOriginalName('');
+    setEditingNameValue('');
+  }, []);
+
+  const commitInlineRename = useCallback(async () => {
+    if (renameCommittingRef.current || !editingNodePath) return;
+    const oldPath = editingNodePath;
+    const trimmed = editingNameValue.trim();
+    if (!trimmed || trimmed === editingOriginalName) {
+      cancelInlineRename();
+      return;
+    }
+
+    renameCommittingRef.current = true;
+    try {
+      const resPath = await renameFileNative(oldPath, trimmed);
+      const newPath = resPath || oldPath;
+      const oldKey = norm(oldPath);
+      const newKey = norm(newPath);
+      originalsRef.current.set(newKey, newPath);
+
+      // Update children in-place so the renamed folder updates immediately without flicker
+      setChildren((prev) => {
+        const next: Record<string, NativePlace[]> = {};
+        for (const [k, list] of Object.entries(prev)) {
+          const updatedKey =
+            k === oldKey
+              ? newKey
+              : k.startsWith(oldKey + '\\')
+              ? newKey + k.slice(oldKey.length)
+              : k;
+          next[updatedKey] = list.map((item) => {
+            const itemKey = norm(item.path);
+            if (itemKey === oldKey) {
+              return { name: trimmed, path: newPath };
+            }
+            if (itemKey.startsWith(oldKey + '\\')) {
+              return {
+                ...item,
+                path: newPath + item.path.slice(oldPath.length),
+              };
+            }
+            return item;
+          });
+        }
+        return next;
+      });
+
+      setExpanded((prev) => {
+        const next = new Set<string>();
+        for (const k of prev) {
+          if (k === oldKey) next.add(newKey);
+          else if (k.startsWith(oldKey + '\\')) next.add(newKey + k.slice(oldKey.length));
+          else next.add(k);
+        }
+        return next;
+      });
+
+      cancelInlineRename();
+
+      // If the active folder was the renamed folder (or inside it), navigate to its new path
+      if (activePath) {
+        const activeKey = norm(activePath);
+        if (activeKey === oldKey) {
+          onNavigate(newPath);
+        } else if (activeKey.startsWith(oldKey + '\\')) {
+          onNavigate(newPath + activePath.slice(oldPath.length));
+        } else {
+          // Active folder might be the parent of the renamed folder: trigger refresh
+          window.dispatchEvent(
+            new CustomEvent('aerobridge:tree-refresh', { detail: { path: activePath, silent: true } })
+          );
+        }
+      }
+    } catch (err) {
+      console.warn('[NativeExplorerTree rename error]:', err);
+      cancelInlineRename();
+    }
+  }, [activePath, cancelInlineRename, editingNameValue, editingNodePath, editingOriginalName, onNavigate]);
 
   // Compute ordered list of all currently visible nodes in the tree
   const getVisibleNodes = useCallback((): NativePlace[] => {
@@ -244,10 +463,17 @@ export const NativeExplorerTree: React.FC<NativeExplorerTreeProps> = ({
   useEffect(() => {
     if (!activePath) return;
     const key = norm(activePath);
+    const isActualFolderChange = prevActiveKeyRef.current !== key;
+    prevActiveKeyRef.current = key;
+
     const ancestors = pathAncestors(activePath);
     setExpanded((prev) => {
       const next = new Set(prev);
-      ancestors.forEach((a) => next.add(norm(a)));
+      ancestors.forEach((a) => {
+        const k = norm(a);
+        originalsRef.current.set(k, a);
+        next.add(k);
+      });
       return next;
     });
     ancestors.forEach((a) => {
@@ -265,6 +491,24 @@ export const NativeExplorerTree: React.FC<NativeExplorerTreeProps> = ({
       return next;
     });
     setLastAnchor((prev) => prev || key);
+
+    // Ensure active folder is visible when navigating to a new folder, without resetting scroll on refresh
+    if (isActualFolderChange) {
+      requestAnimationFrame(() => {
+        if (!treeScrollRef.current) return;
+        const activeEl = treeScrollRef.current.querySelector(
+          `[data-tree-node-key="${CSS.escape(key)}"]`
+        ) as HTMLElement | null;
+        if (activeEl) {
+          const containerRect = treeScrollRef.current.getBoundingClientRect();
+          const elRect = activeEl.getBoundingClientRect();
+          if (elRect.top < containerRect.top || elRect.bottom > containerRect.bottom) {
+            activeEl.scrollIntoView({ block: 'nearest' });
+            savedScrollTopRef.current = treeScrollRef.current.scrollTop;
+          }
+        }
+      });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activePath]);
 
@@ -272,6 +516,7 @@ export const NativeExplorerTree: React.FC<NativeExplorerTreeProps> = ({
   const handleNodeClick = useCallback(
     (e: React.MouseEvent, node: NativePlace) => {
       const key = norm(node.path);
+      originalsRef.current.set(key, node.path);
 
       if (e.ctrlKey || e.metaKey) {
         // CTRL + CLICK: Toggle node selection
@@ -319,17 +564,47 @@ export const NativeExplorerTree: React.FC<NativeExplorerTreeProps> = ({
         }
         onNavigate(node.path);
       } else {
-        // NORMAL CLICK: Select single node, set anchor, navigate, expand if closed
+        // NORMAL CLICK: Select single node, set anchor, navigate (only if not already active on double-click), expand if closed
         setSelectedPaths(new Set([key]));
         setSelectedOriginals(new Map([[key, node.path]]));
         setLastAnchor(key);
-        onNavigate(node.path);
+        if (!activePath || norm(activePath) !== key) {
+          onNavigate(node.path);
+        }
         if (!expanded.has(key)) {
           toggle(node.path);
         }
       }
     },
-    [expanded, getVisibleNodes, lastAnchor, onNavigate, toggle]
+    [activePath, expanded, getVisibleNodes, lastAnchor, onNavigate, toggle]
+  );
+
+  // Handle click/double-click specifically on the folder name text (Windows Explorer style rename)
+  const handleFolderNameClick = useCallback(
+    (e: React.MouseEvent, node: NativePlace, isAlreadyActive: boolean) => {
+      if (e.ctrlKey || e.metaKey || e.shiftKey) return;
+      const key = norm(node.path);
+      const now = Date.now();
+      const prev = lastLabelClickRef.current;
+      lastLabelClickRef.current = { key, time: now };
+
+      // Windows Explorer slow second click on an already active folder's name (450ms - 2200ms)
+      if (isAlreadyActive && prev.key === key && now - prev.time >= 450 && now - prev.time <= 2200) {
+        e.stopPropagation();
+        startInlineRename(node);
+      }
+    },
+    [startInlineRename]
+  );
+
+  const handleFolderNameDoubleClick = useCallback(
+    (e: React.MouseEvent, node: NativePlace) => {
+      if (!canRenameFolder(node.path)) return;
+      e.stopPropagation();
+      e.preventDefault();
+      startInlineRename(node);
+    },
+    [canRenameFolder, startInlineRename]
   );
 
   // Handle right-click context menu preserving or setting multi-selection
@@ -356,7 +631,7 @@ export const NativeExplorerTree: React.FC<NativeExplorerTreeProps> = ({
     [onContextMenu, selectedOriginals, selectedPaths]
   );
 
-  // Keyboard navigation within tree (Arrow keys, Shift+Arrow, Ctrl+A, Key A)
+  // Keyboard navigation within tree (Arrow keys, Shift+Arrow, Ctrl+A, Key A, F2)
   const handleTreeKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLDivElement>) => {
       // Ignore if typing in text inputs
@@ -373,6 +648,19 @@ export const NativeExplorerTree: React.FC<NativeExplorerTreeProps> = ({
       // Check if dialog is open
       if (document.querySelector('[role="dialog"], .fixed.inset-0.z-50, .fixed.inset-0.z-60')) {
         return;
+      }
+
+      // F2: Inline rename active/selected folder in tree
+      if (e.key === 'F2' || e.code === 'F2') {
+        const visible = getVisibleNodes();
+        const targetKey = lastAnchor || (activePath ? norm(activePath) : null);
+        const found = targetKey ? visible.find((n) => norm(n.path) === targetKey) : null;
+        if (found && canRenameFolder(found.path)) {
+          e.preventDefault();
+          e.stopPropagation();
+          startInlineRename(found);
+          return;
+        }
       }
 
       // Key 'a' / 'A' without modifiers collapses all
@@ -443,7 +731,7 @@ export const NativeExplorerTree: React.FC<NativeExplorerTreeProps> = ({
         }
       }
     },
-    [activePath, collapseAll, getVisibleNodes, lastAnchor, onNavigate]
+    [activePath, canRenameFolder, collapseAll, getVisibleNodes, lastAnchor, onNavigate, startInlineRename]
   );
 
   // Global listener for key 'a' to collapse all folders when not in inputs
@@ -482,6 +770,7 @@ export const NativeExplorerTree: React.FC<NativeExplorerTreeProps> = ({
     const isActive = !!activePath && norm(activePath) === key;
     const isSelected = selectedPaths.has(key);
     const isDragTarget = dragOverNode === node.path;
+    const isEditing = editingNodePath !== null && norm(editingNodePath) === key;
     const kids = children[key];
     const isLeaf = kids && kids.length === 0;
 
@@ -494,7 +783,11 @@ export const NativeExplorerTree: React.FC<NativeExplorerTreeProps> = ({
     return (
       <div key={`${level}-${key}`} className="relative">
         <div
-          onClick={(e) => handleNodeClick(e, node)}
+          data-tree-node-key={key}
+          onClick={(e) => {
+            if (isEditing) return;
+            handleNodeClick(e, node);
+          }}
           onContextMenu={(e) => handleContextMenu(e, node)}
           data-drop-path={node.path}
           onDragOver={(e) => handleNodeDragOver(e, node.path)}
@@ -510,7 +803,7 @@ export const NativeExplorerTree: React.FC<NativeExplorerTreeProps> = ({
               : 'text-zinc-300 hover:bg-white/[0.05] hover:text-white'
           }`}
           style={{ paddingLeft: `${6 + level * 14}px` }}
-          title={node.path}
+          title={isDrive ? node.path : `${node.path}\n(Dvojklik na název složky pro přejmenování)`}
         >
           {/* Windows 11 Signature Left Pill Indicator for Active Selection */}
           {isActive && (
@@ -541,8 +834,39 @@ export const NativeExplorerTree: React.FC<NativeExplorerTreeProps> = ({
           {/* Windows 11 Fluent Icon */}
           {iconElement}
 
-          {/* Folder Name */}
-          <span className="truncate tracking-tight flex-1">{node.name}</span>
+          {/* Folder Name or Inline Rename Input */}
+          {isEditing ? (
+            <input
+              ref={renameInputRef}
+              type="text"
+              value={editingNameValue}
+              onChange={(e) => setEditingNameValue(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              onDoubleClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              onKeyDown={(e) => {
+                e.stopPropagation();
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  void commitInlineRename();
+                } else if (e.key === 'Escape') {
+                  e.preventDefault();
+                  cancelInlineRename();
+                }
+              }}
+              onBlur={() => void commitInlineRename()}
+              className="flex-1 min-w-0 bg-[#0d1117] text-white text-[12px] px-1.5 py-0.5 rounded border border-[#60cdff] outline-none font-normal shadow-inner select-text"
+            />
+          ) : (
+            <span
+              data-folder-name="true"
+              onClick={(e) => handleFolderNameClick(e, node, isActive)}
+              onDoubleClick={(e) => handleFolderNameDoubleClick(e, node)}
+              className="truncate tracking-tight flex-1"
+            >
+              {node.name}
+            </span>
+          )}
         </div>
 
         {/* Nested Subfolders with subtle Windows 11 tree connection guide */}
@@ -640,7 +964,13 @@ export const NativeExplorerTree: React.FC<NativeExplorerTreeProps> = ({
                     )}
                     <div className="flex items-center gap-2 truncate min-w-0">
                       <Win11Folder className="w-4 h-4 shrink-0" />
-                      <span className="truncate">{name}</span>
+                      <span
+                        data-folder-name="true"
+                        onDoubleClick={(e) => handleFolderNameDoubleClick(e, { name, path: favPath })}
+                        className="truncate"
+                      >
+                        {name}
+                      </span>
                     </div>
 
                     <div className="flex items-center gap-1 shrink-0 ml-1">
@@ -677,19 +1007,30 @@ export const NativeExplorerTree: React.FC<NativeExplorerTreeProps> = ({
     <div
       tabIndex={0}
       onKeyDown={handleTreeKeyDown}
-      className="border-b border-white/[0.06] pb-2 outline-none focus:outline-none"
+      className="flex flex-col flex-1 min-h-0 outline-none focus:outline-none"
     >
-      <div className="px-3.5 pt-3 pb-1.5 text-[11px] font-semibold tracking-wider text-zinc-400 uppercase flex items-center justify-between">
+      <div className="px-3.5 pt-3 pb-1.5 text-[11px] font-semibold tracking-wider text-zinc-400 uppercase flex items-center justify-between shrink-0 border-b border-white/[0.04]">
         <div className="flex items-center gap-2">
           <Win11ThisPC className="w-4 h-4" />
           <span>Tento počítač</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {selectedPaths.size > 1 && (
             <span className="text-[10px] text-[#60cdff] font-medium bg-[#60cdff]/10 px-1.5 py-0.5 rounded-[4px]">
               {selectedPaths.size} vybráno
             </span>
           )}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              void refreshTreeInPlace({ silent: false });
+            }}
+            className="p-1 text-zinc-400 hover:text-white rounded-[4px] hover:bg-white/[0.08] transition-all cursor-pointer"
+            title="Obnovit strom složek (zachová pozici na aktuální složce)"
+          >
+            <RefreshCw className={`w-3 h-3 ${isRefreshingTree ? 'animate-spin text-[#60cdff]' : ''}`} />
+          </button>
           <button
             type="button"
             onClick={collapseAll}
@@ -704,7 +1045,13 @@ export const NativeExplorerTree: React.FC<NativeExplorerTreeProps> = ({
           </button>
         </div>
       </div>
-      <div>
+      <div
+        ref={treeScrollRef}
+        onScroll={(e) => {
+          savedScrollTopRef.current = e.currentTarget.scrollTop;
+        }}
+        className="flex-1 overflow-y-auto pb-2"
+      >
         {places.map((p) => {
           const isPictures =
             p.name.toLowerCase().includes('obrázky') ||

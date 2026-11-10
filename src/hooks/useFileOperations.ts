@@ -342,10 +342,16 @@ export function useFileOperations({
           await renameFileNative(inputDialog.targetPath, value);
           addToast('Přejmenováno', `Nový název: ${value}`);
           if (nativeDir) await navigateNative(nativeDir);
+          window.dispatchEvent(
+            new CustomEvent('aerobridge:tree-refresh', { detail: { path: nativeDir || undefined, silent: true } })
+          );
         } else if (inputDialog.type === 'new-folder' && inputDialog.targetPath) {
           await createFolderNative(inputDialog.targetPath, value);
           addToast('Složka vytvořena', value);
           if (nativeDir) await navigateNative(nativeDir);
+          window.dispatchEvent(
+            new CustomEvent('aerobridge:tree-refresh', { detail: { path: nativeDir || undefined, silent: true } })
+          );
         } else if (inputDialog.type === 'confirm-delete' && inputDialog.targetPaths) {
           await handleExecuteDelete(inputDialog.targetPaths);
         }
@@ -356,6 +362,31 @@ export function useFileOperations({
       }
     },
     [inputDialog, nativeDir, navigateNative, handleExecuteDelete, addToast]
+  );
+
+  const handleInlineRenameAsset = useCallback(
+    async (asset: AssetItem, newName: string) => {
+      const trimmed = newName.trim();
+      if (!trimmed) return;
+      try {
+        if (isDesktopApp() && asset.fullPath) {
+          await renameFileNative(asset.fullPath, trimmed);
+          addToast('Přejmenováno', `Nový název: ${trimmed}`);
+          if (nativeDir) await navigateNative(nativeDir);
+          window.dispatchEvent(
+            new CustomEvent('aerobridge:tree-refresh', { detail: { path: nativeDir || undefined, silent: true } })
+          );
+        } else {
+          setAssets((prev) =>
+            prev.map((a) => (a.id === asset.id ? { ...a, name: trimmed } : a))
+          );
+          addToast('Přejmenováno', `Nový název: ${trimmed}`);
+        }
+      } catch (err) {
+        addToast('Přejmenování selhalo', String(err), 'warning');
+      }
+    },
+    [nativeDir, navigateNative, setAssets, addToast]
   );
 
   const handleDeleteSelected = useCallback(() => {
@@ -453,6 +484,7 @@ export function useFileOperations({
     handleCutFiles,
     handlePasteFiles,
     handleRenameRequest,
+    handleInlineRenameAsset,
     handleCreateFolderRequest,
     handleDeleteRequest,
     handleExecuteDelete,

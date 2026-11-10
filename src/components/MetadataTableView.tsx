@@ -26,6 +26,7 @@ interface MetadataTableViewProps {
   onThumbnailSizeChange?: (size: number) => void;
   fitMode?: 'cover' | 'contain';
   onMoveAssets?: (idsOrPaths: string[], targetFolder: string, isCopy?: boolean) => void;
+  onRename?: (asset: AssetItem, newName: string) => void;
 }
 
 const directImageExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg', 'bmp', 'ico', 'avif'];
@@ -47,8 +48,50 @@ export const MetadataTableView: React.FC<MetadataTableViewProps> = ({
   onThumbnailSizeChange,
   fitMode = 'cover',
   onMoveAssets,
+  onRename,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [editingId, setEditingId] = React.useState<string | null>(null);
+  const [editingValue, setEditingValue] = React.useState<string>('');
+  const renameInputRef = useRef<HTMLInputElement | null>(null);
+  const committingRenameRef = useRef<boolean>(false);
+
+  const startInlineRename = (asset: AssetItem, e?: React.MouseEvent) => {
+    if (!onRename) return;
+    e?.stopPropagation();
+    e?.preventDefault();
+    committingRenameRef.current = false;
+    setEditingId(asset.id);
+    setEditingValue(asset.name);
+    requestAnimationFrame(() => {
+      const input = renameInputRef.current;
+      if (input) {
+        input.focus();
+        const dotIdx = !asset.isFolder ? asset.name.lastIndexOf('.') : -1;
+        if (dotIdx > 0) {
+          input.setSelectionRange(0, dotIdx);
+        } else {
+          input.select();
+        }
+      }
+    });
+  };
+
+  const cancelInlineRename = () => {
+    committingRenameRef.current = false;
+    setEditingId(null);
+    setEditingValue('');
+  };
+
+  const commitInlineRename = (asset: AssetItem) => {
+    if (committingRenameRef.current) return;
+    committingRenameRef.current = true;
+    const trimmed = editingValue.trim();
+    setEditingId(null);
+    if (trimmed && trimmed !== asset.name && onRename) {
+      onRename(asset, trimmed);
+    }
+  };
 
   // Map thumbnailSize (100 - 460) smoothly to table row thumbnail size (28px - 110px)
   const thumbPx = Math.max(
@@ -206,13 +249,12 @@ export const MetadataTableView: React.FC<MetadataTableViewProps> = ({
                     if (!asset.isFolder || !asset.fullPath) return;
                     handleDropOnFolder(e, asset.fullPath);
                   }}
-                  className={`transition-colors cursor-pointer select-none ${
-                    isSelected
+                  className={`transition-colors cursor-pointer select-none ${isSelected
                       ? 'bg-[#282d38] text-white shadow-sm font-medium'
                       : isFocused
-                      ? 'bg-white/[0.06] text-white'
-                      : 'hover:bg-white/[0.03] text-zinc-300'
-                  }`}
+                        ? 'bg-white/[0.06] text-white'
+                        : 'hover:bg-white/[0.03] text-zinc-300'
+                    }`}
                 >
                   {/* Badge */}
                   <td className={`${cellPaddingClass} px-4 text-center align-middle`}>
@@ -274,15 +316,46 @@ export const MetadataTableView: React.FC<MetadataTableViewProps> = ({
                                 };
                               }
                             }}
-                            className={`w-full h-full ${
-                              asset.isIcon || !resolvedSrc || fitMode === 'contain'
+                            className={`w-full h-full ${asset.isIcon || !resolvedSrc || fitMode === 'contain'
                                 ? 'object-contain p-0.5'
                                 : 'object-cover'
-                            } transition-transform duration-150`}
+                              } transition-transform duration-150`}
                           />
                         </div>
                       )}
-                      <span className="truncate max-w-sm lg:max-w-md xl:max-w-xl text-xs">{asset.name}</span>
+                      {editingId === asset.id ? (
+                        <input
+                          ref={renameInputRef}
+                          type="text"
+                          value={editingValue}
+                          onChange={(e) => setEditingValue(e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                          onDoubleClick={(e) => e.stopPropagation()}
+                          onMouseDown={(e) => e.stopPropagation()}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => {
+                            e.stopPropagation();
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              commitInlineRename(asset);
+                            } else if (e.key === 'Escape') {
+                              e.preventDefault();
+                              cancelInlineRename();
+                            }
+                          }}
+                          onBlur={() => commitInlineRename(asset)}
+                          className="bg-[#0d1117] text-white text-xs font-medium px-2 py-1 rounded border border-[#60cdff] outline-none shadow-inner select-text min-w-[220px]"
+                        />
+                      ) : (
+                        <span
+                          data-rename-label="true"
+                          onDoubleClick={(e) => startInlineRename(asset, e)}
+                          className="truncate max-w-sm lg:max-w-md xl:max-w-xl text-xs px-1 py-0.5 -mx-1 rounded hover:bg-white/[0.06] cursor-text"
+                          title={`${asset.name} (Dvojklik na název pro přejmenování)`}
+                        >
+                          {asset.name}
+                        </span>
+                      )}
                     </div>
                   </td>
 

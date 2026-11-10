@@ -27,10 +27,6 @@ export function endDragSession(graceMs = 1500): void {
   }, graceMs);
 }
 
-export function hasDragSession(): boolean {
-  return sessionPaths !== null && sessionPaths.length > 0;
-}
-
 const looksLikePath = (s: string) => /[\\/:]/.test(s);
 
 /**
